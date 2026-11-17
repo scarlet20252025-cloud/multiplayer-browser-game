@@ -1,0 +1,17 @@
+node_modules/
+local/
+private-games/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+*.log
+playwright-report/
+test-results/
+# Original game archives and generated extracts stay outside the public repository.
+*.zip
+*.7z
+*.rar
+*.har
+# The authored test SWF is intentionally included; original games are not.
