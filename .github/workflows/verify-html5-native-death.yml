@@ -6,6 +6,7 @@ on:
     paths:
       - 'scripts/verify-html5-native-death.mjs'
       - 'server/html5-scene-guard.mjs'
+      - 'adapters/fireboy-html5/authority-input.mjs'
       - '.github/workflows/verify-html5-native-death.yml'
   workflow_dispatch:
 

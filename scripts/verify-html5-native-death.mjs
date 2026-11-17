@@ -68,11 +68,12 @@ try{
   result.deathMarker=deadMarker;
   result.roomSuspended=app.room.suspendedReason!==null;
   result.lifecycle=fire.events.find(e=>e.type==='lifecycle')??null;
-  result.suspendedReason=app.room.suspendedReason;
   if(!sawNativeDeath)
     throw Error('No actual native character dead/dying flag observed on this input route');
   result.checks.push('original-character-entered-dead-or-dying');
   await until(()=>app.room.suspendedReason!==null,12000);
+  result.suspendedReason=app.room.suspendedReason;
+  result.room=app.room.publicState();
   if(!['CHARACTER_DEAD','CHARACTER_DYING','LEVEL_ENDED',
         'LEVEL_EPOCH_CHANGED','NATIVE_SCENE_CHANGED'].includes(app.room.suspendedReason))
     throw Error('Native death did not result in a recognized room lifecycle boundary');

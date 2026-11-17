@@ -5,6 +5,8 @@ on:
     branches: ['work/flash-netplay-lab']
     paths:
       - 'adapters/fireboy-html5/spectator-*.mjs'
+      - 'adapters/fireboy-html5/authority-input.mjs'
+      - 'server/html5-scene-guard.mjs'
       - 'server/html5-research-room.mjs'
       - 'server/html5-room-core.mjs'
       - 'adapters/fireboy-html5/state-snapshot.mjs'
