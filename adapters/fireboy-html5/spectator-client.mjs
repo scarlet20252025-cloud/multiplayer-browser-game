@@ -9,13 +9,13 @@ import {installHtml5Spectator} from './spectator-projection.mjs';
 export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}){
   if(!game?.level||typeof wsUrl!=='string'||!/^wss?:\/\//.test(wsUrl))
     throw new TypeError('Loaded game and WebSocket URL required');
-  const projection=installHtml5Spectator(game,{devices});
+  let projection=installHtml5Spectator(game,{devices});
   const ws=new WebSocket(wsUrl);
   const keys=new Set();
   let seq=0,commandSeq=0,closed=false,seat=null,room=null,roomEpoch=null,
     initial=false,latestState=null,lastApply=null,lastError=null,frames=0,
-    lifecycle=null;
-  let jumpHeld=false,edgePressed=0,edgeReleased=0;
+    lifecycle=null,roundNumber=0,resetting=false;
+  let jumpHeld=false,edgePressed=0,edgeReleased=0,latestBuildSha256=null;
   const statusListeners=new Set();
   const notify=()=>{
     const current=status();
@@ -25,7 +25,7 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     if(ws.readyState!==WebSocket.OPEN||closed)return false;
     ws.send(JSON.stringify(value));return true;
   };
-  const allowedKeys=new Set(['ArrowLeft','ArrowRight','ArrowUp','KeyA','KeyD','KeyW','Space','KeyP']);
+  const allowedKeys=new Set(['ArrowLeft','ArrowRight','ArrowUp','KeyA','KeyD','KeyW','Space','KeyP','KeyR']);
   function moveDirection(){
     const left=keys.has('ArrowLeft')||keys.has('KeyA');
     const right=keys.has('ArrowRight')||keys.has('KeyD');
@@ -39,7 +39,7 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     jumpHeld=down;
   }
   function sendInput(){
-    if(closed||lifecycle||seat===null||!room?.bothReady||room.effectivePaused)return false;
+    if(closed||resetting||lifecycle||seat===null||!room?.bothReady||room.effectivePaused)return false;
     reconcileEdges();
     const packet={type:'input',seq:seq++,moveX:moveDirection(),moveY:0,
       buttons:jumpHeld?1:0,pressed:edgePressed,released:edgeReleased};
@@ -48,14 +48,24 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     return true;
   }
   function issuePause(){
-    if(!room?.bothReady||roomEpoch===null||closed||lifecycle)return;
+    if(!room?.bothReady||roomEpoch===null||closed||lifecycle||resetting)return;
     send({type:'room-command',command:'pause.set',
       roomEpoch,commandId:'view-'+seat+'-'+(++commandSeq),
       baseRevision:room.pauseRevision,desiredPaused:!room.userPaused});
   }
+  function requestRestart(){
+    if(closed||resetting||roomEpoch===null||seat===null||
+       (!lifecycle&&!room?.suspendedReason))return false;
+    return send({type:'room-command',command:'round.restart.vote',
+      roomEpoch,roundNumber,commandId:'view-'+seat+'-restart-'+(++commandSeq)});
+  }
   function keyDown(event){
     if(!allowedKeys.has(event.code))return;
     event.preventDefault();
+    if(event.code==='KeyR'){
+      if(!event.repeat)requestRestart();
+      return;
+    }
     if(event.code==='KeyP'){
       if(!event.repeat)issuePause();
       return;
@@ -71,19 +81,87 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     keys.clear();reconcileEdges();sendInput();
   }
   function status(){
-    return {seat,room,initial,frames,lastError,lifecycle,
+    return {seat,room,initial,frames,lastError,lifecycle,roundNumber,resetting,
       latestSeq:latestState?.snapshot?.snapshotSeq??null,
       lastApply,readyState:ws.readyState,viewerGamePaused:game.paused};
+  }
+  async function applyRoundReset(message){
+    if(message.roomEpoch!==roomEpoch ||
+       !Number.isSafeInteger(message.roundNumber) ||
+       message.roundNumber!==roundNumber+1 ||
+       message.snapshot?.schemaVersion!==1 ||
+       message.snapshot?.sessionEpoch!==roomEpoch ||
+       !Number.isSafeInteger(message.levelEpoch) ||
+       message.levelEpoch!==message.snapshot.levelEpoch ||
+       typeof message.gameSha256!=='string' ||
+       message.gameSha256!==latestBuildSha256)
+      throw Error('Wrong restart round, session, or source build');
+    if(resetting)throw Error('Concurrent restart refused');
+    resetting=true;
+    keys.clear();jumpHeld=false;edgePressed=0;edgeReleased=0;
+    const oldLevel=game.level;
+    try{
+      projection.uninstall();
+      // The existing native retry() must run its own Phaser scene transition.
+      // No character location, physics body or gameplay status is fabricated.
+      game.paused=false;
+      if(typeof oldLevel?.retry!=='function')throw Error('Native retry missing from spectator');
+      oldLevel.retry.call(oldLevel);
+      const deadline=Date.now()+45000;
+      while(Date.now()<deadline){
+        if(game.state?.current==='level'&&!game.state.fading &&
+           game.level?.levelStarted && game.level?.pers1?.body &&
+           game.level?.pers2?.body &&
+           (game.level!==oldLevel || game.level.pers1!==oldLevel.pers1 ||
+            game.level.root!==oldLevel.root))break;
+        await new Promise(resolve=>setTimeout(resolve,40));
+      }
+      if(!(game.state?.current==='level'&&game.level?.levelStarted&&
+           game.level?.pers1?.body&&game.level?.pers2?.body&&
+           (game.level!==oldLevel || game.level.pers1!==oldLevel.pers1 ||
+            game.level.root!==oldLevel.root)))
+        throw Error('Native viewer retry did not rebuild scene within deadline');
+      projection=installHtml5Spectator(game,{devices});
+      lastApply=projection.initialize(message.snapshot);
+      initial=true;
+      latestState={snapshot:message.snapshot};
+      frames++;
+      roundNumber=message.roundNumber;
+      seq=0;
+      resetting=false;
+      lifecycle=null;
+      room=message.room;
+      lastError=null;
+      if(!send({type:'ready',roundNumber}))
+        throw Error('Could not acknowledge restarted viewer round');
+      notify();
+    }catch(err){
+      resetting=false;
+      lifecycle={reason:'ROUND_RESET_FAILED',message:err.message,
+        levelEpoch:message.levelEpoch};
+      lastError='ROUND_RESET_FAILED: '+err.message;
+      notify();
+      throw err;
+    }
   }
   ws.onmessage=event=>{
     let message;
     try{message=JSON.parse(event.data);}catch{lastError='BAD_JSON';notify();return;}
     if(message.type==='welcome'){
       seat=message.slot;roomEpoch=message.room?.roomEpoch;
+      latestBuildSha256=message.gameSha256;
       if(seat!==0&&seat!==1){lastError='INVALID_SEAT';notify();return;}
-      room=message.room;send({type:'ready'});notify();return;
+      room=message.room;roundNumber=room.roundNumber??0;
+      send({type:'ready',roundNumber});notify();return;
     }
     if(message.type==='room'){room=message.room;notify();return;}
+    if(message.type==='round-reset'){
+      void applyRoundReset(message).catch(error=>{
+        lastError='ROUND_RESET_FAILED: '+error.message;
+        notify();
+      });
+      return;
+    }
     if(message.type==='lifecycle'){
       if(message.roomEpoch!==roomEpoch||
         typeof message.reason!=='string'||!/^[-A-Z_]{3,64}$/.test(message.reason)){
@@ -128,6 +206,6 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     window.removeEventListener('blur',blur);
     ws.close();projection.uninstall();notify();
   }
-  return Object.freeze({status,onStatus,close,sendInput,projection,
-    lastSnapshot:()=>latestState?.snapshot??null});
+  return Object.freeze({status,onStatus,close,sendInput,requestRestart,
+    get projection(){return projection;},lastSnapshot:()=>latestState?.snapshot??null});
 }
