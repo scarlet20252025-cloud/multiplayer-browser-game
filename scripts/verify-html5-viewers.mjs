@@ -225,6 +225,33 @@ try{
   assert.equal((await viewerState(first)).worldSteps,initialPhysics[0]);
   assert.equal((await viewerState(second)).worldSteps,initialPhysics[1]);
   pass('no-client-physics-resumed',{steps:initialPhysics});
+  // Test actual keyboard P on the web spectator, not a synthetic room command.
+  await first.keyboard.press('KeyP');
+  await until(async()=>{
+    const view=await viewerState(first);
+    return authority.room.userPaused===true &&
+      view.state.room?.userPaused===true ?view:null;
+  },10000);
+  assert.equal((await authority.readAuthority()).gamePaused,true);
+  assert.equal(authority.room.pauseRevision,1);
+  pass('browser-key-P-pauses-authority',{revision:1,gamePaused:true});
+  await second.keyboard.press('KeyP');
+  await until(async()=>{
+    const view=await viewerState(second);
+    return authority.room.userPaused===false &&
+      view.state.room?.pauseRevision===2 && !view.state.room.effectivePaused ?view:null;
+  },10000);
+  assert.equal((await authority.readAuthority()).gamePaused,false);
+  pass('other-browser-key-P-resumes-authority',{revision:2,gamePaused:false});
+  // Explicit spectator.close sends leave before marking the socket closed.
+  await second.evaluate(()=>window.__spec.close());
+  await until(async()=>{
+    const view=await viewerState(first);
+    return authority.room.effectivePaused && view.state.room?.bothReady===false &&
+      view.state.room?.connected?.[1]===false ?view:null;
+  },10000);
+  assert.equal((await authority.readAuthority()).gamePaused,true);
+  pass('browser-leave-pauses-authority',{seatLeft:1,gamePaused:true});
   report.status='passed';
 }catch(error){report.status='failed';report.errors.push(String(error.stack||error));}
 finally{
