@@ -69,8 +69,19 @@ async function readContainedFile(root, relative) {
   } finally { await handle.close(); }
 }
 
-function authoredPage(script, requireScript) {
+function authoredPage(script, requireScript, playerConfig=null) {
   const scriptUrl = script.split('/').map(encodeURIComponent).join('/');
+  const playerEntry=playerConfig?JSON.stringify(playerConfig).replace(/</g,'\\u003c').replace(/&/g,'\\u0026'):null;
+  const playerUi=playerEntry?`
+<aside id="research-player-hud" style="position:fixed;top:8px;right:8px;z-index:2147483646;background:#101b27eb;border:1px solid #3a5268;color:#f2f7ff;font:13px sans-serif;border-radius:9px;padding:10px;min-width:210px">
+<div style="font-weight:bold">本地双人研究室 · 非公开发行</div>
+<div id="research-player-status" aria-live="polite">正在初始化原生关卡…</div>
+<div style="font-size:11px;color:#c6d5e3">A/D 或 ←/→ 移动 · W/↑/Space 跳跃</div>
+<div style="font-size:11px;color:#c6d5e3">P 暂停 · 双方按 R 同意重开</div>
+<button id="research-player-restart" disabled type="button">同意重开 (R)</button>
+</aside>
+<script type="application/json" id="research-player-config">${playerEntry}</script>
+<script type="module" src="/__research__/local-player.mjs"></script>`:'';
   return `<!doctype html>
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -80,6 +91,7 @@ function authoredPage(script, requireScript) {
 <div id="root"><div id="container"></div><div id="hammer"></div><div id="debug-fps"></div></div>
 <div id="research-notice">Instrumented research harness · 非原包基准</div>
 <script data-main="/${scriptUrl}" src="/${requireScript}"></script>
+${playerUi}
 </body></html>\n`;
 }
 
@@ -87,7 +99,7 @@ function authoredPage(script, requireScript) {
  * @param {{root:string,script:string,port?:number}} options
  * @returns {Promise<{url:string,sourceSha256:string,servedSha256:string,sourceBytes:number,close:()=>Promise<void>}>}
  */
-export async function startHtml5ResearchHost({root, script, port = 0, requireScript = REQUIRE_SCRIPT, entryPath = '/'} = {}) {
+export async function startHtml5ResearchHost({root, script, port = 0, requireScript = REQUIRE_SCRIPT, entryPath = '/', autoJoinWsUrl=null, autoJoinLevelId=1} = {}) {
   if (typeof root !== 'string' || !root.trim()) throw failure('HTML5_ROOT_REQUIRED', 'Provide the private first-game directory with --root.');
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw failure('HTML5_INVALID_PORT', 'port must be an integer from 0 to 65535.');
   script = relativePath(script);
@@ -96,6 +108,11 @@ export async function startHtml5ResearchHost({root, script, port = 0, requireScr
   if (typeof entryPath !== 'string' || !entryPath.startsWith('/') || entryPath.startsWith('//')) throw failure('HTML5_INVALID_ENTRY', 'entryPath must be a URL path');
   if (entryPath !== '/') relativePath(entryPath.slice(1));
   if (path.extname(script) !== '.js') throw failure('HTML5_INVALID_SCRIPT', 'script must identify a .js file inside the selected root.');
+  if(autoJoinWsUrl!==null){
+    if(typeof autoJoinWsUrl!=='string'||!/^ws:\/\/127\.0\.0\.1:\d+\/ws$/.test(autoJoinWsUrl)||
+       !Number.isSafeInteger(autoJoinLevelId)||autoJoinLevelId<1)
+      throw failure('HTML5_INVALID_AUTO_JOIN','Only a local loopback WebSocket and positive level ID may auto join');
+  }
   const gameRoot = path.resolve(root);
   let source;
   try { source = await readContainedFile(gameRoot, script); }
@@ -118,7 +135,8 @@ export async function startHtml5ResearchHost({root, script, port = 0, requireScr
   if (occurrences !== 1) throw failure('HTML5_INSTANCE_ANCHOR_COUNT', `Expected exactly one Game instance anchor; found ${occurrences}. No source was changed.`);
   const served = Buffer.from(text.replace(INSTANCE_ANCHOR, INSTANCE_EXPOSURE), 'utf8');
   const sourceSha256 = sha256(source), servedSha256 = sha256(served), sourceBytes = source.length;
-  const html = Buffer.from(authoredPage(script, requireScript), 'utf8');
+  const html = Buffer.from(authoredPage(script, requireScript,
+    autoJoinWsUrl?{wsUrl:autoJoinWsUrl,levelId:autoJoinLevelId}:null), 'utf8');
   const manifest = Buffer.from(JSON.stringify({schema:1, kind:'instrumented-research-harness', originalPackageBaseline:false,
     script, requireScript, entryPath, sourceSha256, servedSha256, sourceBytes,
     transformation:'Expose the existing Game instance as window.__game in the HTTP response only; original files unchanged.'}) + '\n');
@@ -144,6 +162,9 @@ export async function startHtml5ResearchHost({root, script, port = 0, requireScr
       catch { throw failure('HTML5_INVALID_ENCODING', 'Invalid URL encoding.'); }
       if (pathname === entryPath || (entryPath === '/' && pathname === '/index.html')) return send(200, 'text/html; charset=utf-8', html);
       if (pathname === '/__research__/manifest') return send(200, 'application/json; charset=utf-8', manifest);
+      if (pathname === '/__research__/local-player.mjs'&&autoJoinWsUrl)
+        return send(200,'text/javascript; charset=utf-8',
+          await readContainedFile(REPO_ROOT,'scripts/html5-local-player.mjs'));
       const relative = relativePath(pathname.slice(1));
       if (relative.startsWith(MODULE_PREFIX)) {
         const name = relative.slice(MODULE_PREFIX.length);
