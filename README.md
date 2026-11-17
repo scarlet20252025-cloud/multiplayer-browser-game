@@ -118,7 +118,11 @@ python3 scripts/audit_fireboy.py \
 
 | 路径 | 内容 |
 | --- | --- |
-| [本地 Agent 交接任务](docs/LOCAL_AGENT_HANDOFF.md) | 补齐原游戏材料、复现基准、提交结果及回报格式；可直接交给本地 Agent 执行 |
+| [**交接给下一个 Agent**](docs/HANDOFF_TO_NEXT_AGENT.md) | **从这里开始**：当前状态、已验证结论、待做清单、代码位置速查、已踩过的坑 |
+| [HTML5 路线验证](docs/HTML5_ROUTE_FINDINGS.md) | HTML5 版 6 部实机运行、Node 可运行性、输入路径定位、输入桥验证 |
+| [本地 Agent 交接任务](docs/LOCAL_AGENT_HANDOFF.md) | 上一轮的任务书（补材料、跑基准），已完成 |
+| [本地 Agent 检查结论](docs/LOCAL_AGENT_FINDINGS.md) | 材料核对、两款 Flash 原包的基准结果、探针复现 |
+| [原游戏材料](docs/ORIGINAL_GAME_MATERIALS.md) | 原包放置方式、入口、依赖关系、重建条件 |
 | [架构决策](docs/ARCHITECTURE_DECISION.md) | 非视频同步路线、取舍、原游戏改造与验收顺序 |
 | [实际验证报告](docs/VERIFICATION_REPORT.md) | CI 来源、通过项、延迟/载荷测量及未覆盖范围 |
 | [自建服务器部署](docs/DEPLOYMENT.md) | 单机、局域网、公网代理和指标边界 |
