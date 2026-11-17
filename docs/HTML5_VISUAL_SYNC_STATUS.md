@@ -68,3 +68,7 @@ node scripts/verify-html5-viewers.mjs --root "E:\肥鱼不乐园\flash-archive\0
 火属性钻石的权威坐标为 (656, 848)，本轮有 8 组火娃轨迹样本。完整 JSON 留在该 CI 的 [artifact](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44074232490)（存储期限受 GitHub Actions 设定限制），持续保留的数值摘要在 `evidence/html5/44074232490/collection-summary.json`。本轮合计 12 项浏览器断言通过，6 次已知 `h5api is not defined` 进度错误仍记录，不能说完全无错误。
 
 **仍未验证**：已收集后新玩家重进场时的钻石映射、实际推箱子、按钮/杠杆联动、死亡重开、关卡完成与用户上传原包。后续测试必须针对真实玩法事件，不得通过直接设角色坐标或调用触发方法绕过玩法。
+
+## 2026-11-17 — 晚加入钻石恢复与重新接管
+
+真实测试首先发现后加入浏览器错误显示 7 颗钻石（权威只剩 6），见 [CI #44074796969](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44074796969)；已通过初始钻石稳定登记表和 tombstone 修复。最新 [CI #44076714653](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44076714653) 14 项通过，涵盖真实拾取、晚加入显示与按键重新接管水娃，详细见 [HTML5_REJOIN_FIX.md](HTML5_REJOIN_FIX.md)。
