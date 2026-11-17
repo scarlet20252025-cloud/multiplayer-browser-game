@@ -14,6 +14,7 @@ on:
       - 'tests/html5-spectator-projection.test.mjs'
       - 'scripts/html5-research-host.mjs'
       - 'scripts/verify-html5-viewers.mjs'
+      - 'scripts/verify-html5-round-restart.mjs'
       - '.github/workflows/verify-html5-viewers.yml'
   workflow_dispatch:
 
@@ -23,7 +24,7 @@ permissions:
 jobs:
   viewers:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 22
     steps:
       - name: Check out authored code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,11 +56,21 @@ jobs:
           --script js/init.eb02fbdab2aa1d24.js
           --expected-sha256 337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677
           --out local/html5-viewer-results
+      - name: Two native browsers vote and safely restart their game round
+        if: always()
+        run: >-
+          node scripts/verify-html5-round-restart.mjs
+          --root local/html5-candidate/output/A
+          --script js/init.eb02fbdab2aa1d24.js
+          --expected-sha256 337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677
+          --out local/html5-round-restart
       - name: Save only authored observations
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: html5-frozen-viewer-observations
-          path: local/html5-viewer-results/*.json
+          path: |
+            local/html5-viewer-results/*.json
+            local/html5-round-restart/*.json
           if-no-files-found: warn
           retention-days: 14
