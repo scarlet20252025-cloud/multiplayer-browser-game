@@ -82,7 +82,7 @@ async function openViewer(){
     world.Step=function(...args){window.__localPhysicsSteps++;return Reflect.apply(native,this,args);};
     window.__spec=connectHtml5Spectator({game:__game,wsUrl,devices:window.Devices});
   },authority.url.replace(/^http/,'ws')+'/ws');
-  await page.waitForFunction(()=>window.__spec?.status().initial===true,null,{timeout:20000});
+  await page.waitForFunction(()=>window.__spec?.status().seat!==null,null,{timeout:20000});
   return page;
 }
 try{
@@ -97,6 +97,8 @@ try{
   browser=await chromium.launch({timeout:20000});
   const first=await openViewer();
   const second=await openViewer();
+  await Promise.all([first,second].map(page=>
+    page.waitForFunction(()=>window.__spec?.status().initial===true,null,{timeout:20000})));
   const [a,b]=await Promise.all([viewerState(first),viewerState(second)]);
   assert.equal(a.state.seat,0);assert.equal(b.state.seat,1);
   assert.equal(a.state.initial,true);assert.equal(b.state.initial,true);
