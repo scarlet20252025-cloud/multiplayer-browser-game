@@ -26,13 +26,13 @@
 
 真实浏览器验证使用独立工作流 `Verify HTML5 candidate adaptation`。首轮 [CI 44049102258](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44049102258) 已真实运行第一关，暂停拦截、状态导出为 passed；跳跃的原始报告为 blocked，整轮工作流因此失败。原始 JSON 保存在 [evidence/html5/44049102258-1](../evidence/html5/44049102258-1/)，不修改其原状态。工作流仅在临时忽略目录取固定候选，产物只上传生成的 JSON；不上传原包、HTML、JS、素材或游戏截图。
 
-首轮跳跃阻塞来自观察器边界判定：同一 `performance.now()` 时间戳下，按下前的 phase-boundary 与按下后的 input-write 先后相邻；按时间筛选误纳入了前者。判定器现按样本顺序确定窗口，窗口内任何松开仍阻塞。两个针对性回归通过；原始轨迹只读重分析为 passed，仍等待修复后全流程的新 CI 结果，不覆盖首轮报告。
+首轮跳跃阻塞来自观察器边界判定：同一 `performance.now()` 时间戳下，按下前的 phase-boundary 与按下后的 input-write 先后相邻；按时间筛选误纳入了前者。判定器现按样本顺序确定窗口，窗口内任何松开仍阻塞。两个针对性回归通过；原始轨迹只读重分析为 passed，修复后第二轮真实浏览器 [CI 44049750845](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44049750845) 已通过三项任务；首轮 blocked 报告照旧保留。
 
 诊断中保留了 3 次已知 `h5api is not defined`，仅固定源码 SHA、52779 行的 `h5api.progress` 加载进度回调归为已解释项。加载进度 UI 和该平台 SDK 未验证，也未注入 stub；总 passed 不代表页面零异常。其他未知页面异常、console error、资源失败和观察器错误会阻止总 passed。
 
 | 任务 | 已完成的代码与静态结果 | 本轮浏览器状态 |
 | --- | --- | --- |
-| 跳跃边沿 | 记录真实 Box2D Step 后的 body.y、输入、锁存和接地；完成轨迹判定器 | 首轮 blocked（判定器边界）；修复后原轨迹重分析 passed，等待新 CI |
+| 跳跃边沿 | 记录真实 Box2D Step 后的 body.y、输入、锁存和接地；完成轨迹判定器 | 首轮 blocked（保留原报告）；修复后 CI #2 passed（对应固定研究候选） |
 | P 暂停拦截 | 确认 game.paused 与 Box2D.paused 不同；P/HUD/Resume 统一请求接口 | 候选第一关 CI passed；不是生产房间传输验收 |
 | 状态导出 | 已定位真实容器，导出角色/钻石/门/杠杆/按钮/平台观察及差异 | 候选第一关 CI passed；2角色、7钻石、2门、5机关 |
 
@@ -121,3 +121,11 @@ Linux 同样使用 `node` 命令，调整 --root；浏览器系统依赖可用 `
 本轮结束后仍需正式接入房间命令、角色输入消费和状态广播，并实现客户端显示应用与规则隔离，再做真实双客户端及异地网络验收。不会因为状态能导出就把整款原游戏标成已联机。
 
 Windows 提取器夹具的换行哈希缺陷已修复：测试夹具改为写确切 UTF-8 字节，保持原始字节哈希约定。本轮 Linux 13/13 通过；当前容器没有 Windows 实机，不另写 Windows 已实测通过。
+
+## 8. 2026-11-17：用户上传 ZIP 的核对状态
+
+用户已通过会话附件提供 `html5-online-20261117.zip`（26,432,078 字节）。这和 GitHub Actions 使用的固定第三方研究候选**不是同一来源**。此前人工检查指出游戏脚本与候选有默认输入模式、换行格式的差异，但当前执行容器无法访问 ZIP 内容进行新一轮逐字节审计，所以**没有填写用户原包 SHA-256，更没有把候选的测试结果移植成原包 passed**。
+
+新增只读 `scripts/audit_html5_zip.py` 和 `docs/HTML5_UPLOAD_AUDIT.md`：从私人 ZIP 生成六部游戏脚本路径、原始字节哈希、归一化换行哈希和逐文件清单；只产生 JSON，不解包或上传原游戏。其 5 项原创 ZIP 夹具测试连同既有测试在 [GitHub Actions 44053863463](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44053863463) 通过，Python 总计 18 项通过，UTF-8 检查通过。**这证明审计工具在原创夹具上可运行，并非已经在用户 ZIP 上执行。**
+
+对用户原包的独立验收仍需：运行上述脚本、保存报告，核对 `game.js` 哈希；在未修改入口上另做播放基准；随后用 `scripts/verify-html5-adaptation.mjs` 检查三项行为，并单独记录服务端两席位联机。原包和第三方游戏资产不进入公开仓库。
