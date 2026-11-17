@@ -215,6 +215,9 @@ try{
     throw Error('Viewer physics advanced after native restarted projection');
   const authorityNow=(await authority.readAuthority()).snapshot;
   const expectedX=authorityNow.characters.find(x=>x.slot===1)?.display?.x;
+  report.restartPostMotion={expectedX,initialWater,
+    stableA:{waterX:stableA.waterX,snapshotX:stableA.waterSnapshotX,seq:stableA.status?.latestSeq},
+    stableB:{waterX:stableB.waterX,snapshotX:stableB.waterSnapshotX,seq:stableB.status?.latestSeq}};
   if(!Number.isFinite(expectedX)||
      expectedX<=initialWater+15 ||
      !Number.isFinite(stableA.waterSnapshotX) ||
@@ -243,6 +246,7 @@ finally{
     checks:report.checks,
     restartAfter:report.status==='blocked'?report.restartAfter:undefined,
     restartInputDiagnostic:report.status==='blocked'?report.restartInputDiagnostic:undefined,
+    restartPostMotion:report.status==='blocked'?report.restartPostMotion:undefined,
     restartDuringKey:report.status==='blocked'?report.restartDuringKey:undefined,
     restartAfterHold:report.status==='blocked'?report.restartAfterHold:undefined,
     errors:report.errors}));

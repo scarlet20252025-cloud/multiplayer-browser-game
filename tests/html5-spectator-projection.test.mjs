@@ -152,3 +152,24 @@ test('native viewer never executes Box2D world.Step even after delayed game upda
   world.Step(.016,8,3);
   assert.equal(nativeSteps,1);
 });
+
+
+test('frozen native spectator refreshes display transforms BEFORE rendering the new authority frame',()=>{
+  const f=fixture();
+  const order=[];
+  f.game.stage={updateTransform(){order.push(['transform',f.level.pers1.sprite.x]);}};
+  f.game.renderer={render(stage){
+    assert.equal(stage,f.game.stage);
+    order.push(['render',f.level.pers1.sprite.x]);
+  }};
+  const projector=installHtml5Spectator(f.game,{devices:f.devices});
+  projector.initialize(f.snapshot);
+  order.length=0;
+  projector.apply({...f.snapshot,snapshotSeq:2,characters:[
+    {...f.snapshot.characters[0],display:{...f.snapshot.characters[0].display,x:243}},
+    f.snapshot.characters[1]
+  ]});
+  assert.deepEqual(order,[['transform',243],['render',243]]);
+  assert.equal(f.game.paused,true);
+  projector.uninstall();
+});

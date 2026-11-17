@@ -223,8 +223,12 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       if(mapped.category==='diamonds'&&!found.has(id)){mapped.object.visible=false;hidden++;}
     }
     lastSeq=snapshot.snapshotSeq;
-    // Paint the current native scene graph explicitly while the spectator's
-    // Phaser gameplay and Box2D world remain frozen.
+    // Native Phaser normally refreshes PIXI worldTransform in updateLogic,
+    // which is deliberately frozen for spectators. Rendering without it can
+    // show old sprites even when sprite.x/y match the authoritative snapshot.
+    // Updating display transforms is side-effect-free for Box2D physics.
+    if(game.stage && typeof game.stage.updateTransform==='function')
+      game.stage.updateTransform();
     if(game.renderer?.render&&game.stage)
       game.renderer.render(game.stage);
     return {accepted:true,snapshotSeq:lastSeq,applied,hiddenDiamonds:hidden,unknownEntities:unknown,
