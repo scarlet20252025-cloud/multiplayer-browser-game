@@ -76,3 +76,7 @@ node scripts/verify-html5-viewers.mjs --root "E:\肥鱼不乐园\flash-archive\0
 ## 2026-11-17：实际推箱子与联动平台的三浏览器回归
 
 [CI #44084005637](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44084005637) 真实让水娃踩下 group2 按钮，并继续向左推动动态箱子。服务器侧原生箱子从 X≈1039.998 到 X≈962.904；两份冻结观看端在随后同一权威状态中显示箱子 X≈979.847，客户端物理仍为零。事件时刻不同，不可误报为服务器/客户端延迟误差。完整字段、来源版本和未完成项详见 [HTML5_BOX_PUSH.md](HTML5_BOX_PUSH.md)。
+
+## 2026-11-17：按钮复位及动态箱子双端最终收敛（两轮成功）
+
+[CI #44085651969](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44085651969) 运行及第二次重跑都 passed：原游戏按钮离开后回到 state=0，平台 Y≈912；两个冻结的游戏画面同步返回，箱子在连续运动后最终收敛到同一位置，且与权威状态相符。首轮箱子 X 898.216/898.216（权威 898.194）；第二轮 906.906/906.906（权威 906.906）。两端 Box2D 步进始终 0。查看 [HTML5_BOX_PUSH.md](HTML5_BOX_PUSH.md) 的复现与证据边界，聚合数据在 `evidence/html5/44085651969/reset-convergence-summary.json`。此结果不代表用户上传游戏原包已在浏览器验收。
