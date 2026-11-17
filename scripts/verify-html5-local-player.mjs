@@ -53,8 +53,14 @@ try{
       catch{return route.abort();}
     });
   }
-  await Promise.all([fire.goto(app.url,{waitUntil:'domcontentloaded'}),
-    water.goto(app.url,{waitUntil:'domcontentloaded'})]);
+  // Avoid three concurrent native Phaser loads on a constrained CI runner.
+  // The authority is already loaded; join the first real page, then the second.
+  await fire.goto(app.url,{waitUntil:'domcontentloaded'});
+  await until(async()=>{
+    const first=await read(fire);
+    return first.player?.seat===0?first:null;
+  },70000);
+  await water.goto(app.url,{waitUntil:'domcontentloaded'});
   await until(async()=>{
     const [a,b]=await Promise.all([read(fire),read(water)]);
     return a.player?.initial&&b.player?.initial&&
@@ -88,13 +94,26 @@ try{
   const known=report.errorsFromPages.filter(x=>x!=='h5api is not defined');
   if(known.length)throw Error('Unexpected source errors: '+known.join('; '));
   report.status='passed';
-}catch(error){report.errors.push(String(error.stack??error));}
+}catch(error){
+  report.errors.push(String(error.stack??error));
+  report.failureDiagnostics={};
+  try{
+    for(const [i,page] of (browser?.contexts()?.[0]?.pages()??[]).entries()){
+      report.failureDiagnostics['page'+i]={
+        url:page.url(),status:await read(page),
+        gameState:await page.evaluate(()=>window.__game?.state?.current??null).catch(()=>null)
+      };
+    }
+  }catch(err){report.failureDiagnostics.error=String(err);}
+}
 finally{
   await browser?.close().catch(error=>report.errors.push(String(error)));
   await app?.close().catch(error=>report.errors.push(String(error)));
   await writeFile(path.join(dir,'local-two-tab-report.json'),
     JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({status:report.status,gameSha256:report.gameSha256,
-    checks:report.checks.map(x=>x.name),errors:report.errors}));
+    checks:report.checks.map(x=>x.name),errors:report.errors,
+    failureDiagnostics:report.status!=='passed'?report.failureDiagnostics:undefined,
+    pageErrors:report.status!=='passed'?report.errorsFromPages:undefined}));
   if(report.status!=='passed')process.exitCode=1;
 }
