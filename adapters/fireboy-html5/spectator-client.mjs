@@ -100,6 +100,7 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     resetting=true;
     keys.clear();jumpHeld=false;edgePressed=0;edgeReleased=0;
     const oldLevel=game.level;
+    const oldRoot=oldLevel?.root,oldFire=oldLevel?.pers1,oldWater=oldLevel?.pers2;
     try{
       projection.uninstall();
       // The existing native retry() must run its own Phaser scene transition.
@@ -112,14 +113,14 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
         if(game.state?.current==='level'&&!game.state.fading &&
            game.level?.levelStarted && game.level?.pers1?.body &&
            game.level?.pers2?.body &&
-           (game.level!==oldLevel || game.level.pers1!==oldLevel.pers1 ||
-            game.level.root!==oldLevel.root))break;
+           (game.level!==oldLevel || game.level.pers1!==oldFire ||
+            game.level.pers2!==oldWater || game.level.root!==oldRoot))break;
         await new Promise(resolve=>setTimeout(resolve,40));
       }
       if(!(game.state?.current==='level'&&game.level?.levelStarted&&
            game.level?.pers1?.body&&game.level?.pers2?.body&&
-           (game.level!==oldLevel || game.level.pers1!==oldLevel.pers1 ||
-            game.level.root!==oldLevel.root)))
+           (game.level!==oldLevel || game.level.pers1!==oldFire ||
+            game.level.pers2!==oldWater || game.level.root!==oldRoot)))
         throw Error('Native viewer retry did not rebuild scene within deadline');
       projection=installHtml5Spectator(game,{devices});
       lastApply=projection.initialize(message.snapshot);
