@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "startedAt": "2026-11-17T11:19:00.496Z",
+  "scope": "one real HTML5 authority + two independent browser-rendered frozen spectators; no video",
+  "originalPackageBaseline": false,
+  "completeGameStateVerified": false,
+  "publicDeploymentVerified": false,
+  "checks": [
+    {
+      "name": "two-real-browser-spectators",
+      "status": "passed",
+      "value": {
+        "aSeat": 0,
+        "bSeat": 1,
+        "mappedEntities": [
+          17,
+          17
+        ]
+      }
+    },
+    {
+      "name": "viewer-physics-remains-frozen",
+      "status": "passed",
+      "value": {
+        "steps": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "keyboard-from-viewer-zero-controls-fire",
+      "status": "passed",
+      "value": {
+        "fireDeltaX": 50.861968773537825
+      }
+    },
+    {
+      "name": "rendered-fireboy-pixels-change",
+      "status": "passed",
+      "value": {
+        "idlePixelsChanged": 821,
+        "movementPixelsChanged": 8684
+      }
+    },
+    {
+      "name": "keyboard-from-viewer-one-controls-water",
+      "status": "passed",
+      "value": {
+        "waterDeltaX": 61.002037657469316
+      }
+    },
+    {
+      "name": "both-sprites-follow-one-authority",
+      "status": "passed",
+      "value": {
+        "fire": 295.5241554414646,
+        "water": 276.71726630212424,
+        "counts": {
+          "characters": 2,
+          "diamonds": 7,
+          "doors": 2,
+          "mechanisms": 6
+        },
+        "frames": [
+          48,
+          47
+        ]
+      }
+    },
+    {
+      "name": "movable-box-present-and-position-matches",
+      "status": "passed",
+      "value": {
+        "x": 735.999809483882,
+        "y": 258.14407248008916,
+        "kind": "box"
+      }
+    },
+    {
+      "name": "no-client-physics-resumed",
+      "status": "passed",
+      "value": {
+        "steps": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "browser-key-P-pauses-authority",
+      "status": "passed",
+      "value": {
+        "revision": 1,
+        "gamePaused": true
+      }
+    },
+    {
+      "name": "other-browser-key-P-resumes-authority",
+      "status": "passed",
+      "value": {
+        "revision": 2,
+        "gamePaused": false
+      }
+    },
+    {
+      "name": "browser-leave-pauses-authority",
+      "status": "passed",
+      "value": {
+        "seatLeft": 1,
+        "gamePaused": true
+      }
+    }
+  ],
+  "errors": [],
+  "diagnostics": [
+    {
+      "type": "viewer-pageerror",
+      "message": "h5api is not defined"
+    },
+    {
+      "type": "viewer-pageerror",
+      "message": "h5api is not defined"
+    },
+    {
+      "type": "viewer-pageerror",
+      "message": "h5api is not defined"
+    },
+    {
+      "type": "viewer-pageerror",
+      "message": "h5api is not defined"
+    },
+    {
+      "type": "viewer-pageerror",
+      "message": "h5api is not defined"
+    },
+    {
+      "type": "viewer-pageerror",
+      "message": "h5api is not defined"
+    }
+  ],
+  "gameSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "visualPixels": {
+    "idleDelta": {
+      "pixelsChanged": 821,
+      "pixelsConsidered": 73720,
+      "width": 1280,
+      "height": 960
+    },
+    "movedDelta": {
+      "pixelsChanged": 8684,
+      "pixelsConsidered": 73720,
+      "width": 1280,
+      "height": 960
+    },
+    "region": {
+      "left": 22,
+      "top": 766,
+      "right": 402,
+      "bottom": 987
+    },
+    "sha256": {
+      "before": "c16e304d6227f4f887d063ff29b7306d4bad3a64143f9c31832aa408a1a037ab",
+      "idle": "fe6f14b3cae36a0c301f2d0793358c6677885bd529dbafdb3183a592ac31334f",
+      "moved": "6d3a90017b600f014d6c6e89d1e62a6f12f8368a2c588134706de46052ac7498"
+    }
+  },
+  "finishedAt": "2026-11-17T11:19:45.301Z"
+}
