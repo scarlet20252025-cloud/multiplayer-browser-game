@@ -6,6 +6,7 @@ import {WebSocket,WebSocketServer} from 'ws';
 import {startHtml5ResearchHost} from '../scripts/html5-research-host.mjs';
 import {Html5RoomCore} from './html5-room-core.mjs';
 import {Html5SceneGuard} from './html5-scene-guard.mjs';
+import {inspectNativeWin,nextForestLevel} from './html5-level-progression.mjs';
 const id=()=>randomBytes(16).toString('hex');
 export async function startHtml5ResearchRoom({root,script,requireScript,entryPath,levelId=1,port=0,allowedViewerOrigins=[]}={}){
   if(!Number.isInteger(port)||port<0||port>65535)throw new RangeError('Invalid research port');
@@ -37,7 +38,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
     });
     await page.waitForFunction(()=>__game.state.current==='levelMenu'&&!__game.state.fading&&
       __game.state.states.levelMenu.buttons,null,{timeout:30000});
-    const level=await page.evaluate(id=>{
+    let level=await page.evaluate(id=>{
       const menu=__game.state.states.levelMenu;
       const found=menu.templeData.levels.find(x=>Number(x.id)===Number(id));
       if(!found||!(found.state>0))throw Error('Requested level unavailable');
@@ -70,6 +71,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
     });
     const room=new Html5RoomCore({roomEpoch}),peers=new Map();
     let closed=false,failed=null,serial=Promise.resolve(),pendingTick=false,broadcastSeq=0;
+    let lastWinSnapshot=null;
     const send=(ws,obj)=>{if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(obj));};
     const broadcast=obj=>{
       const payload=JSON.stringify(obj);
@@ -197,14 +199,34 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
     const restartNativeRound=async()=>{
       if(!room.restartPending)throw Error('ROUND_RESTART_NOT_APPROVED');
       const priorEpoch=sceneGuard.levelEpoch;
-      await page.evaluate(()=>{
+      const action=room.roundAction;
+      let advance=null;
+      if(action==='advance'){
+        if(room.suspendedReason!=='LEVEL_WON'||!lastWinSnapshot)
+          throw Error('NATIVE_WIN_REQUIRED');
+        const proof=inspectNativeWin(lastWinSnapshot);
+        const nativeTemple=await page.evaluate(()=>{
+          return window.__game.progress.get('temples').find(t=>t.id==='forest');
+        });
+        advance=nextForestLevel({currentLevelId:level.id,temple:nativeTemple,proof});
+        if(advance.complete||!advance.next)throw Error('LAST_STANDARD_LEVEL_COMPLETE');
+      }
+      await page.evaluate(next=>{
         const game=window.__game,old=game?.level;
-        if(typeof old?.retry!=='function')throw Error('Original native retry missing');
+        if(!next&&typeof old?.retry!=='function')throw Error('Original native retry missing');
         window.__researchRestartOld={level:old,root:old.root,
           fire:old.pers1,water:old.pers2};
         window.__html5RoomInput?.uninstall();
-        old.retry.call(old);
-      });
+        if(next){
+          const menu=game.state?.states?.levelMenu;
+          const original=game.progress.get('temples').find(t=>t.id==='forest');
+          const levelData=original?.levels?.find(l=>Number(l.id)===next.id);
+          if(!menu||typeof menu.startLevel!=='function'||!levelData||
+             levelData.filename!==next.filename)
+            throw Error('Original native next level not available');
+          menu.startLevel({data:levelData});
+        }else old.retry.call(old);
+      },advance?.next??null);
       await page.waitForFunction(()=>{
         const old=window.__researchRestartOld,game=window.__game;
         return game?.state?.current==='level' && !game.state.fading &&
@@ -232,9 +254,11 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
         throw Error('Native retry did not advance level epoch');
       sceneGuard=new Html5SceneGuard(baseline);
       const roomState=room.beginNewRound();
+      if(advance?.next)level={id:advance.next.id,filename:advance.next.filename};
+      lastWinSnapshot=null;
       broadcast({type:'round-reset',roomEpoch,
         roundNumber:roomState.roundNumber,levelEpoch:baseline.levelEpoch,
-        gameSha256:host.sourceSha256,level,
+        gameSha256:host.sourceSha256,action,level,
         snapshot:baseline,room:roomState});
       notify();
       return roomState;
@@ -289,7 +313,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
           }catch(err){reject(err.message==='WRONG_ROUND'?'WRONG_ROUND':'ROOM_SUSPENDED');}
         }else if(msg.type==='room-command'){
           void enqueue(async()=>{
-            if(msg.command==='round.restart.vote'){
+            if(msg.command==='round.restart.vote'||msg.command==='round.advance.vote'){
               const vote=room.voteRestart(memberId,msg);
               if(!vote.accepted){reject(vote.code);return;}
               send(ws,{type:'restart-vote-receipt',...vote});
@@ -320,6 +344,8 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
     const evaluateBoundary=async state=>{
       const decision=sceneGuard.observe(state.snapshot);
       if(decision.status!=='suspended')return false;
+      if(decision.reason==='LEVEL_WON'&&inspectNativeWin(state.snapshot).won)
+        lastWinSnapshot=state.snapshot;
       room.suspend(decision.reason);
       notify();
       broadcast({type:'lifecycle',roomEpoch,reason:decision.reason,
