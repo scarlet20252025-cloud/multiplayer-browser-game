@@ -92,3 +92,35 @@ test('an exception inside the real update does not falsely acknowledge input',()
   assert.equal(bridge.inspect().slots[0].ackSeq,-1);
   bridge.uninstall();
 });
+
+test('many replaceable move holds do not queue obsolete walking after key release',()=>{
+  const f=fixture();
+  for(let seq=0;seq<200;seq++){
+    assert.equal(f.bridge.accept(0,input(seq,1)).accepted,true);
+  }
+  assert.equal(f.bridge.inspect().slots[0].queued,1);
+  f.bridge.accept(0,input(200,0));
+  assert.equal(f.bridge.inspect().slots[0].queued,1);
+  f.p1.update();
+  assert.equal(f.p1.steps.at(-1).right,false);
+  assert.equal(f.p1.steps.at(-1).left,false);
+  assert.equal(f.bridge.inspect().slots[0].ackSeq,200);
+  assert.equal(f.p2.steps.length,0);
+});
+test('coalescing held state never drops jump press/release edges',()=>{
+  const f=fixture();
+  f.bridge.accept(1,input(0,1,1,1,0));
+  for(let seq=1;seq<=60;seq++)f.bridge.accept(1,input(seq,1,1,0,0));
+  f.bridge.accept(1,input(61,0,0,0,1));
+  f.bridge.accept(1,input(62,0,0));
+  assert.equal(f.bridge.inspect().slots[1].queued,3);
+  f.p2.update();
+  assert.equal(f.p2.steps.at(-1).up,true);
+  assert.equal(f.bridge.inspect().slots[1].ackSeq,0);
+  f.p2.update();
+  assert.equal(f.p2.steps.at(-1).up,false);
+  assert.equal(f.bridge.inspect().slots[1].ackSeq,61);
+  f.p2.update();
+  assert.equal(f.bridge.inspect().slots[1].ackSeq,62);
+  assert.equal(f.p2.steps.at(-1).right,false);
+});

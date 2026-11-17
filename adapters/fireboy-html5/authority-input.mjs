@@ -75,11 +75,18 @@ export function installHtml5AuthorityInput(game,{maxQueue=128}={}){
     seatIndex(index);assertLive();validate(packet);
     const slot=slots[index];
     if(packet.seq<=slot.lastSeq)return {accepted:false,reason:'duplicate-or-stale',ackSeq:slot.ackSeq};
-    if(slot.queue.length>=maxQueue)throw new Error('Input queue full: fail closed and reset this seat');
-    // Simultaneous press+release must be seen in two separate real game updates.
+    // Movement and final held bits are replaceable. Queuing every 25Hz
+    // heartbeat lets a slow native character keep walking long after keyup.
+    // Preserve every unconsumed jump edge but collapse any pure held state.
     const edges=[];
     if(packet.pressed & JUMP)edges.push(true);
     if(packet.released & JUMP)edges.push(false);
+    if(edges.length===0){
+      const pendingEdges=slot.queue.filter(item=>item.edges.length>0);
+      slot.queue.length=0;
+      slot.queue.push(...pendingEdges);
+    }
+    if(slot.queue.length>=maxQueue)throw new Error('Input queue full: fail closed and reset this seat');
     slot.queue.push({seq:packet.seq,moveX:packet.moveX,held:!!(packet.buttons&JUMP),edges});
     slot.lastSeq=packet.seq;
     return {accepted:true,queued:slot.queue.length};
