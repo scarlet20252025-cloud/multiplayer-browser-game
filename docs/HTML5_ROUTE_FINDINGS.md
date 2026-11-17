@@ -236,6 +236,55 @@ prohibitJump && !up.isDown  → prohibitJump = false   // 松开才解锁
 
 ---
 
+## 输入桥实机验证：通过
+
+### 方法
+
+不改原包。把 `html5-online` 复制到 `local/html5-inject/`，
+在**副本**里把初始化那一行改成同时暴露实例：
+
+```js
+(o = window.__game = new h.Game(m)),
+```
+
+原文件保持逐字节不变。启动本地静态服务（`127.0.0.1:8802`），
+用 Playwright 进入关卡，然后**只写 `cursors.*.isDown`，不发送任何键盘事件**。
+
+角色对象在 `game.level.pers1` / `game.level.pers2`
+（`createCharObjects`，`game.js:45023-45024`：`pers1` 的 id 为 `"fb"`，`pers2` 为 `"wg"`）。
+两者的 `cursors` 都暴露 `up` / `left` / `right`，且 `up` 是**普通对象**（不是 `Phaser.Key`），
+这正是鸭子类型可以直接替换的依据。
+
+### 实测数据
+
+| 阶段 | pers1（火娃） | pers2（水娃） | 备注 |
+| --- | --- | --- | --- |
+| 进入关卡后 | `x=64, y=861` | `x=1184, y=861` | `physics.box2d.paused = false`，`state = "level"` |
+| `pers2.cursors.left.isDown = true`，等 1.2 s | `x=64, y=861`（未动） | **`x=894, y=875`** | 左移 290 px |
+| 改为 `right.isDown = true`，等 1.2 s | `x=64, y=861`（未动） | **`x=1156, y=860`** | 右移 262 px |
+
+结论：
+
+1. **只改 `isDown` 就能驱动角色**，不需要键盘事件、不需要改 Phaser。
+2. **两个角色的输入互相隔离**：驱动 pers2 时 pers1 完全不动。
+3. 位移量约 **240 px/s**，与关卡内实际移动速度同量级，不是"抖动"。
+4. `y` 有小幅变化（861→875→860），符合斜坡/落地的物理表现。
+5. 进入关卡后 `paused` 已自动变回 `false`，不需要额外恢复。
+
+### 对适配的意义
+
+此前从 Flash 源码审计出的输入契约（持续按住 `isDown` + 跳跃 `prohibitJump` 锁存）
+**在 HTML5 版上可以直接复用**，而且接入点比 Flash 版干净：
+
+- 不用改字节码，不用改引擎，只维护三个布尔量；
+- 席位 = `pers1` / `pers2`，天然对应两个角色，不需要额外的角色映射；
+- 服务端每 tick 写入这两个角色的 `isDown`，就是权威输入消费。
+
+**仍然没做的**：跳跃的 `up` 键边沿在实测里只验证了移动（`left`/`right`），
+`prohibitJump` 锁存在真机上的行为、以及暂停键 `P` 的拦截，还需单独测。
+
+---
+
 ## 复现
 
 ```bash
