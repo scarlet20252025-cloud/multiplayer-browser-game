@@ -175,3 +175,24 @@ test('scan and entity limits yield explicit incomplete observations', () => {
   assert.ok(snapshot.unsupported.some(x => x.reason === 'entity-limit'));
   assert.ok(snapshot.unsupported.some(x => x.reason === 'container-scan-limit'));
 });
+
+
+test('real HTML5 Box/BoxPrototype movable crate exports body, sprite and state changes', () => {
+  const {game,options}=fixture();
+  const crate={options:{type:'box',id:23,properties:{}},
+    body:body(151,220),sprite:sprite(151,220)};
+  game.level.objects.push(crate);
+  const exporter=createSnapshotExporter(game,options);
+  const first=exporter.capture();
+  const observed=first.mechanisms.find(x=>x.kind==='box');
+  assert.ok(observed,'Box in level.objects must not be an unsupported mechanism');
+  assert.deepEqual(observed.position,{x:151,y:220});
+  assert.equal(observed.display.x,151);
+  assert.ok(!first.unsupported.some(x=>x.reason==='mechanism-type-not-projected:box'));
+  crate.body.x=170;
+  crate.sprite.x=170;
+  crate.sprite.rotation=.4;
+  const next=exporter.capture();
+  assert.equal(next.mechanisms.find(x=>x.id===observed.id).position.x,170);
+  assert.ok(exporter.diff(first,next).changes.some(x=>x.id===observed.id));
+});

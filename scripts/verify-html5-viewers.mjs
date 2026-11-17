@@ -147,7 +147,7 @@ try{
   assert.equal(a.state.seat,0);assert.equal(b.state.seat,1);
   assert.equal(a.state.initial,true);assert.equal(b.state.initial,true);
   assert.equal(a.gamePaused,true);assert.equal(b.gamePaused,true);
-  assert.equal(a.adapter.entityCount,16);assert.equal(b.adapter.entityCount,16);
+  assert.equal(a.adapter.entityCount,17);assert.equal(b.adapter.entityCount,17);
   assert.ok(a.activeCanvas>=1&&b.activeCanvas>=1);
   pass('two-real-browser-spectators',{aSeat:a.state.seat,bSeat:b.state.seat,
     mappedEntities:[a.adapter.entityCount,b.adapter.entityCount]});
@@ -209,7 +209,7 @@ try{
   });
   assert.equal(matched.counts.diamonds,7);
   assert.equal(matched.counts.doors,2);
-  assert.equal(matched.counts.mechanisms,5);
+  assert.equal(matched.counts.mechanisms,6);
   pass('both-sprites-follow-one-authority',{fire:matched.sfire,water:matched.swater,
     counts:matched.counts,frames:[matched.v0.state.frames,matched.v1.state.frames]});
   assert.equal((await viewerState(first)).worldSteps,initialPhysics[0]);

@@ -4,7 +4,7 @@
  * Never advances local gameplay. Does not provide a complete render-state sync.
  */
 const CATEGORIES=['characters','diamonds','doors','mechanisms'];
-const mechanismTypes=new Set(['lever','pusher','platform']);
+const mechanismTypes=new Set(['lever','pusher','platform','box']);
 const valueAtPath=(root,path)=>{
   if(typeof path!=='string')return undefined;
   // Authoritative observations use only these explicit known container paths.
@@ -48,7 +48,7 @@ function spriteOf(kind,obj){
   if(kind==='diamond')return obj.sprite;
   if(kind==='pusher')return obj.button;
   if(kind==='lever')return obj.body?.sprite;
-  if(kind==='platform')return obj.sprite;
+  if(kind==='platform'||kind==='box')return obj.sprite;
   return null;
 }
 function applyEntity(entity,obj){

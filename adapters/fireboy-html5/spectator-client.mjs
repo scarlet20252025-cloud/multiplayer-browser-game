@@ -106,11 +106,12 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
   }
   function close(){
     if(closed)return;
+    // Send the explicit leave before setting closed: send() rejects closed clients.
+    if(ws.readyState===WebSocket.OPEN)send({type:'leave'});
     closed=true;clearInterval(heartbeat);keys.clear();
     document.removeEventListener('keydown',keyDown,true);
     document.removeEventListener('keyup',keyUp,true);
     window.removeEventListener('blur',blur);
-    if(ws.readyState===WebSocket.OPEN)send({type:'leave'});
     ws.close();projection.uninstall();notify();
   }
   return Object.freeze({status,onStatus,close,sendInput,projection});

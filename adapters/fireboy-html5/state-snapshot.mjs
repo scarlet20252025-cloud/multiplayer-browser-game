@@ -14,7 +14,8 @@
 
 export const SNAPSHOT_SOURCE_SHA256 = '337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677';
 const CATEGORIES = ['characters', 'diamonds', 'doors', 'mechanisms'];
-const SUPPORTED_MECHANISMS = new Set(['lever', 'pusher', 'platform']);
+// HTML5 first-level Box/BoxPrototype is a movable Box2D entity, not a static tile.
+const SUPPORTED_MECHANISMS = new Set(['lever', 'pusher', 'platform', 'box']);
 const objectLike = value => value !== null && (typeof value === 'object' || typeof value === 'function');
 const ownData = (object, key) => {
   if (!objectLike(object)) return undefined;

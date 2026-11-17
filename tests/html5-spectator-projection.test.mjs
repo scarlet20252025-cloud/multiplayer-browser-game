@@ -64,3 +64,26 @@ test('freeze fails closed when local game resumes or scene changes',()=>{
   assert.throws(()=>b.inspect(),/scene changed/);
   assert.equal(b.uninstall(),true);
 });
+
+
+test('frozen spectator applies movable box sprite without advancing Box2D',()=>{
+  const f=fixture();
+  const crate={options:{type:'box'},sprite:sprite(10,15),body:{x:10,y:15}};
+  f.level.objects.push(crate);
+  f.snapshot.mechanisms.push({...f.snapshot.mechanisms[0],
+    id:'crate',kind:'box',sourcePaths:['level.objects[1]'],
+    position:{x:10,y:15},display:{x:10,y:15,rotation:0}});
+  const bridge=installHtml5Spectator(f.game,{devices:f.devices});
+  const first=bridge.initialize(f.snapshot);
+  assert.equal(first.applied,7);
+  assert.equal(crate.sprite.x,10);
+  const next={...f.snapshot,snapshotSeq:2,mechanisms:[
+    f.snapshot.mechanisms[0],{...f.snapshot.mechanisms[1],
+      position:{x:85,y:21},display:{x:85,y:21,rotation:.3}}]};
+  const result=bridge.apply(next);
+  assert.equal(result.unknownEntities,0);
+  assert.equal(crate.sprite.x,85);
+  assert.equal(crate.sprite.rotation,.3);
+  assert.equal(f.game.paused,true);
+  bridge.uninstall();
+});
