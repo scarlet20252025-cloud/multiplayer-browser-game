@@ -54,6 +54,13 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
         sessionEpoch:roomEpoch,sourceGameSha256:sha,devices:window.Devices
       });
     },{roomEpoch,sha:host.sourceSha256});
+    // Capture the full uncollected map before network input can remove any
+    // diamond; its immutable spawn roster survives future collections.
+    await page.evaluate(()=>{
+      const baseline=window.__html5RoomSnapshot.capture();
+      if(!baseline.coverage?.requiredPresent||baseline.diamondRoster.length<1)
+        throw Error('Original level did not expose its initial diamond spawn roster');
+    });
     await page.evaluate(()=>{
       if(!__game.paused)__game.level.togglePause();
       if(!__game.paused)throw Error('Waiting room did not pause');

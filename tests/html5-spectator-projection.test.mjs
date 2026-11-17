@@ -87,3 +87,29 @@ test('frozen spectator applies movable box sprite without advancing Box2D',()=>{
   assert.equal(f.game.paused,true);
   bridge.uninstall();
 });
+
+
+test('late join uses original diamond spawns, not shifted authoritative children indexes',()=>{
+  const f=fixture();
+  f.diamond.data={char:'wg'};
+  const second=Object.assign(new Diamond(),sprite(91,33),{
+    sprite:sprite(0,0),data:{char:'fb'}});
+  f.game.layers.underGround.children.push(second);
+  const live={...f.snapshot.diamonds[0],
+    id:'diamond-two',character:'fb',sourcePaths:['game.layers.underGround.children[0]'],
+    rootDisplay:{x:91,y:33,visible:true},display:{x:0,y:0,visible:true}};
+  f.snapshot.diamonds=[live];
+  f.snapshot.diamondRoster=[
+    {id:'diamond-one',character:'wg',spawn:{x:12,y:13},present:false},
+    {id:'diamond-two',character:'fb',spawn:{x:91,y:33},present:true},
+  ];
+  const bridge=installHtml5Spectator(f.game,{devices:f.devices});
+  const initial=bridge.initialize(f.snapshot);
+  assert.equal(initial.hiddenDiamonds,1);
+  assert.equal(initial.unknownEntities,0);
+  assert.equal(f.diamond.visible,false);
+  assert.equal(second.visible,true);
+  assert.equal(second.x,91);
+  assert.equal(bridge.inspect().entityCount,7);
+  bridge.uninstall();
+});

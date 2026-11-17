@@ -105,7 +105,11 @@ test('diamond disappearance is observed without inventing a collection event', (
   assert.deepEqual(diff.removed, [before.diamonds[0].id]);
   assert.equal(diff.removalMeaning, 'absent-from-observed-containers; cause-not-inferred');
   assert.equal(after.diamonds.length, 0);
-  assert.equal(after.coverage.requiredPresent, false);
+  assert.equal(after.diamondRoster.length, 1);
+  assert.equal(after.diamondRoster[0].id, before.diamonds[0].id);
+  assert.equal(after.diamondRoster[0].present, false);
+  // A legitimately collected final gem must not make a joinable level invalid.
+  assert.equal(after.coverage.requiredPresent, true);
 });
 
 test('new level objects get an epoch even when entity objects are reused', () => {
@@ -195,4 +199,26 @@ test('real HTML5 Box/BoxPrototype movable crate exports body, sprite and state c
   const next=exporter.capture();
   assert.equal(next.mechanisms.find(x=>x.id===observed.id).position.x,170);
   assert.ok(exporter.diff(first,next).changes.some(x=>x.id===observed.id));
+});
+
+
+test('diamond spawn roster survives children-array shifts and preserves live IDs',()=>{
+  const {game,options,diamond}=fixture();
+  const another=Object.assign(new Diamond(),sprite(160,165),{
+    body:body(160,165),sprite:sprite(0,-3),data:{char:'fb'}});
+  game.layers.underGround.children.push(another);
+  const exporter=createSnapshotExporter(game,options);
+  const before=exporter.capture();
+  assert.equal(before.diamondRoster.length,2);
+  const first=before.diamonds.find(d=>d.character==='wg');
+  const second=before.diamonds.find(d=>d.character==='fb');
+  game.layers.underGround.children.splice(game.layers.underGround.children.indexOf(diamond),1);
+  const after=exporter.capture();
+  assert.equal(after.diamonds.length,1);
+  assert.equal(after.diamonds[0].id,second.id);
+  assert.equal(after.diamondRoster.length,2);
+  assert.equal(after.diamondRoster.find(d=>d.id===first.id).present,false);
+  assert.equal(after.diamondRoster.find(d=>d.id===second.id).present,true);
+  assert.deepEqual(after.diamondRoster.find(d=>d.id===second.id).spawn,{x:160,y:165});
+  assert.ok(after.diamonds[0].sourcePaths.some(s=>s.endsWith('[1]')===false));
 });

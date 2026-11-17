@@ -88,6 +88,9 @@ export function createSnapshotExporter(game, {
   let lastPlayerTwo;
   let nextEntity = 0;
   let identities = new WeakMap();
+  // Preserve original spawn identities after the live diamond is destroyed.
+  // The current Phaser children[] index is not stable across removals.
+  let diamondRoster = new Map();
 
   function capture() {
     const unsupported = [];
@@ -157,6 +160,7 @@ export function createSnapshotExporter(game, {
       levelEpoch++;
       nextEntity = 0;
       identities = new WeakMap();
+      diamondRoster = new Map();
     }
     if (!objectLike(level)) report('game.level', 'level-unavailable');
     if (sourceGameSha256 !== SNAPSHOT_SOURCE_SHA256) report('sourceGameSha256', 'source-build-not-audited');
@@ -264,6 +268,14 @@ export function createSnapshotExporter(game, {
         entity.character = field(data, 'char', `${path}.data`);
         entity.presence = 'present-in-underGround';
         entity.rootDisplay = display(object, path);
+        if (!diamondRoster.has(id)) {
+          const x = entity.rootDisplay?.x, y = entity.rootDisplay?.y;
+          if (!Number.isFinite(x) || !Number.isFinite(y) || typeof entity.character !== 'string') {
+            report(path, 'diamond-spawn-identity-unavailable');
+          } else {
+            diamondRoster.set(id, { id, character: entity.character, spawn: { x, y } });
+          }
+        }
       } else if (category === 'doors') {
         entity.character = field(data, 'char', `${path}.data`);
         entity.isOpen = field(object, 'isOpen', path);
@@ -283,9 +295,17 @@ export function createSnapshotExporter(game, {
       }
       snapshot[category].push(entity);
     }
+    // Every client needs the spawn roster, including diamonds absent from the
+    // current children list. present=false is a tombstone, NOT proof of why it
+    // disappeared. Spawns reset only when the level epoch changes.
+    const presentDiamonds = new Set(snapshot.diamonds.map(entity => entity.id));
+    snapshot.diamondRoster = [...diamondRoster.values()].map(row => ({
+      id: row.id, character: row.character, spawn: { ...row.spawn },
+      present: presentDiamonds.has(row.id),
+    }));
     snapshot.counts = Object.fromEntries(CATEGORIES.map(category => [category, snapshot[category].length]));
     snapshot.coverage = {
-      requiredPresent: snapshot.characters.length === 2 && snapshot.diamonds.length > 0 && snapshot.doors.length === 2 && snapshot.mechanisms.length > 0,
+      requiredPresent: snapshot.characters.length === 2 && snapshot.diamondRoster.length > 0 && snapshot.doors.length === 2 && snapshot.mechanisms.length > 0,
       allObservedPositionsFinite: CATEGORIES.every(category => snapshot[category].every(entity => Number.isFinite(entity.position?.x) && Number.isFinite(entity.position?.y))),
       sourceBuildAudited: sourceGameSha256 === SNAPSHOT_SOURCE_SHA256,
       completeGameState: false,

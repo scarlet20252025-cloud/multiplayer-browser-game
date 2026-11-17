@@ -109,8 +109,38 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       throw Error('Expected two characters and two doors');
     const mapping=new Map();
     const used=new Set();
+    const roster=Array.isArray(snapshot.diamondRoster)?snapshot.diamondRoster:null;
+    if(roster){
+      const proto=devices?.Diamond?.prototype;
+      if(!proto)throw Error('Diamond constructor required for spawn-roster mapping');
+      const candidates=game.layers.underGround.children.filter(child=>
+        child&&Object.prototype.isPrototypeOf.call(proto,child));
+      for(const entry of roster){
+        if(typeof entry.id!=='string'||!entry.id||mapping.has(entry.id)||
+          typeof entry.character!=='string'||!Number.isFinite(entry.spawn?.x)||
+          !Number.isFinite(entry.spawn?.y)||typeof entry.present!=='boolean')
+          throw Error('Invalid authority diamond spawn roster');
+        // Identify by the real, immutable map spawn and element type. Never use
+        // shifted underGround.children indices after a diamond is collected.
+        const matches=candidates.filter(child=>!used.has(child)&&
+          child.data?.char===entry.character &&
+          Math.abs(child.x-entry.spawn.x)<2 && Math.abs(child.y-entry.spawn.y)<2);
+        if(matches.length!==1)throw Error('Ambiguous/missing diamond spawn for '+entry.id);
+        const local=matches[0];
+        used.add(local);
+        mapping.set(entry.id,{category:'diamonds',object:local});
+      }
+      if(used.size!==candidates.length)
+        throw Error('Diamond roster is incomplete for the spectator scene');
+    }
     for(const category of CATEGORIES){
       for(const entry of snapshot[category]){
+        if(category==='diamonds'&&roster){
+          const match=mapping.get(entry.id);
+          if(!match||match.category!=='diamonds')
+            throw Error('Live diamond is absent from spawn roster');
+          continue;
+        }
         if(typeof entry.id!=='string'||!entry.id||mapping.has(entry.id))throw Error('Bad/duplicate entity id');
         let local;
         for(const path of entry.sourcePaths??[]){
@@ -142,6 +172,14 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       snapshot.levelEpoch!==epoch.level)throw Error('Snapshot epoch mismatch');
     if(!Number.isSafeInteger(snapshot.snapshotSeq)||snapshot.snapshotSeq<=lastSeq)
       return {accepted:false,reason:'stale',lastSeq};
+    if(Array.isArray(snapshot.diamondRoster)){
+      const present=new Set(snapshot.diamonds.map(entity=>entity.id));
+      for(const row of snapshot.diamondRoster){
+        if(!entities.has(row.id)||entities.get(row.id).category!=='diamonds'||
+           row.present!==present.has(row.id))
+          throw Error('Authority diamond roster/presence mismatch');
+      }
+    }
     const found=new Set();
     let applied=0,hidden=0,unknown=0;
     for(const category of CATEGORIES){
