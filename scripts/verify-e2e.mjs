@@ -6,8 +6,18 @@ import { launchAuthorityBrowser } from '../server/ruffle-authority.mjs';
 await mkdir('local/screenshots',{recursive:true});
 await mkdir('evidence',{recursive:true});
 let app, browser;
-const contexts=[];const pages=[];const browserErrors=[];const checks=[];
+const contexts=[];const pages=[];const browserErrors=[];const runtimeNotices=[];const checks=[];
 const record=(name,detail)=>{checks.push({name,status:'passed',detail});console.log('PASS',name);};
+async function dismissSoftwareRenderingNotice(page,label){
+  // CI intentionally uses SwiftShader. Close the observed informational dialog
+  // using its normal UI; do not hide arbitrary dialogs or change player internals.
+  const dialog=page.locator('ruffle-player #hardware-acceleration-modal');
+  if(await dialog.isVisible()){
+    runtimeNotices.push({page:label,notice:'Ruffle software-rendering notice',action:'clicked the visible close control'});
+    await dialog.locator('.close-modal').click();
+    await dialog.waitFor({state:'hidden'});
+  }
+}
 let outcome='failed';
 try{
   app=await startServer({port:0,maxRooms:3});
@@ -37,6 +47,7 @@ try{
   await b.waitForFunction(()=>window.lab?.ready&&window.lab.slot===1,null,{timeout:60000});
   await a.waitForFunction(()=>window.lab.room.status==='running'&&window.lab.appliedTick>=2);
   await b.waitForFunction(()=>window.lab.appliedTick>=2);
+  await dismissSoftwareRenderingNotice(a,'A');await dismissSoftwareRenderingNotice(b,'B');
   record('server AS3 authority and two distinct client renderers',{room:code,roles:await Promise.all(pages.map(p=>p.evaluate(()=>window.lab.hello)))});
   const initial=await a.evaluate(()=>window.lab.latestState);
   await a.keyboard.down('d');await b.keyboard.down('w');
@@ -90,6 +101,11 @@ try{
   await a.waitForFunction(c=>window.lab?.ready&&window.lab.slot===0&&window.lab.room.code===c,code,{timeout:60000});
   await b.waitForFunction(t=>window.lab.room.status==='running'&&window.lab.latestState.tick>t,previousTick,{timeout:15000});
   record('refresh reconnect preserves seat and authoritative room',{room:code,previousTick});
+  for(const [i,page] of pages.entries()){
+    await dismissSoftwareRenderingNotice(page,String(i));
+    assert.equal(await page.locator('ruffle-player .modal:not(.hidden)').count(),0,'A runtime dialog must not obscure the screenshot');
+  }
+  record('both viewers are visibly unobstructed before screenshots',{runtimeNotices});
   await a.screenshot({path:'local/screenshots/lab-player-a.png',fullPage:true});
   await b.screenshot({path:'local/screenshots/lab-player-b.png',fullPage:true});
   await a.locator('#leave').click();await a.waitForFunction(()=>window.lab.slot===null);
@@ -100,6 +116,7 @@ try{
   const pairing=await Promise.all(pages.map(p=>p.evaluate(()=>({room:window.lab.room.code,slot:window.lab.slot}))));
   assert.equal(pairing[0].room,pairing[1].room);assert.notEqual(pairing[0].slot,pairing[1].slot);
   record('quick match pairs two independent browsers',pairing);
+  for(const [i,page] of pages.entries())await dismissSoftwareRenderingNotice(page,`matched-${i}`);
   assert.deepEqual(browserErrors,[]);
   const clientErrors=await Promise.all(pages.map(p=>p.evaluate(()=>window.lab.errors)));
   assert.deepEqual(clientErrors,[[],[]]);record('no browser or application errors through the final matched room',{browserErrors,clientErrors});
@@ -107,7 +124,7 @@ try{
 }catch(error){checks.push({name:'failure',status:'failed',message:error.stack});console.error(error);for(let i=0;i<pages.length;i++)await pages[i].screenshot({path:`local/screenshots/failure-${i}.png`,fullPage:true}).catch(()=>{});process.exitCode=1;}
 finally{
   const result={schema:1,status:outcome,recordedAt:new Date().toISOString(),scope:'Authored AS3 probe only; original games have NOT been run',
-    environment:{node:process.version,browser:browser?.version()??null,network:'local loopback; not an Internet latency result'},checks,metrics:app?.getMetrics()??null,browserErrors};
+    environment:{node:process.version,browser:browser?.version()??null,graphics:'headless Chromium with SwiftShader software rendering',network:'local loopback; not an Internet latency result'},checks,metrics:app?.getMetrics()??null,browserErrors,runtimeNotices};
   await writeFile('evidence/e2e-results.json',JSON.stringify(result,null,2)+'\n');
   for(const context of contexts)await context.close();
   await browser?.close();await app?.close();
