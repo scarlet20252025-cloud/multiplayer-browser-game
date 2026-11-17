@@ -4,7 +4,7 @@
 
 当前主要验证路径是 **Node.js 房间服务 + 服务端 Chromium/Ruffle/AS3 + 客户端 Ruffle 显示实例**。仓库内的 `probe.swf` 是自写测试程序，包含两个可移动方块和独立鼠标标记。它用于检验 AS3 桥接、房间、输入归属与状态应用；《森林冰火人》和《闪翼双星》原版接入仍需补齐 SWF/资源并完成专用适配。
 
-方案比较、原游戏的最小改造位置和验收步骤见 [架构决策](docs/ARCHITECTURE_DECISION.md)。
+方案比较、原游戏的最小改造位置和验收步骤见 [架构决策](docs/ARCHITECTURE_DECISION.md)。实际运行结果见 [验证报告](docs/VERIFICATION_REPORT.md) 与 [成功的 GitHub Actions 运行](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44033828759)。
 
 ## 当前做到哪里
 
@@ -13,8 +13,9 @@
 | 上传材料审计 | 实际包为反编译文本和 JSON，没有原游戏 SWF、JavaScript 运行文件、图片及音频。见两份源码审计 |
 | 冰火人第一代数据提取 | 已提取 32 个正式关卡、316 次工厂调用，13 个原创夹具测试通过；保留一个未知瓦片值，不推测其语义。提取数据不是完整游戏 |
 | 自写 AS3 夹具编译 | 已生成 AS3/AVM2 SWF，并记录编译器和产物哈希，见 [build-evidence.json](experiments/as3-probe/build-evidence.json) |
-| 房间与传输实现 | 已提供创建、加入、快速配对、输入缓冲、快照、重连和释放输入的代码；具体测试结论以测试输出和 `evidence/*.json` 为准 |
-| 浏览器端到端验证 | 当前工作环境的 Chromium 启动受 socket 限制，标准浏览器下载也未成功；需要在正常服务器或仓库 CI 运行并保存证据。不能从编译成功推断浏览器测试通过 |
+| 房间与传输实现 | 18 项协议/服务器逻辑测试通过；覆盖并发匹配、初始化取消、席位保留、故障终态、输入确认和资源释放 |
+| 浏览器端到端验证 | GitHub Actions 中 13 项检查通过：一个真实 AS3 权威实例与两个独立浏览器显示实例、输入与鼠标隔离、实际显示对象位置、初始 tick、重连、退出和快速匹配；截图已检查 |
+| 真实权威网络验证 | 8 项检查通过，包含同 tick 短按、非法输入拒绝、输入超时释放、重连及每方向 40 ms 固定延迟实验；这不是原游戏或公网测试 |
 | 两款原游戏联机 | 尚未验收。原游戏缺运行包，不能把自写方块实验或关卡提取当作原版联机成功 |
 
 没有实际结果文件，或结果文件的 `status` 不是 `passed`，就不能把相应项目写成已通过。即使独立夹具通过，也只覆盖记录的版本、环境和测试范围。
@@ -87,7 +88,7 @@ npm run test:network
 npm run test:e2e
 ```
 
-浏览器测试脚本应生成 `evidence/e2e-results.json`；其他实验结果按脚本说明保存在 `evidence/`。仓库 CI 的最终结果和附带产物用于补齐本地环境未能完成的运行验证。不要把测试脚本存在、工作流已提交或任务已启动写成测试已通过。
+最近完成的运行代码提交为 `b1779ed50d5d222a61b5e95d7388c1bec9425801`，CI #3 成功。`evidence/e2e-results.json`、`evidence/network-results.json` 和 `evidence/ci-summary.json` 保存结果与来源；截图保存在 `evidence/screenshots/`。本地系统浏览器受限的尝试另保留在 `evidence/local-runtime-attempt.json`，没有混入成功结论。后续只更新文档和证据的提交不改变该已测代码。
 
 阅读证据时，至少核对 `status`、时间、运行环境、版本、检查项和范围。回环地址上的结果不能代表异地公网；应用层延迟或丢弃消息实验也不能直接代表实际链路丢包。状态载荷计数不包含所有网络协议开销和初始资源下载。当前不公布未测得的并发房间数、带宽或输入延迟承诺。
 
@@ -118,6 +119,7 @@ python3 scripts/audit_fireboy.py \
 | 路径 | 内容 |
 | --- | --- |
 | [架构决策](docs/ARCHITECTURE_DECISION.md) | 非视频同步路线、取舍、原游戏改造与验收顺序 |
+| [实际验证报告](docs/VERIFICATION_REPORT.md) | CI 来源、通过项、延迟/载荷测量及未覆盖范围 |
 | [自建服务器部署](docs/DEPLOYMENT.md) | 单机、局域网、公网代理和指标边界 |
 | [冰火人源码审计](docs/FIREBOY_SOURCE_AUDIT.md) | 输入、Box2D、25/26 时钟差异、32 关提取与缺件 |
 | [闪翼源码审计](docs/SHANYI_SOURCE_AUDIT.md) | 反编译质量、输入边沿、Alchemy、慢动作与显示列表依赖 |
