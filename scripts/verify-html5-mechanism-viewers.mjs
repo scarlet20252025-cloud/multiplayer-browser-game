@@ -248,6 +248,42 @@ try{
     viewerY:report.releaseProbe.viewerY,
     initialPlatformY:authorityBefore.platform.y
   });
+  if(report.boxProbe?.status==='passed'){
+    // Separate the two claims: (1) each renderer tracks its own received
+    // frame, (2) both independent renderers eventually converge after motion.
+    // Never compare an earlier authoritative box sample to a later client frame.
+    report.boxConvergenceProbe={status:'blocked',samples:[]};
+    const convergence=await until(async()=>{
+      const [left,right,server]=await Promise.all([
+        view(first),view(second),authority.readAuthority()]);
+      const actual=server.snapshot.mechanisms.find(m=>m.kind==='box');
+      const l=left.rendered?.box,r=right.rendered?.box;
+      const serverX=actual?.display?.x,serverY=actual?.display?.y;
+      if(!l||!r||!Number.isFinite(serverX)||!Number.isFinite(serverY))return null;
+      const sample={
+        time:Date.now(),leftX:l.x,rightX:r.x,serverX,
+        leftY:l.y,rightY:r.y,serverY,
+        leftStep:left.stepCount,rightStep:right.stepCount
+      };
+      if(report.boxConvergenceProbe.samples.length<70)
+        report.boxConvergenceProbe.samples.push(sample);
+      if([left,right].some(v=>v.error||!v.delivered?.box ||
+        Math.abs(v.rendered.box.x-v.delivered.box.x)>1||
+        Math.abs(v.rendered.box.y-v.delivered.box.y)>1))return null;
+      if(Math.abs(l.x-r.x)>3||Math.abs(l.y-r.y)>3)return null;
+      if(Math.abs(l.x-serverX)>8||Math.abs(r.x-serverX)>8||
+         Math.abs(l.y-serverY)>8||Math.abs(r.y-serverY)>8)return null;
+      if(left.stepCount!==0||right.stepCount!==0)
+        throw Error('Spectator simulated Box2D during convergence');
+      return sample;
+    },14000);
+    report.boxConvergenceProbe.status='passed';
+    report.boxConvergenceProbe.converged=convergence;
+    pass('both-viewers-eventually-converge-on-real-box-position',{
+      serverX:convergence.serverX,viewerX:[convergence.leftX,convergence.rightX],
+      serverY:convergence.serverY,viewerY:[convergence.leftY,convergence.rightY]
+    });
+  }
   const unknown=report.diagnostics.filter(x=>x.type==='pageerror'&&
     x.message!=='h5api is not defined');
   if(unknown.length)throw Error('Unexplained browser errors detected');
