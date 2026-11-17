@@ -84,6 +84,11 @@ async function viewerState(page){
     worldSteps:window.__localPhysicsSteps??null,
     fire:{x:window.__game?.level?.pers1?.sprite?.x,y:window.__game?.level?.pers1?.sprite?.y},
     water:{x:window.__game?.level?.pers2?.sprite?.x,y:window.__game?.level?.pers2?.sprite?.y},
+    visibleDiamonds:(()=>{
+      const proto=window.Devices?.Diamond?.prototype;
+      return proto?window.__game?.layers?.underGround?.children?.filter(child=>
+        Object.prototype.isPrototypeOf.call(proto,child)&&child.visible!==false).length:null;
+    })(),
     crate:(()=>{const box=window.__game?.level?.objects?.find(x=>x?.options?.type==='box');
       return box?{x:box.sprite?.x,y:box.sprite?.y,rotation:box.sprite?.rotation}:null;})(),
     activeCanvas:document.querySelectorAll('canvas').length,
@@ -225,6 +230,61 @@ try{
   assert.equal((await viewerState(first)).worldSteps,initialPhysics[0]);
   assert.equal((await viewerState(second)).worldSteps,initialPhysics[1]);
   pass('no-client-physics-resumed',{steps:initialPhysics});
+  // Gameplay interaction: collect a real Fireboy diamond by ordinary keyboard
+  // input only. Do NOT directly change body position, contact callbacks, or
+  // diamond counters; the original Box2D sensor must perform the collection.
+  const collectionBefore=(await authority.readAuthority()).snapshot;
+  const fireBefore=collectionBefore.characters.find(c=>c.slot===0);
+  const choices=collectionBefore.diamonds.filter(d=>
+    ['fb','fbwg','silver'].includes(d.character) &&
+    Number.isFinite(d.position?.x)&&Number.isFinite(d.position?.y) &&
+    d.position.x > fireBefore.position.x+40 && d.position.y > 800)
+    .sort((a,b)=>a.position.x-b.position.x);
+  if(!choices.length)throw Error('No suitable Fireboy diamond on the lower route; do not guess a path');
+  const targetDiamond=choices[0];
+  const collectionTrace=[];
+  let collected=null;
+  await first.keyboard.down('ArrowRight');
+  try{
+    for(let sample=0;sample<68;sample++){
+      await sleep(140);
+      const current=(await authority.readAuthority()).snapshot;
+      const fire=current.characters.find(c=>c.slot===0);
+      collectionTrace.push({sample,fireX:fire.position.x,fireY:fire.position.y,
+        diamondCount:current.counts.diamonds,fireDiamonds:fire.gameplay.diamonds,
+        targetPresent:current.diamonds.some(d=>d.id===targetDiamond.id),
+        levelEnded:current.level.ended});
+      if(current.counts.diamonds===collectionBefore.counts.diamonds-1 &&
+         !current.diamonds.some(d=>d.id===targetDiamond.id) &&
+         fire.gameplay.diamonds===fireBefore.gameplay.diamonds+1){
+        collected=current;break;
+      }
+      if(current.level.ended||fire.position.x>targetDiamond.position.x+90)break;
+    }
+  }finally{await first.keyboard.up('ArrowRight');}
+  report.collectionProbe={
+    target:{id:targetDiamond.id,x:targetDiamond.position.x,y:targetDiamond.position.y,
+      character:targetDiamond.character},
+    before:{count:collectionBefore.counts.diamonds,fireDiamonds:fireBefore.gameplay.diamonds},
+    trace:collectionTrace,
+    satisfied:!!collected
+  };
+  assert.ok(collected,'Real diamond pickup was not observed after normal keyboard movement');
+  const bothCollected=await until(async()=>{
+    const [viewA,viewB]=await Promise.all([viewerState(first),viewerState(second)]);
+    if(viewA.visibleDiamonds!==collectionBefore.counts.diamonds-1 ||
+       viewB.visibleDiamonds!==collectionBefore.counts.diamonds-1)return null;
+    if(viewA.state.lastError||viewB.state.lastError)return null;
+    return {viewA,viewB};
+  },15000);
+  assert.equal(bothCollected.viewA.worldSteps,initialPhysics[0]);
+  assert.equal(bothCollected.viewB.worldSteps,initialPhysics[1]);
+  pass('real-diamond-contact-and-two-viewer-removal',{
+    authorityDiamondCount:collected.counts.diamonds,
+    fireDiamonds:collected.characters.find(c=>c.slot===0).gameplay.diamonds,
+    viewers:[bothCollected.viewA.visibleDiamonds,bothCollected.viewB.visibleDiamonds],
+    targetX:targetDiamond.position.x,observedSamples:collectionTrace.length
+  });
   // Test actual keyboard P on the web spectator, not a synthetic room command.
   await first.keyboard.press('KeyP');
   await until(async()=>{
