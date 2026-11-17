@@ -167,6 +167,9 @@ try{
   ],room:authority.room.publicState()};
   const renewed=await authority.readAuthority();
   report.restartAfter.levelEpoch=renewed.snapshot.levelEpoch;
+  report.restartAfter.gamePaused=renewed.gamePaused;
+  report.restartAfter.physicsPaused=renewed.physicsPaused;
+  report.restartAfter.inputSlots=renewed.input?.slots;
   if(renewed.snapshot.levelEpoch<=beforeRound.levelEpoch||
      renewed.snapshot.characters.length!==2||renewed.snapshot.diamonds.length!==7)
     throw Error('Native restarted authority was not reset to the expected first level');
@@ -179,7 +182,11 @@ try{
   await pause(700);
   await water.keyboard.up('KeyD');
   const moved=await until(async()=>{
-    const [a,b]=await Promise.all([state(fire),state(water)]);
+    const [a,b,server]=await Promise.all([state(fire),state(water),authority.readAuthority()]);
+    report.restartInputDiagnostic={room:authority.room.publicState(),
+      authority:{gamePaused:server.gamePaused,physicsPaused:server.physicsPaused,
+        slots:server.input?.slots,waterX:server.snapshot?.characters?.find(x=>x.slot===1)?.display?.x},
+      viewers:[{waterX:a.waterX,status:a.status},{waterX:b.waterX,status:b.status}]};
     if(!Number.isFinite(a.waterX)||!Number.isFinite(b.waterX)||
        a.waterX<=initialWater+15||b.waterX<=initialWater+15 ||
        Math.abs(a.waterX-b.waterX)>4)return null;
@@ -212,7 +219,9 @@ finally{
   await writeFile(path.join(dir,'native-round-restart-report.json'),
     JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({status:report.status,reason:report.suspendedReason,
-    checks:report.checks,initialViewers:report.status==='blocked'?report.initialViewers:undefined,
+    checks:report.checks,
+    restartAfter:report.status==='blocked'?report.restartAfter:undefined,
+    restartInputDiagnostic:report.status==='blocked'?report.restartInputDiagnostic:undefined,
     errors:report.errors}));
   if(report.status!=='passed')process.exitCode=1;
 }

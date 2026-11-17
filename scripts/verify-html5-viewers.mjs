@@ -267,7 +267,15 @@ try{
       }
       if(current.level.ended||fire.position.x>targetDiamond.position.x+90)break;
     }
-  }finally{await first.keyboard.up('ArrowRight');}
+  }finally{
+    await first.keyboard.up('ArrowRight');
+    // Decelerate on the safe left side immediately after the collectible.
+    // The original Box2D actor has momentum after releasing right, which can
+    // otherwise carry Fireboy into a real hazard before the pause test.
+    await first.keyboard.down('ArrowLeft');
+    await sleep(450);
+    await first.keyboard.up('ArrowLeft');
+  }
   report.collectionProbe={
     target:{id:targetDiamond.id,x:targetDiamond.position.x,y:targetDiamond.position.y,
       character:targetDiamond.character},
