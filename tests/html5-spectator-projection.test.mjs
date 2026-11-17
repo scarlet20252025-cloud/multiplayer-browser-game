@@ -134,3 +134,21 @@ test('unsafe nonconfigurable local pause cannot silently escape the freeze guard
   Object.defineProperty(f.game,'paused',{value:false,writable:true,configurable:false});
   assert.throws(()=>installHtml5Spectator(f.game,{devices:f.devices}),/nonconfigurable/);
 });
+
+test('native viewer never executes Box2D world.Step even after delayed game updates',()=>{
+  const f=fixture();let nativeSteps=0;
+  const world={Step(){nativeSteps++;}};
+  f.game.physics.box2d.world=world;
+  const before=world.Step;
+  const spectator=installHtml5Spectator(f.game,{devices:f.devices});
+  f.game.paused=false;
+  for(let i=0;i<10;i++)world.Step(.016,8,3);
+  assert.equal(nativeSteps,0);
+  assert.equal(spectator.inspect().blockedWorldSteps,10);
+  assert.equal(spectator.inspect().blockedUnpauses,1);
+  spectator.initialize(f.snapshot);
+  spectator.uninstall();
+  assert.equal(world.Step,before);
+  world.Step(.016,8,3);
+  assert.equal(nativeSteps,1);
+});

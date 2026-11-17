@@ -90,14 +90,29 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
   const ownToggleDescriptor=Object.getOwnPropertyDescriptor(level,'togglePause');
   const originalInputEnabled=game.input?.enabled;
   const originalGamePauseDescriptor=Object.getOwnPropertyDescriptor(game,'paused');
+  const world=game.physics?.box2d?.world;
+  const oldWorldStepDescriptor=world?Object.getOwnPropertyDescriptor(world,'Step'):null;
+  const oldWorldStep=world?.Step;
+  if(world&&typeof oldWorldStep!=='function')
+    throw new Error('Native spectator Box2D world has no callable Step');
+  if(oldWorldStepDescriptor&&!oldWorldStepDescriptor.configurable)
+    throw new Error('Native spectator Box2D Step cannot be frozen');
   if(originalGamePauseDescriptor && !originalGamePauseDescriptor.configurable)
     throw new Error('Spectator cannot guard a nonconfigurable native pause property');
   if(!originalGamePauseDescriptor && !Object.isExtensible(game))
     throw new Error('Spectator cannot install a pause guard on this game');
   const signal=level.pauseKey?.onDown;
   const oldToggle=level.togglePause;
-  let active=true,initialized=false,lastSeq=0,epoch=null,entities=new Map(),blockedUnpauses=0;
+  let active=true,initialized=false,lastSeq=0,epoch=null,entities=new Map(),blockedUnpauses=0,blockedWorldSteps=0;
   if(signal&&typeof signal.remove==='function')signal.remove(oldToggle,null);
+  // Protect the native viewer even if a Phaser callback bypasses Game.paused:
+  // original rules and collision stepping execute ONLY in the authority.
+  if(world&&typeof oldWorldStep==='function'){
+    Object.defineProperty(world,'Step',{
+      configurable:true,writable:true,enumerable:oldWorldStepDescriptor?.enumerable??true,
+      value:function spectatorNoPhysicsStep(){blockedWorldSteps++;return undefined;}
+    });
+  }
   // The original level may asynchronously set Game.paused=false AFTER
   // loading (even after levelStarted). Keep the locally rendered spectator
   // permanently paused until uninstall; native physics must never run here.
@@ -214,7 +229,7 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
   function inspect(){
     assertLive();
     return {initialized,lastSeq,entityCount:entities.size,
-      blockedUnpauses,gamePaused:game.paused,
+      blockedUnpauses,blockedWorldSteps,gamePaused:game.paused,
       physicsPaused:game.physics?.box2d?.paused??null};
   }
   function uninstall(){
@@ -226,6 +241,10 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
     else delete level.togglePause;
     if(signal&&typeof signal.add==='function'&&oldToggle&&!signal.has?.(oldToggle,null))
       signal.add(oldToggle,null);
+    if(world&&typeof oldWorldStep==='function'){
+      if(oldWorldStepDescriptor)Object.defineProperty(world,'Step',oldWorldStepDescriptor);
+      else delete world.Step;
+    }
     if(game.input)game.input.enabled=originalInputEnabled;
     if(originalGamePauseDescriptor)
       Object.defineProperty(game,'paused',originalGamePauseDescriptor);
