@@ -96,7 +96,7 @@ test('a native scene boundary suspends the whole room and rejects old controls',
   assert.equal(core.receiveInput('client-aaaa',input(5,1),200).code,'ROOM_SUSPENDED');
   assert.equal(core.proposePause('client-bbbb',pause('new',false)).code,'ROOM_SUSPENDED');
   assert.equal(core.sample(201).inputs[0].seq,-1);
-  core.markReady('client-aaaa');
+  assert.throws(()=>core.markReady('client-aaaa'),/ROOM_SUSPENDED/);
   assert.equal(core.running,false);
   assert.deepEqual(core.suspend('CHARACTER_DEAD'),
     {changed:false,reason:'LEVEL_EPOCH_CHANGED'});
