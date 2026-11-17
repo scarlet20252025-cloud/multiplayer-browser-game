@@ -5,6 +5,7 @@ import {chromium} from 'playwright';
 import {WebSocket,WebSocketServer} from 'ws';
 import {startHtml5ResearchHost} from '../scripts/html5-research-host.mjs';
 import {Html5RoomCore} from './html5-room-core.mjs';
+import {Html5SceneGuard} from './html5-scene-guard.mjs';
 const id=()=>randomBytes(16).toString('hex');
 export async function startHtml5ResearchRoom({root,script,requireScript,entryPath,levelId=1,port=0,allowedViewerOrigins=[]}={}){
   if(!Number.isInteger(port)||port<0||port>65535)throw new RangeError('Invalid research port');
@@ -56,11 +57,13 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
     },{roomEpoch,sha:host.sourceSha256});
     // Capture the full uncollected map before network input can remove any
     // diamond; its immutable spawn roster survives future collections.
-    await page.evaluate(()=>{
-      const baseline=window.__html5RoomSnapshot.capture();
-      if(!baseline.coverage?.requiredPresent||baseline.diamondRoster.length<1)
+    const baseline=await page.evaluate(()=>{
+      const snapshot=window.__html5RoomSnapshot.capture();
+      if(!snapshot.coverage?.requiredPresent||snapshot.diamondRoster.length<1)
         throw Error('Original level did not expose its initial diamond spawn roster');
+      return snapshot;
     });
+    const sceneGuard=new Html5SceneGuard(baseline);
     await page.evaluate(()=>{
       if(!__game.paused)__game.level.togglePause();
       if(!__game.paused)throw Error('Waiting room did not pause');
@@ -227,6 +230,18 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
           inputs.forEach((input,slot)=>{if(input.seq>=0)window.__html5RoomInput.accept(slot,input);});
         },sampled);
         const state=await capture();
+        const decision=sceneGuard.observe(state.snapshot);
+        if(decision.status==='suspended'){
+          // Do not send player input into a changed native scene. A deliberate
+          // restart handshake (not implemented here) must rearm both clients.
+          room.suspend(decision.reason);
+          notify();
+          broadcast({type:'lifecycle',roomEpoch,reason:decision.reason,
+            levelEpoch:state.snapshot?.levelEpoch??null,
+            snapshotSeq:state.snapshot?.snapshotSeq??null,
+            restartSupported:false});
+          return;
+        }
         broadcast({type:'state',roomEpoch,broadcastSeq:++broadcastSeq,
           ...state,ack:state.input.slots.map(x=>x.ackSeq)});
       }).finally(()=>{pendingTick=false;});

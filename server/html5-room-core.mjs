@@ -18,6 +18,7 @@ export class Html5RoomCore {
     this.inputTimeoutMs=inputTimeoutMs;
     this.members=[null,null];
     this.userPaused=false;
+    this.suspendedReason=null;
     this.pauseRevision=0;
     this.receipts=new Map();
   }
@@ -46,12 +47,21 @@ export class Html5RoomCore {
     return this.publicState();
   }
   get bothReady(){return this.members.every(m=>m?.ready===true);}
-  get effectivePaused(){return !this.bothReady||this.userPaused;}
-  get running(){return this.bothReady&&!this.userPaused;}
+  get effectivePaused(){return !this.bothReady||this.userPaused||this.suspendedReason!==null;}
+  get running(){return this.bothReady&&!this.userPaused&&this.suspendedReason===null;}
   publicState(){
     return {protocol:HTML5_ROOM_VERSION,roomEpoch:this.roomEpoch,ready:this.members.map(m=>!!m?.ready),
       connected:this.members.map(m=>!!m),bothReady:this.bothReady,
-      userPaused:this.userPaused,effectivePaused:this.effectivePaused,pauseRevision:this.pauseRevision};
+      userPaused:this.userPaused,effectivePaused:this.effectivePaused,pauseRevision:this.pauseRevision,
+      suspendedReason:this.suspendedReason};
+  }
+  suspend(reason){
+    if(typeof reason!=='string'||!/^[-A-Z_]{3,64}$/.test(reason))
+      throw new TypeError('Suspension requires a server-owned reason');
+    if(this.suspendedReason)return {changed:false,reason:this.suspendedReason};
+    this.suspendedReason=reason;
+    this.resetPending();
+    return {changed:true,reason};
   }
   detach(memberId){
     const seat=this.seatFor(memberId);
@@ -66,6 +76,7 @@ export class Html5RoomCore {
   }
   receiveInput(memberId,message,now=Date.now()){
     const {slot,member}=this.memberFor(memberId);
+    if(this.suspendedReason)return {accepted:false,code:'ROOM_SUSPENDED'};
     if(!this.running)return {accepted:false,code:'NOT_RUNNING'};
     if(!message||typeof message!=='object'||Array.isArray(message)
       ||Object.keys(message).some(key=>!requiredInputKeys.has(key)))
@@ -115,6 +126,7 @@ export class Html5RoomCore {
   }
   proposePause(memberId,command){
     this.memberFor(memberId);
+    if(this.suspendedReason)return {accepted:false,code:'ROOM_SUSPENDED'};
     if(!command||typeof command!=='object'||Array.isArray(command)||
        Object.keys(command).some(key=>!commandKeys.has(key))||
        command.type!=='room-command'||command.command!=='pause.set'||

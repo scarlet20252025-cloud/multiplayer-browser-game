@@ -221,6 +221,7 @@ export function createSnapshotExporter(game, {
       coordinates: { bodyPosition: 'pixels, via Phaser Box2D body.x/y getters', displayPosition: 'local pixels in each existing parent', rotation: 'radians' },
       level: {
         started: field(level, 'levelStarted', 'level'),
+        sceneName: field(ownData(game, 'state'), 'current', 'game.state'),
         gamePaused: field(game, 'paused', 'game'),
         ended: field(level, 'ended', 'level'),
         physicsPaused: field(ownData(ownData(game, 'physics'), 'box2d'), 'paused', 'game.physics.box2d'),
