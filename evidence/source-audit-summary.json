@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "scope": "Static source audit and data extraction; neither original game has been run",
+  "attachments": [
+    {
+      "file": "flash-archive-20261117.zip",
+      "status": "unavailable",
+      "read": false
+    },
+    {
+      "file": "flash-archive-源码版-20261117.zip",
+      "status": "audited",
+      "uncompressedBytes": 37280624
+    }
+  ],
+  "inventory": {
+    "files": 4425,
+    "extensions": {
+      ".as": 3594,
+      ".asasm": 376,
+      ".cpp": 69,
+      ".hpp": 69,
+      ".json": 283,
+      ".md": 12,
+      ".py": 14,
+      ".txt": 8
+    },
+    "runtime_files": {
+      "abc_bytecode": 0,
+      "assets": 0,
+      "html": 0,
+      "javascript": 0,
+      "swf": 0
+    }
+  },
+  "manifestSha256": "0ccefa7e389ffe7341a04a8ab224270a74f55fc46a335a22f40c822eec69eb1b",
+  "fireboy": {
+    "formalLevels": 32,
+    "levelSourceSha256": "1f38948cdbf0ab437af554ca9fbadfea834743ed4579ae3df69516d05b2f4229",
+    "parameters": {
+      "stageFps": 25,
+      "physicsTimeStep": 0.038461538461538464,
+      "physicsTimeStepFraction": {
+        "numerator": 1,
+        "denominator": 26
+      },
+      "physicsIterations": 50,
+      "gravity": {
+        "x": 0.0,
+        "y": 26.0
+      },
+      "pixelsPerPhysicsUnit": 20
+    },
+    "dataOutputSha256": "f4fb6b633a649c7f09f5be609784f2cac80cbed96b8f34cd672310b683e293fc",
+    "limitations": [
+      "Not a Flash compiler or a game runtime",
+      "Factory argument extraction does not implement Box2D fixtures or mechanics",
+      "HTML5 Tiled GIDs are not interpreted",
+      "Ground semantics were audited for the supplied FBWG1 source; review other revisions"
+    ],
+    "details": "docs/FIREBOY_SOURCE_AUDIT.md"
+  },
+  "shanyi": {
+    "coreAsFiles": 987,
+    "features": {
+      "alchemy_cmodule": {
+        "files": 657,
+        "occurrences": 25770
+      },
+      "box2d": {
+        "files": 671,
+        "occurrences": 10681
+      },
+      "decompiler_pseudo_instructions": {
+        "files": 955,
+        "occurrences": 27091
+      },
+      "embed_metadata": {
+        "files": 0,
+        "occurrences": 0
+      },
+      "external_interface": {
+        "files": 0,
+        "occurrences": 0
+      },
+      "flash_display_api": {
+        "files": 545,
+        "occurrences": 1373
+      },
+      "flash_display_hit_tests": {
+        "files": 17,
+        "occurrences": 98
+      },
+      "flash_frame_events": {
+        "files": 43,
+        "occurrences": 67
+      },
+      "flash_imports": {
+        "files": 613,
+        "occurrences": 3435
+      },
+      "flash_keyboard_events": {
+        "files": 9,
+        "occurrences": 31
+      },
+      "flash_timeline_state": {
+        "files": 126,
+        "occurrences": 599
+      },
+      "local_persistence": {
+        "files": 1,
+        "occurrences": 4
+      },
+      "random": {
+        "files": 13,
+        "occurrences": 53
+      },
+      "runtime_frame_rate": {
+        "files": 5,
+        "occurrences": 9
+      },
+      "wall_clock_and_timers": {
+        "files": 9,
+        "occurrences": 21
+      }
+    },
+    "details": "docs/SHANYI_SOURCE_AUDIT.md"
+  },
+  "textValidation": {
+    "encoding": "utf-8-sig",
+    "decodeErrorFiles": [],
+    "replacementCharacterFiles": [
+      "02-fireboy-watergirl/decompiled/3-export/script/scripts/system/Strings.as"
+    ]
+  },
+  "originalGameArtifactsPublished": false
+}

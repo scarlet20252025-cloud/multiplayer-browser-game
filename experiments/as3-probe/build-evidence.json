@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Original AS3 bridge fixture; does not contain or validate either archived game.",
+  "sources": {
+    "flex": {
+      "version": "4.16.1 build 20171115",
+      "url": "https://downloads.apache.org/flex/4.16.1/binaries/apache-flex-sdk-4.16.1-bin.tar.gz",
+      "sha256": "17fda7ac8d3e476cad3127f345455ef316acfb87c6f4322e5897bd8d9b09388e",
+      "officialMd5Url": "https://downloads.apache.org/flex/4.16.1/binaries/apache-flex-sdk-4.16.1-bin.tar.gz.md5",
+      "officialMd5": "0fba6c912c3919ae1b978ca2d053fe07"
+    },
+    "playerglobal": {
+      "version": "32.0",
+      "url": "https://fpdownload.macromedia.com/get/flashplayer/updaters/32/playerglobal32_0.swc",
+      "sha256": "7d4d6168d27603cfb3b750302448e354e0bbc1bdd58f5d101c3dcf6891e9bb65"
+    }
+  },
+  "compiler": {
+    "version": "Version 4.16.1 build 20171115",
+    "mxmlcJarSha256": "cc07d749e376715e650271a9875289e49d94234902fff5e5fae287c478c8557b",
+    "options": [
+      "-load-config=",
+      "-compiler.external-library-path=<playerglobal32_0.swc>",
+      "-target-player=11.1",
+      "-swf-version=14",
+      "-static-link-runtime-shared-libraries=true",
+      "-debug=false",
+      "-omit-trace-statements=false",
+      "-output=experiments/as3-probe/probe.swf",
+      "experiments/as3-probe/src/NetProbe.as"
+    ]
+  },
+  "fixture": {
+    "source": "experiments/as3-probe/src/NetProbe.as",
+    "sourceSha256": "3f81b8551e661a76c6a2622ac7d386ccaf013087ca2549d843cac0778da6de49",
+    "output": "experiments/as3-probe/probe.swf",
+    "sha256": "8b0bb88d829af2101a4b5e734cee7f05adbbacb7b838143cddabf44ec5ff09dd",
+    "bytes": 2979,
+    "signature": "CWS",
+    "swfVersion": 14,
+    "declaredUncompressedBytes": 5141,
+    "avm2Flag": true,
+    "doAbcTags": 1
+  },
+  "verification": {
+    "compiled": true,
+    "validSwfLength": true,
+    "actionScript3": true,
+    "runtimeTest": "See separate browser-test evidence; compilation alone does not prove the bridge runs."
+  }
+}
