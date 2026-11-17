@@ -45,3 +45,31 @@ test('invalid starting identity is rejected rather than guessing a baseline',()=
   assert.throws(()=>new Html5SceneGuard({...original(),level:{started:false}}),/incomplete/);
   assert.throws(()=>new Html5SceneGuard({...original(),sessionEpoch:null}),/incomplete/);
 });
+
+
+test('original dual-door condition distinguishes native win from generic ended state',()=>{
+  const before=original();
+  before.doors=[{isUp:false},{isUp:false}];
+  const guard=new Html5SceneGuard(before);
+  const win=structuredClone(before);
+  win.snapshotSeq=2;win.level.ended=true;
+  win.doors=[{isUp:true},{isUp:true}];
+  assert.equal(guard.observe(win).reason,'LEVEL_WON');
+});
+test('both doors must be raised AND original level ended, not just proximity',()=>{
+  const b=original();b.doors=[{isUp:true},{isUp:true}];
+  const guard=new Html5SceneGuard(b);
+  assert.equal(guard.observe({...b,snapshotSeq:2}).status,'active');
+  const incomplete=structuredClone(b);
+  incomplete.snapshotSeq=3;incomplete.level.ended=true;
+  incomplete.doors[1].isUp=false;
+  assert.equal(guard.observe(incomplete).reason,'LEVEL_ENDED');
+});
+test('native death takes priority over dual-door success when a character is dead',()=>{
+  const b=original();const guard=new Html5SceneGuard(b);
+  const state=structuredClone(b);state.snapshotSeq=2;
+  state.level.ended=true;
+  state.doors=[{isUp:true},{isUp:true}];
+  state.characters[0].gameplay.dead=true;
+  assert.equal(guard.observe(state).reason,'CHARACTER_DEAD');
+});

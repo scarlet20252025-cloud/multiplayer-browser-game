@@ -38,14 +38,17 @@ export class Html5SceneGuard {
       reason='NON_MONOTONIC_SNAPSHOT';
     else if(snapshot.level?.started!==true)
       reason='LEVEL_STOPPED';
-    else if(snapshot.level?.ended===true)
-      reason='LEVEL_ENDED';
     else if(!Array.isArray(snapshot.characters)||snapshot.characters.length!==2)
       reason='CHARACTERS_MISSING';
     else if(snapshot.characters.some(x=>x.gameplay?.dead===true))
       reason='CHARACTER_DEAD';
     else if(snapshot.characters.some(x=>x.gameplay?.dying===true))
       reason='CHARACTER_DYING';
+    else if(snapshot.level?.ended===true && Array.isArray(snapshot.doors) &&
+      snapshot.doors.length===2 && snapshot.doors.every(door=>door.isUp===true))
+      reason='LEVEL_WON';
+    else if(snapshot.level?.ended===true)
+      reason='LEVEL_ENDED';
     if(reason){
       this.latched=reason;
       return {status:'suspended',reason,lastSeq:this.lastSeq,levelEpoch:this.levelEpoch};
