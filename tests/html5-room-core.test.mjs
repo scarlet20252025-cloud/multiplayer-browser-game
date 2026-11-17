@@ -69,3 +69,15 @@ test('invalid HTML5-only actions, wrong sockets and malformed command fields fai
   assert.equal(x.proposePause('client-aaaa',{...pause('a',true),seat:1}).code,'INVALID_PAUSE_COMMAND');
   assert.equal(x.proposePause('client-aaaa',{...pause('a',true),desiredPaused:'true'}).code,'INVALID_PAUSE_COMMAND');
 });
+
+test('real browser packets with validated jump edge fields are normalized and consumed',()=>{
+  const x=room();x.attach('client-aaaa');x.attach('client-bbbb');
+  x.markReady('client-aaaa');x.markReady('client-bbbb');
+  const packet={...input(4,1,0),pressed:1,released:1};
+  assert.equal(x.receiveInput('client-aaaa',packet,100).accepted,true);
+  const result=x.sample(102).inputs[0];
+  assert.deepEqual([result.seq,result.moveX,result.buttons,result.pressed,result.released],[4,1,0,1,1]);
+  assert.equal(x.receiveInput('client-aaaa',{...input(5,0),pressed:2},105).code,'INVALID_HTML5_EDGE');
+  assert.equal(x.receiveInput('client-aaaa',{...input(5,0),released:-1},106).code,'INVALID_HTML5_EDGE');
+  assert.equal(x.receiveInput('client-aaaa',{...input(5,0),pressed:1,slot:1},107).code,'INVALID_INPUT_FIELDS');
+});

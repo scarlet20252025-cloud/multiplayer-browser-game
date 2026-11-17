@@ -75,10 +75,23 @@ export class Html5RoomCore {
     if(!Number.isFinite(now)||now<0)return {accepted:false,code:'INVALID_TIME'};
     if(now-member.rateStart>=1000||now<member.rateStart){member.rateStart=now;member.rateCount=0;}
     if(++member.rateCount>MAX_INPUTS_PER_SECOND)return {accepted:false,code:'RATE_LIMIT'};
-    const code=member.input.receive(message,now);
+    // Browser clients report explicit edge hints, whereas the original
+    // InputBuffer validates only canonical held-state fields. Validate the
+    // hints before normalizing; never forward unknown or slot-spoof fields.
+    const pressed=message.pressed ?? 0, released=message.released ?? 0;
+    if(![pressed,released].every(v=>Number.isInteger(v)&&v>=0&&v<=1))
+      return {accepted:false,code:'INVALID_HTML5_EDGE'};
+    const canonical={type:'input',seq:message.seq,moveX:message.moveX,
+      moveY:message.moveY,buttons:message.buttons};
+    if(message.aimX!==undefined)canonical.aimX=message.aimX;
+    if(message.aimY!==undefined)canonical.aimY=message.aimY;
+    const code=member.input.receive(canonical,now);
     if(code)return {accepted:false,code};
-    // Change in pressed/released bits may be queued by InputBuffer. No slot id
-    // is accepted from the client; this member's socket fixes the seat.
+    // Explicit edges from this authenticated seat may include press+release
+    // between two sends. Preserve them, but never accept arbitrary actions.
+    member.input.pressed |= pressed;
+    member.input.released |= released;
+    // The server's socket fixes the seat; clients cannot override it.
     member.expired=false;
     member.lastReceivedAt=now;
     return {accepted:true,slot,seq:member.input.seq};
