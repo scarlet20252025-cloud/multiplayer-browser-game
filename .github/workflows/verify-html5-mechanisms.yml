@@ -4,6 +4,8 @@ on:
     branches: ['work/flash-netplay-lab']
     paths:
       - 'scripts/verify-html5-mechanisms.mjs'
+      - 'scripts/verify-html5-mechanism-viewers.mjs'
+      - 'adapters/fireboy-html5/spectator-client.mjs'
       - 'server/html5-research-room.mjs'
       - '.github/workflows/verify-html5-mechanisms.yml'
   workflow_dispatch:
@@ -45,11 +47,20 @@ jobs:
           --expected-sha256 337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677
           --level-id 52 --seat 1 --direction=-1
           --out local/html5-mechanism-results
+      - name: Check both real browser displays follow pressed button and moving platform
+        run: >-
+          node scripts/verify-html5-mechanism-viewers.mjs
+          --root local/html5-candidate/output/A
+          --script js/init.eb02fbdab2aa1d24.js
+          --expected-sha256 337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677
+          --out local/html5-mechanism-viewers
       - name: Preserve failed or successful JSON traces
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: html5-mechanism-trace
-          path: local/html5-mechanism-results/*.json
+          path: |
+            local/html5-mechanism-results/*.json
+            local/html5-mechanism-viewers/*.json
           if-no-files-found: warn
           retention-days: 14

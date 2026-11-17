@@ -114,5 +114,6 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     window.removeEventListener('blur',blur);
     ws.close();projection.uninstall();notify();
   }
-  return Object.freeze({status,onStatus,close,sendInput,projection});
+  return Object.freeze({status,onStatus,close,sendInput,projection,
+    lastSnapshot:()=>latestState?.snapshot??null});
 }
