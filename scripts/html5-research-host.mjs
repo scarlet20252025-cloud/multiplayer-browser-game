@@ -79,6 +79,7 @@ function authoredPage(script, requireScript, playerConfig=null) {
 <div style="font-size:11px;color:#c6d5e3">A/D 或 ←/→ 移动 · W/↑/Space 跳跃</div>
 <div style="font-size:11px;color:#c6d5e3">P 暂停 · 双方按 R 同意重开</div>
 <button id="research-player-restart" disabled type="button">同意重开 (R)</button>
+<button id="research-player-next" disabled type="button">同意下一关 (N)</button>
 </aside>
 <script type="application/json" id="research-player-config">${playerEntry}</script>
 <script type="module" src="/__research__/local-player.mjs"></script>`:'';

@@ -2,7 +2,8 @@
 const configNode=document.getElementById('research-player-config');
 const output=document.getElementById('research-player-status');
 const restart=document.getElementById('research-player-restart');
-if(!configNode||!output||!restart)throw Error('Local player UI is incomplete');
+const advance=document.getElementById('research-player-next');
+if(!configNode||!output||!restart||!advance)throw Error('Local player UI is incomplete');
 const config=JSON.parse(configNode.textContent);
 if(typeof config.wsUrl!=='string'||!/^ws:\/\/127\.0\.0\.1:\d+\/ws$/.test(config.wsUrl)||
    !Number.isSafeInteger(config.levelId)||config.levelId<1)
@@ -30,6 +31,7 @@ function renderStatus(status){
   else if(room?.bothReady)phase='正在游戏';
   output.textContent=role+' · 第 '+String((status.roundNumber??0)+1)+' 轮 · '+phase;
   restart.disabled=!(status.lifecycle||room?.suspendedReason)||status.resetting;
+  advance.disabled=(status.lifecycle?.reason??room?.suspendedReason)!=='LEVEL_WON'||status.resetting;
 }
 try{
   await until(()=>window.__game?.state?.current==='menu',60000);
@@ -52,9 +54,11 @@ try{
   const unsubscribe=player.onStatus(renderStatus);
   renderStatus(player.status());
   restart.addEventListener('click',()=>player.requestRestart());
+  advance.addEventListener('click',()=>player.requestAdvance());
   window.addEventListener('pagehide',()=>{unsubscribe();player.close();},{once:true});
 }catch(error){
   output.textContent='本地双人研究室启动失败：'+error.message;
   restart.disabled=true;
+  advance.disabled=true;
   console.error('HTML5_LOCAL_PLAYER_FAILED',error);
 }
