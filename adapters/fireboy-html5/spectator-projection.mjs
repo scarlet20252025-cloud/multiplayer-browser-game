@@ -89,12 +89,24 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
   const ownPauseDescriptor=Object.getOwnPropertyDescriptor(level,'pauseUpdate');
   const ownToggleDescriptor=Object.getOwnPropertyDescriptor(level,'togglePause');
   const originalInputEnabled=game.input?.enabled;
+  const originalGamePauseDescriptor=Object.getOwnPropertyDescriptor(game,'paused');
+  if(originalGamePauseDescriptor && !originalGamePauseDescriptor.configurable)
+    throw new Error('Spectator cannot guard a nonconfigurable native pause property');
+  if(!originalGamePauseDescriptor && !Object.isExtensible(game))
+    throw new Error('Spectator cannot install a pause guard on this game');
   const signal=level.pauseKey?.onDown;
   const oldToggle=level.togglePause;
-  let active=true,initialized=false,lastSeq=0,epoch=null,entities=new Map();
+  let active=true,initialized=false,lastSeq=0,epoch=null,entities=new Map(),blockedUnpauses=0;
   if(signal&&typeof signal.remove==='function')signal.remove(oldToggle,null);
-  // Game.paused still renders the stage each frame but skips physics/rules/tweens.
-  game.paused=true;
+  // The original level may asynchronously set Game.paused=false AFTER
+  // loading (even after levelStarted). Keep the locally rendered spectator
+  // permanently paused until uninstall; native physics must never run here.
+  // This only intercepts the VIEWER game property, never the authority.
+  Object.defineProperty(game,'paused',{
+    configurable:true,enumerable:originalGamePauseDescriptor?.enumerable??true,
+    get(){return true;},
+    set(next){if(next!==true)blockedUnpauses++;}
+  });
   if(game.input)game.input.enabled=false;
   level.pauseUpdate=()=>{};
   level.togglePause=()=>{};
@@ -201,7 +213,8 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
   }
   function inspect(){
     assertLive();
-    return {initialized,lastSeq,entityCount:entities.size,gamePaused:game.paused,
+    return {initialized,lastSeq,entityCount:entities.size,
+      blockedUnpauses,gamePaused:game.paused,
       physicsPaused:game.physics?.box2d?.paused??null};
   }
   function uninstall(){
@@ -214,6 +227,9 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
     if(signal&&typeof signal.add==='function'&&oldToggle&&!signal.has?.(oldToggle,null))
       signal.add(oldToggle,null);
     if(game.input)game.input.enabled=originalInputEnabled;
+    if(originalGamePauseDescriptor)
+      Object.defineProperty(game,'paused',originalGamePauseDescriptor);
+    else delete game.paused;
     entities.clear();
     return true;
   }

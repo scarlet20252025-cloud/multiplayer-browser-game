@@ -58,9 +58,11 @@ test('viewer does not invent diamond mapping from constructor names or incomplet
 test('freeze fails closed when local game resumes or scene changes',()=>{
   const f=fixture(),b=installHtml5Spectator(f.game,{devices:f.devices});
   b.initialize(f.snapshot);
-  f.game.paused=false;
-  assert.throws(()=>b.apply({...f.snapshot,snapshotSeq:2}),/resumed locally/);
-  f.game.paused=true;f.game.level={};
+  f.game.paused=false; // native delayed callback must not unfreeze the viewer
+  assert.equal(f.game.paused,true);
+  assert.equal(b.inspect().blockedUnpauses,1);
+  assert.equal(b.apply({...f.snapshot,snapshotSeq:2}).accepted,true);
+  f.game.level={};
   assert.throws(()=>b.inspect(),/scene changed/);
   assert.equal(b.uninstall(),true);
 });
@@ -112,4 +114,23 @@ test('late join uses original diamond spawns, not shifted authoritative children
   assert.equal(second.x,91);
   assert.equal(bridge.inspect().entityCount,7);
   bridge.uninstall();
+});
+
+test('spectator restores original writable pause property after native late unpause',()=>{
+  const f=fixture();
+  const before=Object.getOwnPropertyDescriptor(f.game,'paused');
+  const adapter=installHtml5Spectator(f.game,{devices:f.devices});
+  f.game.paused=false;
+  f.game.paused=false;
+  assert.equal(f.game.paused,true);
+  assert.equal(adapter.inspect().blockedUnpauses,2);
+  assert.equal(adapter.uninstall(),true);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(f.game,'paused'),before);
+  f.game.paused=false;
+  assert.equal(f.game.paused,false);
+});
+test('unsafe nonconfigurable local pause cannot silently escape the freeze guard',()=>{
+  const f=fixture();
+  Object.defineProperty(f.game,'paused',{value:false,writable:true,configurable:false});
+  assert.throws(()=>installHtml5Spectator(f.game,{devices:f.devices}),/nonconfigurable/);
 });
