@@ -13,7 +13,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MODULE_NAMES = new Set(['pause-bridge.mjs', 'state-snapshot.mjs', 'jump-observer.mjs', 'jump-analysis.mjs', 'authority-input.mjs']);
+const MODULE_NAMES = new Set(['pause-bridge.mjs', 'state-snapshot.mjs', 'jump-observer.mjs', 'jump-analysis.mjs', 'authority-input.mjs', 'spectator-projection.mjs', 'spectator-client.mjs']);
 const MODULE_PREFIX = 'adapters/fireboy-html5/';
 const INSTANCE_ANCHOR = '(o = new h.Game(m)),';
 const INSTANCE_EXPOSURE = '(o = window.__game = new h.Game(m)),';

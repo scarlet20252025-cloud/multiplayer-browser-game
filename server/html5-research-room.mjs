@@ -6,8 +6,13 @@ import {WebSocket,WebSocketServer} from 'ws';
 import {startHtml5ResearchHost} from '../scripts/html5-research-host.mjs';
 import {Html5RoomCore} from './html5-room-core.mjs';
 const id=()=>randomBytes(16).toString('hex');
-export async function startHtml5ResearchRoom({root,script,requireScript,entryPath,levelId=1,port=0}={}){
+export async function startHtml5ResearchRoom({root,script,requireScript,entryPath,levelId=1,port=0,allowedViewerOrigins=[]}={}){
   if(!Number.isInteger(port)||port<0||port>65535)throw new RangeError('Invalid research port');
+  if(!Array.isArray(allowedViewerOrigins)||allowedViewerOrigins.some(origin=>{
+    try{const url=new URL(origin);return url.protocol!=='http:'||!['127.0.0.1','localhost'].includes(url.hostname)||url.origin!==origin;}
+    catch{return true;}
+  }))throw new TypeError('Viewer origins must be explicit local HTTP origins');
+  const viewerOrigins=new Set(allowedViewerOrigins);
   let host,browser,page;
   try{
     host=await startHtml5ResearchHost({root,script,requireScript,entryPath});
@@ -92,7 +97,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
     server.on('upgrade',(req,socket,head)=>{
       const h=req.headers.host;
       const valid=h==='127.0.0.1:'+server.address()?.port||h==='localhost:'+server.address()?.port;
-      if(req.url!=='/ws'||!valid||(req.headers.origin&&req.headers.origin!=='http://'+h)||closed||failed){
+      if(req.url!=='/ws'||!valid||(req.headers.origin&&req.headers.origin!=='http://'+h&&!viewerOrigins.has(req.headers.origin))||closed||failed){
         socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;
       }
       wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws));
