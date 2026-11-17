@@ -70,6 +70,7 @@ async function openViewer(){
     };
     const mod=await import('/adapters/fireboy-html5/spectator-client.mjs');
     window.__spec=mod.connectHtml5Spectator({game:__game,wsUrl,devices:window.Devices});
+    window.__viewerPhysicsStepCount=0;
     // Ignore native physics frames occurring during the async module import.
     // The counter starts at the moment the spectator is frozen.
     window.__viewerPhysicsStepCount=0;

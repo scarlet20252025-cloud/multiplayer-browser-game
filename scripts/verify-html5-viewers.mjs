@@ -138,6 +138,8 @@ async function openViewer(){
     const native=world.Step;
     world.Step=function(...args){window.__localPhysicsSteps++;return Reflect.apply(native,this,args);};
     window.__spec=connectHtml5Spectator({game:__game,wsUrl,devices:window.Devices});
+    // Count only frames after the spectator's async install has frozen the game.
+    window.__localPhysicsSteps=0;
   },authority.url.replace(/^http/,'ws')+'/ws');
   await page.waitForFunction(()=>window.__spec?.status().seat!==null,null,{timeout:20000});
   return page;
