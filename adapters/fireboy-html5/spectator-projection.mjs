@@ -101,10 +101,47 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
     throw new Error('Spectator cannot guard a nonconfigurable native pause property');
   if(!originalGamePauseDescriptor && !Object.isExtensible(game))
     throw new Error('Spectator cannot install a pause guard on this game');
+  const renderer=game.renderer;
+  const nativeRender=renderer?.render;
+  const ownRenderDescriptor=renderer?Object.getOwnPropertyDescriptor(renderer,'render'):null;
+  if(renderer&&typeof nativeRender==='function'&&ownRenderDescriptor&&!ownRenderDescriptor.configurable)
+    throw new Error('Cannot install native spectator presentation guard');
+  const originalActors=[level.pers1,level.pers2];
   const signal=level.pauseKey?.onDown;
   const oldToggle=level.togglePause;
-  let active=true,initialized=false,lastSeq=0,epoch=null,entities=new Map(),blockedUnpauses=0,blockedWorldSteps=0;
+  let active=true,initialized=false,lastSeq=0,epoch=null,entities=new Map(),blockedUnpauses=0,blockedWorldSteps=0,presentedSnapshot=null,presentationReplays=0;
   if(signal&&typeof signal.remove==='function')signal.remove(oldToggle,null);
+  function repaintNativeFrame(){
+    if(!active||!presentedSnapshot||game.level!==level)return;
+    // Phaser's own body sync can overwrite display-only x/y during its paused
+    // draw cycle. Re-apply the most recent validated authority presentation
+    // immediately before each native render; never change Box2D bodies.
+    const present=new Set();
+    for(const category of CATEGORIES){
+      for(const entity of presentedSnapshot[category]){
+        const mapped=entities.get(entity.id);
+        if(!mapped||mapped.category!==category)continue;
+        present.add(entity.id);
+        applyEntity(entity,mapped.object);
+        if(category==='diamonds')mapped.object.visible=true;
+      }
+    }
+    for(const [id,mapped] of entities){
+      if(mapped.category==='diamonds'&&!present.has(id))mapped.object.visible=false;
+    }
+    if(game.stage&&typeof game.stage.updateTransform==='function')
+      game.stage.updateTransform();
+    presentationReplays++;
+  }
+  if(renderer&&typeof nativeRender==='function'){
+    Object.defineProperty(renderer,'render',{
+      configurable:true,writable:true,enumerable:ownRenderDescriptor?.enumerable??false,
+      value:function authoritativeSpectatorRender(...args){
+        repaintNativeFrame();
+        return Reflect.apply(nativeRender,this,args);
+      }
+    });
+  }
   // Protect the native viewer even if a Phaser callback bypasses Game.paused:
   // original rules and collision stepping execute ONLY in the authority.
   if(world&&typeof oldWorldStep==='function'){
@@ -223,6 +260,7 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       if(mapped.category==='diamonds'&&!found.has(id)){mapped.object.visible=false;hidden++;}
     }
     lastSeq=snapshot.snapshotSeq;
+    presentedSnapshot=snapshot;
     // Native Phaser normally refreshes PIXI worldTransform in updateLogic,
     // which is deliberately frozen for spectators. Rendering without it can
     // show old sprites even when sprite.x/y match the authoritative snapshot.
@@ -236,7 +274,8 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
   }
   function inspect(){
     assertLive();
-    return {initialized,lastSeq,entityCount:entities.size,
+    return {initialized,lastSeq,entityCount:entities.size,presentationReplays,
+      actorRefsMatch:originalActors[0]===level.pers1&&originalActors[1]===level.pers2,
       blockedUnpauses,blockedWorldSteps,gamePaused:game.paused,
       physicsPaused:game.physics?.box2d?.paused??null};
   }
@@ -253,6 +292,11 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       if(oldWorldStepDescriptor)Object.defineProperty(world,'Step',oldWorldStepDescriptor);
       else delete world.Step;
     }
+    if(renderer&&typeof nativeRender==='function'&&renderer.render!==nativeRender){
+      if(ownRenderDescriptor)Object.defineProperty(renderer,'render',ownRenderDescriptor);
+      else delete renderer.render;
+    }
+    presentedSnapshot=null;
     if(game.input)game.input.enabled=originalInputEnabled;
     if(originalGamePauseDescriptor)
       Object.defineProperty(game,'paused',originalGamePauseDescriptor);

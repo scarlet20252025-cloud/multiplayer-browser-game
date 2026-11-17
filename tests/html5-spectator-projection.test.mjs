@@ -173,3 +173,32 @@ test('frozen native spectator refreshes display transforms BEFORE rendering the 
   assert.equal(f.game.paused,true);
   projector.uninstall();
 });
+
+
+test('native paused renderer replays last authoritative sprites after local physics display backwrite',()=>{
+  const f=fixture();
+  const rendered=[];
+  f.game.stage={updateTransform(){rendered.push({kind:'transform',x:f.level.pers2.sprite.x});}};
+  const originalRender=function(stage){
+    assert.equal(stage,f.game.stage);
+    rendered.push({kind:'render',x:f.level.pers2.sprite.x});
+  };
+  f.game.renderer={render:originalRender};
+  const projector=installHtml5Spectator(f.game,{devices:f.devices});
+  projector.initialize(f.snapshot);
+  projector.apply({...f.snapshot,snapshotSeq:2,characters:[
+    f.snapshot.characters[0],
+    {...f.snapshot.characters[1],display:{...f.snapshot.characters[1].display,x:250}}
+  ]});
+  rendered.length=0;
+  // Simulates an asynchronous native Box2D sprite sync; the real physics
+  // state is never altered by the spectator projection.
+  f.level.pers2.sprite.x=96;
+  f.game.renderer.render(f.game.stage);
+  assert.equal(f.level.pers2.sprite.x,250);
+  assert.deepEqual(rendered,[{kind:'transform',x:250},{kind:'render',x:250}]);
+  assert.equal(projector.inspect().actorRefsMatch,true);
+  assert.ok(projector.inspect().presentationReplays>=1);
+  projector.uninstall();
+  assert.equal(f.game.renderer.render,originalRender);
+});
