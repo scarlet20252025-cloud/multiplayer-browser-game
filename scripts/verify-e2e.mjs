@@ -108,8 +108,14 @@ try{
   record('both viewers are visibly unobstructed before screenshots',{runtimeNotices});
   await a.screenshot({path:'local/screenshots/lab-player-a.png',fullPage:true});
   await b.screenshot({path:'local/screenshots/lab-player-b.png',fullPage:true});
-  await a.locator('#leave').click();await a.waitForFunction(()=>window.lab.slot===null);
-  await b.locator('#leave').click();await b.waitForFunction(()=>window.lab.slot===null);
+  for(const page of pages){
+    const stopped=await page.evaluate(()=>{
+      document.getElementById('leave').click();
+      return window.lab.slot===null&&window.lab.ready===false;
+    });
+    assert.equal(stopped,true,'Leave must stop the input sender before a server acknowledgement can arrive');
+  }
+  record('leave synchronously stops local input before its network acknowledgement',{});
   await a.locator('#match').click();await b.locator('#match').click();
   await a.waitForFunction(()=>window.lab?.ready&&window.lab.room.status==='running'&&window.lab.appliedTick>=2,null,{timeout:60000});
   await b.waitForFunction(()=>window.lab?.ready&&window.lab.room.status==='running'&&window.lab.appliedTick>=2,null,{timeout:60000});

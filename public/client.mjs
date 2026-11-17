@@ -96,7 +96,12 @@ function request(type){notice('正在准备 AS3 房间……');transmit({type,pr
 $('create').addEventListener('click',()=>request('create'));
 $('join').addEventListener('click',()=>request('join'));
 $('match').addEventListener('click',()=>request('match'));
-$('leave').addEventListener('click',()=>{clearInput();transmit({type:'leave'});});
+$('leave').addEventListener('click',()=>{
+  clearInput();transmit({type:'leave'});
+  // Stop the periodic sender synchronously. Waiting for "left" can enqueue an
+  // input after the server has already detached this connection from its seat.
+  resetSession();notice('正在退出房间……');
+});
 function sendInput(){
   if(!member||!lab.ready)return;
   const has=(...keys)=>keys.some(k=>pressed.has(k));
