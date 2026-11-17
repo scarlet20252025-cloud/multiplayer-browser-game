@@ -101,3 +101,44 @@ test('a native scene boundary suspends the whole room and rejects old controls',
   assert.deepEqual(core.suspend('CHARACTER_DEAD'),
     {changed:false,reason:'LEVEL_EPOCH_CHANGED'});
 });
+
+test('two authenticated votes start a new round and invalidate previous held inputs',()=>{
+  const core=room();core.attach('client-aaaa');core.attach('client-bbbb');
+  core.markReady('client-aaaa');core.markReady('client-bbbb');
+  core.receiveInput('client-aaaa',input(100,1,1),100);
+  core.suspend('CHARACTER_DYING');
+  const vote=id=>({type:'room-command',command:'round.restart.vote',
+    roomEpoch:'fixture-room-1',roundNumber:0,commandId:id});
+  assert.deepEqual(core.voteRestart('client-aaaa',vote('vote-1')),
+    {accepted:true,roundNumber:0,votes:1,execute:false});
+  assert.equal(core.voteRestart('client-aaaa',vote('vote-1')).votes,1);
+  assert.equal(core.voteRestart('client-bbbb',vote('vote-2')).execute,true);
+  assert.equal(core.publicState().restartPending,true);
+  const next=core.beginNewRound();
+  assert.equal(next.roundNumber,1);
+  assert.deepEqual(next.ready,[false,false]);
+  assert.equal(next.pauseRevision,1);
+  assert.equal(core.running,false);
+  assert.equal(core.publicState().suspendedReason,null);
+  assert.throws(()=>core.markReady('client-aaaa',0),/WRONG_ROUND/);
+  core.markReady('client-aaaa',1);
+  assert.equal(core.running,false);
+  core.markReady('client-bbbb',1);
+  assert.equal(core.running,true);
+  assert.equal(core.receiveInput('client-aaaa',input(0,-1),200).accepted,true);
+  assert.equal(core.sample(201).inputs[0].moveX,-1);
+});
+test('restart cannot be spoofed, replayed across round or initiated by one seat',()=>{
+  const core=room();core.attach('client-aaaa');core.attach('client-bbbb');
+  core.markReady('client-aaaa');core.markReady('client-bbbb');
+  const cmd={type:'room-command',command:'round.restart.vote',
+    roomEpoch:'fixture-room-1',roundNumber:0,commandId:'x'};
+  assert.equal(core.voteRestart('client-aaaa',cmd).code,'ROUND_NOT_SUSPENDED');
+  core.suspend('LEVEL_ENDED');
+  assert.equal(core.voteRestart('client-aaaa',{...cmd,seat:1}).code,'INVALID_RESTART_COMMAND');
+  assert.equal(core.voteRestart('client-aaaa',{...cmd,roundNumber:1}).code,'INVALID_RESTART_COMMAND');
+  assert.equal(core.voteRestart('client-aaaa',cmd).votes,1);
+  assert.throws(()=>core.beginNewRound(),/NOT_APPROVED/);
+  core.detach('client-bbbb');
+  assert.equal(core.voteRestart('client-aaaa',cmd).code,'NEED_TWO_MEMBERS');
+});

@@ -21,6 +21,9 @@ export class Html5RoomCore {
     this.suspendedReason=null;
     this.pauseRevision=0;
     this.receipts=new Map();
+    this.roundNumber=0;
+    this.restartVotes=new Set();
+    this.restartPending=false;
   }
   seatFor(memberId){
     const i=this.members.findIndex(m=>m?.id===memberId);
@@ -41,8 +44,10 @@ export class Html5RoomCore {
       lastReceivedAt:0,rateStart:0,rateCount:0};
     return slot;
   }
-  markReady(memberId){
+  markReady(memberId,roundNumber=this.roundNumber===0?0:null){
     const {member}=this.memberFor(memberId);
+    if(roundNumber!==this.roundNumber)throw new Error('WRONG_ROUND');
+    if(this.suspendedReason||this.restartPending)throw new Error('ROOM_SUSPENDED');
     member.ready=true;
     return this.publicState();
   }
@@ -53,7 +58,8 @@ export class Html5RoomCore {
     return {protocol:HTML5_ROOM_VERSION,roomEpoch:this.roomEpoch,ready:this.members.map(m=>!!m?.ready),
       connected:this.members.map(m=>!!m),bothReady:this.bothReady,
       userPaused:this.userPaused,effectivePaused:this.effectivePaused,pauseRevision:this.pauseRevision,
-      suspendedReason:this.suspendedReason};
+      suspendedReason:this.suspendedReason,roundNumber:this.roundNumber,
+      restartVotes:this.restartVotes.size,restartPending:this.restartPending};
   }
   suspend(reason){
     if(typeof reason!=='string'||!/^[-A-Z_]{3,64}$/.test(reason))
@@ -63,10 +69,48 @@ export class Html5RoomCore {
     this.resetPending();
     return {changed:true,reason};
   }
+  voteRestart(memberId,command){
+    this.memberFor(memberId);
+    if(!command||typeof command!=='object'||Array.isArray(command)||
+       Object.keys(command).some(key=>!['type','command','roomEpoch','roundNumber','commandId'].includes(key))||
+       command.type!=='room-command'||command.command!=='round.restart.vote'||
+       command.roomEpoch!==this.roomEpoch||
+       !Number.isSafeInteger(command.roundNumber)||command.roundNumber!==this.roundNumber||
+       typeof command.commandId!=='string'||command.commandId.length<1||command.commandId.length>128)
+      return {accepted:false,code:'INVALID_RESTART_COMMAND'};
+    if(!this.suspendedReason)return {accepted:false,code:'ROUND_NOT_SUSPENDED'};
+    if(!this.members.every(member=>!!member))return {accepted:false,code:'NEED_TWO_MEMBERS'};
+    this.restartVotes.add(memberId);
+    if(this.restartVotes.size===2)this.restartPending=true;
+    return {accepted:true,roundNumber:this.roundNumber,
+      votes:this.restartVotes.size,execute:this.restartPending};
+  }
+  beginNewRound(){
+    if(!this.restartPending||this.restartVotes.size!==2||!this.suspendedReason)
+      throw new Error('ROUND_RESTART_NOT_APPROVED');
+    this.roundNumber++;
+    this.pauseRevision++;
+    this.userPaused=false;
+    this.suspendedReason=null;
+    this.restartPending=false;
+    this.restartVotes.clear();
+    this.receipts.clear();
+    for(const member of this.members){
+      if(!member)continue;
+      member.ready=false;
+      member.input=new InputBuffer();
+      member.expired=false;
+      member.lastReceivedAt=0;
+      member.rateStart=0;
+      member.rateCount=0;
+    }
+    return this.publicState();
+  }
   detach(memberId){
     const seat=this.seatFor(memberId);
     if(seat===null)return {detached:false};
     this.members[seat].input.resetPending();
+    this.restartVotes.delete(memberId);
     this.members[seat]=null;
     for(const member of this.members)member?.input.resetPending();
     return {detached:true,slot:seat,room:this.publicState()};
@@ -76,7 +120,7 @@ export class Html5RoomCore {
   }
   receiveInput(memberId,message,now=Date.now()){
     const {slot,member}=this.memberFor(memberId);
-    if(this.suspendedReason)return {accepted:false,code:'ROOM_SUSPENDED'};
+    if(this.suspendedReason||this.restartPending)return {accepted:false,code:'ROOM_SUSPENDED'};
     if(!this.running)return {accepted:false,code:'NOT_RUNNING'};
     if(!message||typeof message!=='object'||Array.isArray(message)
       ||Object.keys(message).some(key=>!requiredInputKeys.has(key)))
