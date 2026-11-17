@@ -156,8 +156,53 @@ No 'Access-Control-Allow-Origin' header is present on the requested resource.
 
 补充事实：脱壳后的 `decrypted/core_3.swf`（纯代码包）能加载并渲染
 （800×600，WebGL 正常），但画面是**纯白空白** —— 因为它只有 ABC 字节码，
-图形与音频全在 `core_4.swf`。这印证了代码包与资源包必须合并才能独立运行，
-当前**尚未合并**。
+图形与音频全在 `core_4.swf`。
+
+### 3.3 合并实验：静态拼接已证伪
+
+按"代码包 + 资源包"的直觉做了三种合并，**全部未能渲染游戏**：
+
+| 方案 | 做法 | 结果 |
+| --- | --- | --- |
+| A | core_3 原样 + core_4 的定义 tag 重编号（+1000）后追加 | 加载成功、5/5 检查通过，**纯白** |
+| B | 在 A 基础上把文档类从 `fw` 改成 `Main` | 同上，**纯白** |
+| C | 加载后调用 Ruffle 的 `player.play()` | 同上，**纯白** |
+
+单独运行的结果对照：
+
+| 包 | 画面 |
+| --- | --- |
+| `core_3.swf`（代码） | 纯白 |
+| `core_4.swf`（资源） | **有画面**：白底、底部黑色地面、正上方一个半球形黑色物体、左上角文字 |
+| `core_3 + core_4` 合并 | 纯白 |
+| `core-game.swf`（第二层壳，含 4 个加密分片） | 纯黑，点击画面无效 |
+
+**根因**：这不是"代码包 + 资源包"的关系，而是**四段式链式加载**。
+`fw` 类里有 4 处独立的加载调用（反编译 `fw.as` 第 1043、2698、2918、4222 行），
+分属四个私有方法 `§ fw   §()`、`§  f w  §()`、`§  f w§()`、`§ fw  §()`，
+各自 `new` 一个分片类并调用 `§ f  w§(ByteArray, Function)`。这是一条
+"前一段加载完成才触发下一段"的链，链头没有被触发时全链不动。
+
+因此：
+- `core_3`、`core_4` 只是链上的两段，单独或两两拼接都不会启动；
+- 合并包里没有 `fw`，链式加载无从触发，所以即使结构正确、检查全过，画面仍是空白；
+- `core-game.swf` 里 `fw` 存在但链头未启动，表现为纯黑且点击无效。
+
+**这条路线要真正走通，只能改 `fw` 的字节码**，在构造函数里直接调用那 4 个私有方法，
+或另写一个 AS3 loader 去驱动。本机没有 AS3 编译器（无 mxmlc / Flex SDK），
+写 loader 这条暂时不可行；改字节码需要 `rabcdasm`/`rabcasm` 精确插入指令，
+`core-game` 的 ABC 只有 50 KB，工具能力上可行，但本次未执行。
+
+合并工具已提交在 `scripts/merge_shanyi_kernel.py`，复现命令：
+
+```bash
+python scripts/merge_shanyi_kernel.py core_3.swf core_4.swf -o merged.swf
+python scripts/merge_shanyi_kernel.py core_3.swf core_4.swf -o merged.swf --document-class Main
+```
+
+它同时验证了 character ID 重编号的正确性：重编号后 2177 个定义的引用关系一致、
+SWF 能被 Ruffle 正常解析，只是**缺调度器**。这个工具对后续"把 4 段合并成一个包"
+仍然有用，届时需要把 `fw` 一并纳入并改写其触发条件。
 
 ---
 
