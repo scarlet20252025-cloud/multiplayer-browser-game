@@ -60,3 +60,11 @@ node scripts/verify-html5-viewers.mjs --root "E:\肥鱼不乐园\flash-archive\0
 [GitHub Actions #44072833908](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44072833908) 对应固定研究候选完成 **11 项实际浏览器检查**，全部通过，失败数为零；其原始 JSON 保存到 [evidence/html5/44072833908/viewer-report.json](../evidence/html5/44072833908/viewer-report.json)。可见画面区域像素变化从无人操作的 821 增加到角色移动后的 8,684（区域 73,720 像素）；两端物理步骤继续为 0；同步对象总数 17（包括 1 个 box）。本轮仍出现 6 次已记录的 `h5api is not defined` 进度回调异常。
 
 该测试验证了**浏览器实际操作 → 服务器状态变化 → 两浏览器真实画面**以及 P 键/离开房间行为，但不覆盖掉线重连后的全关卡恢复、箱子被推动后的真实玩法、钻石被收集后的状态和通关动画。用户上传 ZIP 的版本并非本 CI 使用的固定研究候选；继续保留不同来源的独立状态记录。
+
+## 2026-11-17 — 真实钻石收集（新增）
+
+[CI #44074232490](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44074232490) 对固定研究候选实现了**正常浏览器按键引发原生 Box2D 接触后收集火钻石**。权威钻石数量 7→6，火娃个人钻石计数 0→1，两份冻结观看端均显示 6 颗钻石。测试不调用 `Diamond.grabbed()`，不传送角色，不直接销毁对象；浏览器两端物理步进仍为 0。
+
+火属性钻石的权威坐标为 (656, 848)，本轮有 8 组火娃轨迹样本。完整 JSON 留在该 CI 的 [artifact](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44074232490)（存储期限受 GitHub Actions 设定限制），持续保留的数值摘要在 `evidence/html5/44074232490/collection-summary.json`。本轮合计 12 项浏览器断言通过，6 次已知 `h5api is not defined` 进度错误仍记录，不能说完全无错误。
+
+**仍未验证**：已收集后新玩家重进场时的钻石映射、实际推箱子、按钮/杠杆联动、死亡重开、关卡完成与用户上传原包。后续测试必须针对真实玩法事件，不得通过直接设角色坐标或调用触发方法绕过玩法。
