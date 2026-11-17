@@ -53,41 +53,83 @@ try{
   const start=await app.readAuthority();
   report.initial={characters:start.snapshot.characters.map(x=>({slot:x.slot,position:x.position})),
     doors:start.snapshot.doors.map(x=>({char:x.character,isUp:x.isUp,position:x.position}))};
-  // Actual input plan: move toward the right-hand floor opening and return
-  // toward the exits. Native Box2D decides whether this is a valid solution.
-  const plan=[
-    {name:'approach-upper-right-opening',moveX:1,maxMs:9500},
-    {name:'return-toward-lower-left-exits',moveX:-1,maxMs:10500},
-    {name:'observe-native-doors',moveX:0,maxMs:2500}
-  ];
-  report.plan=plan;
-  for(const phase of plan){
-    const started=Date.now();
-    while(Date.now()-started<phase.maxMs){
-      if(!app.room.running)break;
-      fire.send(button(seq,phase.moveX));
-      water.send(button(seq,phase.moveX));
-      seq++;
-      await delay(80);
-      if(seq%3===0){
-        const state=await app.readAuthority();
-        const line={phase:phase.name,seq,
-          characters:state.snapshot.characters.map(x=>({slot:x.slot,x:x.position.x,
-            y:x.position.y,dead:x.gameplay?.dead,dying:x.gameplay?.dying})),
-          doors:state.snapshot.doors.map(x=>({char:x.character,isUp:x.isUp,
-            currentFrac:x.currentFrac})),
-          ended:state.snapshot.level.ended??null,
-          scene:state.snapshot.level.sceneName,
-          reason:app.room.suspendedReason};
-        if(report.trace.length<250)report.trace.push(line);
-        if(state.snapshot.doors.length===2&&
-           state.snapshot.doors.every(x=>x.isUp===true)&&
-           state.snapshot.level.ended===true){
-          observed=line;break;
-        }
-      }
+  // Read-only scene feedback: stage13 has an upper floor ending at x=928,
+  // and a lower intermediary platform at y=768. Each character receives
+  // *different* left/right/jump inputs via its authenticated socket.
+  const goals=start.snapshot.doors.map(d=>({
+    char:d.character,x:d.position.x,y:d.position.y
+  }));
+  const slots=start.snapshot.characters.map(c=>({
+    slot:c.slot,x:c.position.x,y:c.position.y,
+    phase:'approach-upper-gap',jumpHeld:false,
+    barrierA:false,barrierB:false,previousButtons:0
+  }));
+  report.plan={levelId,source:'read-only original ground tile/door observations',
+    upperGapStartX:928,turnBackAtX:1020,midPlatformY:768,
+    goals,notes:'Independent per-seat feedback; only natural keyboard movement and jump packets'};
+  const limit=Date.now()+39000;
+  while(Date.now()<limit && app.room.running){
+    const state=await app.readAuthority();
+    for(const slot of slots){
+      const actor=state.snapshot.characters.find(p=>p.slot===slot.slot);
+      if(!actor)throw Error('A real native character disappeared');
+      slot.x=actor.position.x;slot.y=actor.position.y;
+      if(slot.phase==='approach-upper-gap'&&slot.x>=1015)
+        slot.phase='return-on-descent';
+      if(slot.phase==='return-on-descent'&&slot.y>675&&slot.x<935)
+        slot.phase='cross-middle-platform';
+      if(slot.y>815)slot.phase='bottom-failure';
     }
-    if(observed||!app.room.running)break;
+    if(state.snapshot.doors.length===2 &&
+       state.snapshot.doors.every(d=>d.isUp===true) &&
+       state.snapshot.level.ended===true){
+      observed={phase:'native-door-win',seq,
+        doors:state.snapshot.doors.map(d=>({isUp:d.isUp,char:d.character})),
+        characters:state.snapshot.characters.map(c=>({slot:c.slot,x:c.position.x,y:c.position.y}))};
+      report.trace.push(observed);
+      break;
+    }
+    let commands=[];
+    for(const slot of slots){
+      const goal=goals.find(g=>g.char===(slot.slot===0?'fb':'wg'));
+      if(!goal||!Number.isFinite(goal.x))throw Error('Native target door not mapped');
+      let moveX=0,jump=0;
+      if(slot.phase==='approach-upper-gap')moveX=1;
+      else if(slot.phase==='return-on-descent'||slot.phase==='cross-middle-platform'){
+        moveX=-1;
+        if(slot.phase==='cross-middle-platform'){
+          for(const wall of [736,288]){
+            if(slot.x<wall+62&&slot.x>wall+17&&slot.y>685&&slot.y<795)
+              jump=1;
+          }
+        }
+        if(slot.x<=goal.x+10&&slot.phase==='cross-middle-platform')
+          slot.phase='hold-at-original-exit';
+      }else if(slot.phase==='hold-at-original-exit'){
+        moveX=Math.abs(slot.x-goal.x)<12?0:(goal.x>slot.x?1:-1);
+      }
+      // A jump press/release is a native input edge, not direct physics state.
+      const pressed=jump&&!slot.previousButtons?1:0;
+      const released=!jump&&slot.previousButtons?1:0;
+      slot.previousButtons=jump;
+      const msg={type:'input',seq,moveX,moveY:0,buttons:jump,pressed,released};
+      (slot.slot===0?fire:water).send(msg);
+      commands.push({slot:slot.slot,phase:slot.phase,moveX,jump,x:slot.x,y:slot.y,
+        targetX:goal.x});
+    }
+    seq++;
+    await delay(85);
+    if(seq%4===0){
+      const sample=await app.readAuthority();
+      report.trace.push({seq,commands,
+        characters:sample.snapshot.characters.map(c=>({slot:c.slot,x:c.position.x,
+          y:c.position.y,dying:c.gameplay?.dying})),
+        doors:sample.snapshot.doors.map(d=>({char:d.character,isUp:d.isUp,
+          currentFrac:d.currentFrac})),
+        ended:sample.snapshot.level.ended,reason:app.room.suspendedReason});
+      if(report.trace.length>175)report.trace.shift();
+    }
+    if(slots.every(s=>s.phase==='bottom-failure'))break;
   }
   report.nativeVictoryObserved=!!observed;
   report.roomReason=app.room.suspendedReason;
