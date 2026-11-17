@@ -64,7 +64,9 @@ class ExtractTests(unittest.TestCase):
     def run_extract(self, text, include_test=False):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / 'level.as'
-            p.write_text(text, encoding='utf-8')
+            # The provenance assertion below is for these exact fixture bytes,
+            # independent of Windows' text-mode newline translation.
+            p.write_bytes(text.encode('utf-8'))
             (Path(d)/'Game.as').write_text('[SWF(width="1",frameRate="25")]', encoding='utf-8')
             return audit.extract(p, include_test)
 
