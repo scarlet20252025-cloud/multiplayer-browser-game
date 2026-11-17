@@ -97,9 +97,8 @@ try{
   const first=result.trace[0];
   const peer=clients[seat];
   for(let t=0;t<125;t++){
-    // A short real jump helps reach an elevated actuator; the normal game
-    // consumes the jump latch and decides whether physical contact occurs.
-    const buttons=t>=8&&t<20?1:0;
+    // Only ordinary movement. The original game decides whether the floor button is pressed.
+    const buttons=0; // Stage 52 is a floor pusher; move across it, do not jump.
     peer.ws.send(JSON.stringify({type:'input',seq:seq++,moveX:direction,
       moveY:0,buttons,pressed:0,released:0}));
     await sleep(65);
