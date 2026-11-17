@@ -223,6 +223,10 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       if(mapped.category==='diamonds'&&!found.has(id)){mapped.object.visible=false;hidden++;}
     }
     lastSeq=snapshot.snapshotSeq;
+    // Paint the current native scene graph explicitly while the spectator's
+    // Phaser gameplay and Box2D world remain frozen.
+    if(game.renderer?.render&&game.stage)
+      game.renderer.render(game.stage);
     return {accepted:true,snapshotSeq:lastSeq,applied,hiddenDiamonds:hidden,unknownEntities:unknown,
       completeGameState:false};
   }

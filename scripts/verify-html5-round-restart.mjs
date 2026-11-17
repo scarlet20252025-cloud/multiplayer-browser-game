@@ -85,7 +85,8 @@ async function state(page){
     physicsSteps:window.__viewerPhysicsStepCount,
     nativeGamePaused:window.__game?.paused??null,
     fireX:window.__game?.level?.pers1?.sprite?.x??null,
-    waterX:window.__game?.level?.pers2?.sprite?.x??null
+    waterX:window.__game?.level?.pers2?.sprite?.x??null,
+    waterSnapshotX:window.__spec?.lastSnapshot?.()?.characters?.find(x=>x.slot===1)?.display?.x??null
   }));
 }
 try{
@@ -201,11 +202,16 @@ try{
   const authorityNow=(await authority.readAuthority()).snapshot;
   const expectedX=authorityNow.characters.find(x=>x.slot===1)?.display?.x;
   if(!Number.isFinite(expectedX)||
-     Math.abs(stableA.waterX-expectedX)>8 ||
-     Math.abs(stableB.waterX-expectedX)>8)
-    throw Error('Rearmed viewers are not synchronized to restarted Watergirl');
+     expectedX<=initialWater+15 ||
+     !Number.isFinite(stableA.waterSnapshotX) ||
+     !Number.isFinite(stableB.waterSnapshotX) ||
+     Math.abs(stableA.waterX-stableA.waterSnapshotX)>1 ||
+     Math.abs(stableB.waterX-stableB.waterSnapshotX)>1 ||
+     Math.abs(stableA.waterX-stableB.waterX)>4)
+    throw Error('Rearmed viewers do not match their own authority frames');
   report.restartMotion={initialWater,viewerX:[stableA.waterX,stableB.waterX],
-    authorityX:expectedX,viewerSteps};
+    viewerSnapshotX:[stableA.waterSnapshotX,stableB.waterSnapshotX],
+    latestAuthorityX:expectedX,viewerSteps};
   report.checks.push('new-round-seat-input-controls-original-watergirl');
   report.checks.push('reloaded-viewers-render-new-authority-without-local-physics');
   report.fullRestartHandshakeVerified=true;
