@@ -69,6 +69,9 @@ async function openViewer(){
     };
     const mod=await import('/adapters/fireboy-html5/spectator-client.mjs');
     window.__spec=mod.connectHtml5Spectator({game:__game,wsUrl,devices:window.Devices});
+    // Ignore native physics frames occurring during the async module import.
+    // The counter starts at the moment the spectator is frozen.
+    window.__viewerPhysicsStepCount=0;
   },authority.url.replace(/^http/,'ws')+'/ws');
   await page.waitForFunction(()=>window.__spec?.status().seat!==null,
     null,{timeout:20000});
@@ -97,6 +100,7 @@ try{
   await Promise.all([fire,water].map(page=>page.waitForFunction(()=>
     window.__spec?.status().initial===true,null,{timeout:25000})));
   const [beforeFire,beforeWater]=await Promise.all([state(fire),state(water)]);
+  report.initialViewers={fire:beforeFire,water:beforeWater};
   if(beforeFire.status.seat!==0||beforeWater.status.seat!==1||
     beforeFire.physicsSteps!==0||beforeWater.physicsSteps!==0)
     throw Error('Two native frozen viewer seats not initialized');
@@ -145,6 +149,7 @@ finally{
   await writeFile(path.join(dir,'native-death-viewer-report.json'),
     JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({status:report.status,reason:report.suspendedReason,
-    checks:report.checks,errors:report.errors}));
+    checks:report.checks,initialViewers:report.status==='blocked'?report.initialViewers:undefined,
+    errors:report.errors}));
   if(report.status!=='passed')process.exitCode=1;
 }
