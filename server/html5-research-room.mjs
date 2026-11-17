@@ -87,6 +87,31 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
       if(__game.paused!==value)throw Error('Native pause handler failed');
     },paused);
     const syncPause=async()=>{await enginePause(room.effectivePaused);notify();};
+    const inspectMechanisms=()=>page.evaluate(()=>{
+      const game=window.__game,level=game?.level;
+      const constructors=window.Devices??{};
+      const kinds=['Pusher','Lever','Box','MovingPlatform','Beamer','LightPusher'];
+      const sample=(entry,index)=>({
+        index,id:entry?.id??null,type:entry?.type??null,
+        x:entry?.x??null,y:entry?.y??null,
+        group:entry?.properties?.group??null
+      });
+      return {
+        levelId:level?.levelData?.id??null,
+        runtime:(level?.objects??[]).map((object,index)=>{
+          const options=object?.options??{};
+          const recognized=kinds.filter(name=>typeof constructors[name]==='function'&&
+            object instanceof constructors[name]);
+          return {index,ownType:Object.hasOwn(options,'type'),
+            optionsType:options.type??null,mapObjectId:options.id??null,
+            x:options.x??null,y:options.y??null,
+            group:options.properties?.group??null,recognized,
+            bodyX:object?.body?.x??object?.button?.body?.x??null,
+            bodyY:object?.body?.y??object?.button?.body?.y??null};
+        }),
+        authoredMapEntries:(level?.mapData?.objects?.Objects??[]).map(sample)
+      };
+    });
     const capture=()=>page.evaluate(()=>({
       snapshot:window.__html5RoomSnapshot.capture(),
       input:window.__html5RoomInput.inspect(),
@@ -174,7 +199,8 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
     let closing;
     return {
       url:'http://127.0.0.1:'+server.address().port,room,level,
-      sourceSha256:host.sourceSha256,servedSha256:host.servedSha256,readAuthority:capture,
+      sourceSha256:host.sourceSha256,servedSha256:host.servedSha256,
+      readAuthority:capture,inspectMechanisms,
       close(){
         closing??=(async()=>{
           closed=true;clearInterval(timer);

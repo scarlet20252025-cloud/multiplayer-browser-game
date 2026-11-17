@@ -63,6 +63,10 @@ try{
   clients.forEach(p=>p.ws.send('{"type":"ready"}'));
   await waitFor(()=>clients[0].events.find(e=>e.type==='room'&&e.room?.bothReady&&!e.room.effectivePaused));
   const before=await app.readAuthority();
+  result.runtimeMechanisms=await app.inspectMechanisms();
+  result.snapshotUnsupported=before.snapshot.unsupported;
+  result.allMechanisms=before.snapshot.mechanisms.map(x=>({id:x.id,kind:x.kind,sourcePaths:x.sourcePaths,
+    group:x.group,mapObjectId:x.mapObjectId,position:x.position}));
   const actor=before.snapshot.characters.find(c=>c.slot===seat);
   const levers=before.snapshot.mechanisms.filter(x=>x.kind==='lever'&&
     Number.isFinite(x.position?.x)&&Number.isFinite(x.position?.y));
