@@ -42,7 +42,7 @@ node scripts/verify-html5-mechanisms.mjs --root local/private/html5-online/games
 
 ## 2026-11-17：按钮释放、平台返回与箱子最终收敛
 
-固定研究候选第 52 关的完整真实浏览器流程已额外跑通两次：角色正常离开按钮 → 原生按钮恢复 \`state=0\` → 同组平台按原版物理返回 \`Y≈912\` → 两个冻结浏览器同时显示复位结果；在动态箱子继续移动之后，两端箱子精灵位置最终收敛至同一坐标，而且各自匹配最新权威状态。无直接写入按钮、平台或箱子位置的代码。
+固定研究候选第 52 关的完整真实浏览器流程已额外跑通两次：角色正常离开按钮 → 原生按钮恢复 `state=0` → 同组平台按原版物理返回 `Y≈912` → 两个冻结浏览器同时显示复位结果；在动态箱子继续移动之后，两端箱子精灵位置最终收敛至同一坐标，而且各自匹配最新权威状态。无直接写入按钮、平台或箱子位置的代码。
 
 - [CI #44085651969，第一次成功](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44085651969)：按钮 Y=159.744、平台 Y=912.064；两端平台均 Y=912.064；箱子权威 X=898.194295，两个客户端 X=898.216265；客户端物理 0/0。
 - [CI #44085651969，第二次独立重跑](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44085651969)：按钮 Y=159.744、平台 Y=912.128；两端平台均 Y=912.128；箱子权威 X=906.906217，两个客户端 X=906.906230；客户端物理 0/0。
@@ -50,3 +50,7 @@ node scripts/verify-html5-mechanisms.mjs --root local/private/html5-online/games
 - 整理后的两轮数字见 [evidence/html5/44085651969/reset-convergence-summary.json](../evidence/html5/44085651969/reset-convergence-summary.json)。完整生成报告保存在对应 GitHub Actions artifact（受保留期影响），并保存了每个 artifact ZIP 的 SHA-256 以追溯来源。
 
 注意：两个浏览器在**箱子仍在快速移动时**可能显示不同网络帧，不能只从不同时刻的画面坐标相减判断同步错误。新验收明确要求它们在后续相同世界状态下收敛，并与权威服务器坐标相符。完整游戏规则覆盖仍为 `false`，原用户 ZIP 的 JavaScript 版本与上述 CI 固定候选不同；用户原包独立 Playwright/浏览器验收仍未完成。
+
+## 用户上传版关卡资源的静态对应
+
+已经直接读取用户上传 `html5-online-20261117.zip` 中的 `games/1-forest-temple/data/forest/levels/forest_04_1.json`，并与固定 CI 候选对应地图比较：两者的 Objects tileset 都是 `firstgid=24`，Objects 层都含 9 个对象，按钮地图对象 ID=34、gid=24、地图坐标 (1088,192)、`group=2`；对应平台 ID=35、地图坐标 (448,896)、`group=2`、`dy=3`。因此**这一关卡路径的地图与分组静态一致**。但两套 `game.js` 的 SHA-256 不同；不能将地图一致解释为客户端版本运行或游戏逻辑完全一致。
