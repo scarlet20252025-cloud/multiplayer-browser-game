@@ -152,6 +152,88 @@ HTML5 路线没有这类问题，代价是要在压缩 JS 上做适配。
 不需要 Flash 运行时，启动与 CPU 开销都低于 Ruffle 权威宿主。
 若长期要省掉浏览器，方向是第二条（剥离 p2.js），而不是第三条。
 
+> **修正**：上节把物理层写成 p2.js 是误判。真正的模块路径是 `Phaser.Physics.BOX2D`
+> （见下节 441 行附近的 `startSystem`）。Box2D 依然是纯 JS，结论不变，但依据要按 Box2D 记。
+
+---
+
+## 输入读取点与主循环（已定位）
+
+### 物理与时钟
+
+`States/Level` 的 `loadComplete`（`game.js:44800` 附近）：
+
+```js
+this.game.physics.startSystem(Phaser.Physics.BOX2D);
+this.game.physics.box2d.setPTMRatio(32);      // 32 像素 = 1 米
+this.game.physics.box2d.gravity.y = 1e3;
+this.game.physics.box2d.useElapsedTime = true;
+this.game.physics.box2d.paused = true;         // 初始暂停
+this.game.physics.box2d.update = function () {
+  if (!this.paused) {
+    var a = Math.min(0.04, this.game.time.elapsed / 1e3);
+    this.world.Step(a, this.velocityIterations, this.positionIterations);
+  }
+};
+```
+
+要点：
+
+- 物理是 **Box2D**，不是 p2.js；`PTMRatio = 32`（Flash 版是 20，**两版坐标换算不同**）。
+- 步长**不是固定值**，是 `min(0.04, 实际帧间隔)`——即自适应步长，上限 0.04 s。
+- `paused = true` 起步，`update` 已被重写成受控调用，**权威端可以直接接管 `paused` 与 `Step`**。
+- `GameConfig.ticking` 另有 `referenceFPS: 60` / `referenceTPS: 60` 与 `minTPS/maxTPS` 自适应，
+  说明逻辑 tick 与渲染帧本来就是分开调度的。
+
+### 按键注册（`States/Level/CharCursors`，`game.js:42786-42788`）
+
+```js
+"fb" === this.id
+  ? (this.up = {isDown:false}, this.left = {isDown:false}, this.right = {isDown:false})  // 触屏按钮
+  : "wg" === this.id
+    ? (this.up = addKey(Phaser.Keyboard.W), this.left = addKey(A), this.right = addKey(D))   // WASD
+    : (this.up = addKey(Phaser.Keyboard.UP), this.left = addKey(LEFT), this.right = addKey(RIGHT));  // 方向键
+```
+
+三个分支产出的都是**同一种鸭子类型**：带 `isDown`（`Phaser.Key` 也有，手写的触屏对象也有），
+外加 `active`，触屏分支还有 `buttonDown`。**这是最干净的输入桥接入点**——
+不需要改 Phaser，只要在 `CharCursors` 构造后把这三个对象换成由网络输入驱动的实现。
+
+### 状态消费（`character.update()`，`game.js:43071-43181`）
+
+```js
+(this.cursors.right.isDown || this.cursors.left.isDown) && this.isOnLiquid
+this.cursors.left.isDown ? … : this.cursors.right.isDown ? …        // 移动方向
+this.prohibitJump && !this.cursors.up.isDown && (this.prohibitJump = !1),
+!this.prohibitJump && this.cursors.up.isDown && (地面条件)           // 跳跃
+```
+
+**跳跃用的是"按下锁存 + 松手清除"**：
+
+```js
+prohibitJump && !up.isDown  → prohibitJump = false   // 松开才解锁
+!prohibitJump && up.isDown  → 允许起跳               // 按住不会连跳
+```
+
+这与 `docs/INPUT_AND_CLOCK_CONTRACT.md` 里从 Flash 源码审计出的语义**完全一致**
+（`prohibitjump` / `u_pressed`）。也就是说，之前为 Flash 版写的输入契约**可以直接复用**，
+不需要为 HTML5 重新定义规则。
+
+### 对适配的直接含义
+
+| 项 | HTML5 版实测位置 | 适配做法 |
+| --- | --- | --- |
+| 输入读取 | `CharCursors` 的 `up/left/right` | 换成网络驱动的 `{isDown}` 对象 |
+| 输入消费 | `character.update()` 每帧读 `isDown` | 在 tick 内读取，不需要每帧轮询队列 |
+| 跳跃锁存 | `prohibitJump` | 保留原逻辑，网络侧只发"按下/松开" |
+| 物理步进 | `box2d.update` 已被重写、`paused` 可控 | 权威端持有 `paused` 与 `Step` |
+| 暂停 | `pauseKey = addKey(P)`，`togglePause` | 改为房间命令，禁止客户端自行暂停 |
+| 坐标系 | `PTMRatio = 32` | 快照里的物理坐标换算与 Flash 版（20）不同 |
+
+**尚未验证**：以上全部来自静态阅读，没有实机注入 hook。
+下一步应做的实验是：在 `CharCursors` 后插入一个替换 `isDown` 的桩，
+用键盘事件之外的方式驱动角色，确认位置确实随桩变化。
+
 ---
 
 ## 复现
