@@ -1,0 +1,518 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-17T15:30:52+08:00",
+  "repositoryCommit": "1d31780d6e64be65f9c18adaeef6f6a7536578ee",
+  "scope": "仅记录本地实际存在的文件；哈希不等于已提供原文件。",
+  "games": [
+    {
+      "gameId": "fireboy-1",
+      "displayName": "森林冰火人 第一代（Fireboy and Watergirl in the Forest Temple）",
+      "versionDescription": "2009 年 Flash 原版；本地有 AddictingGames / KIZI / SIKIDS 三个发行打包",
+      "sourceVersionMatch": {
+        "status": "matched",
+        "basis": "Game.as 与 level.as 的 SHA-256 与远程审计值完全一致；且 addictinggames 包头的 640×520 与源码 [SWF(width=640,height=520)] 相符。",
+        "gameAsSha256": "c0df054d2ce56525f749b93eff0e2d25c9dbda00cb69311be2c4f732b58646cd",
+        "levelAsSha256": "1f38948cdbf0ab437af554ca9fbadfea834743ed4579ae3df69516d05b2f4229"
+      },
+      "materialsLocated": "partial",
+      "missing": [
+        "获准在非 addictinggames.com 域名下运行的授权版本",
+        "_assets/assets.swf（level.as:22 的 Embed 目标，仅影响重新构建）"
+      ],
+      "entrypoint": "1-forest-temple_addictinggames.swf",
+      "launchParameters": [],
+      "dependencies": {
+        "assetsEmbedded": true,
+        "externalRuntimeDependency": "AGdom.initDomain() 要求 loaderURL 含 addictinggames.com 或 shockwave.com",
+        "detail": "素材全部内嵌（494 图形 / 27 音频 / 14 字体）；但 SDK 初始化依赖发行站点，本地 127.0.0.1 下 getServer() 不执行，预加载回调不触发。"
+      },
+      "files": [
+        {
+          "relativePath": "1-forest-temple_addictinggames.swf",
+          "role": "entry",
+          "bytes": 1864205,
+          "sha256": "324063c8f1918242ff20e1a6eacd0b343ef65aaddd12f9dce16bc39f4e645d1c",
+          "modified": false,
+          "source": "AddictingGames 发行版（Flash 保存计划 / Internet Archive 取得）",
+          "swfHeader": {
+            "signature": "CWS",
+            "swfVersion": 9,
+            "declaredLength": 2369518,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 640.0,
+              "height": 520.0
+            },
+            "frameRate": 25.0,
+            "frameCount": 3,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 494,
+              "audio": 27,
+              "fonts": 14,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "1-forest-temple_kizi.swf",
+          "role": "archive",
+          "bytes": 1994152,
+          "sha256": "cfcd0eab530695844e15c463307d716cf7fde4c66631e7cb0667d87f0366e84d",
+          "modified": false,
+          "source": "KIZI 发行版（Internet Archive 取得）",
+          "swfHeader": {
+            "signature": "CWS",
+            "swfVersion": 10,
+            "declaredLength": 2589718,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 640.0,
+              "height": 480.0
+            },
+            "frameRate": 25.0,
+            "frameCount": 3,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 549,
+              "audio": 27,
+              "fonts": 12,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "1-forest-temple_sikids.swf",
+          "role": "archive",
+          "bytes": 1857391,
+          "sha256": "c007c8ef959f037820eb91e8551f4e19deb89b7960e71c53faf14385f778cbe2",
+          "modified": false,
+          "source": "SIKIDS 发行版（Internet Archive 取得）",
+          "swfHeader": {
+            "signature": "CWS",
+            "swfVersion": 9,
+            "declaredLength": 2340152,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 640.0,
+              "height": 480.0
+            },
+            "frameRate": 25.0,
+            "frameCount": 3,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 479,
+              "audio": 19,
+              "fonts": 10,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "2-light-temple.swf",
+          "role": "archive",
+          "bytes": 4015341,
+          "sha256": "aa5b2d403855075edad5bce3a064579160ffbcc720ee8f7a167c98903ae15674",
+          "modified": false,
+          "source": "光之神殿，后期重编版（Internet Archive 取得）",
+          "swfHeader": {
+            "signature": "CWS",
+            "swfVersion": 15,
+            "declaredLength": 4936177,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 640.0,
+              "height": 480.0
+            },
+            "frameRate": 25.0,
+            "frameCount": 3,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 537,
+              "audio": 22,
+              "fonts": 16,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "2-light-temple_alt.swf",
+          "role": "archive",
+          "bytes": 3962063,
+          "sha256": "43d304eb76c9b0dc50e4d7ff2088695e0a54f6ae6980533155a80e9afb969f78",
+          "modified": false,
+          "source": "光之神殿，原始版（Internet Archive 取得）",
+          "swfHeader": {
+            "signature": "CWS",
+            "swfVersion": 10,
+            "declaredLength": 4814204,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 640.0,
+              "height": 480.0
+            },
+            "frameRate": 25.0,
+            "frameCount": 3,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 532,
+              "audio": 29,
+              "fonts": 16,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "3-ice-temple.swf",
+          "role": "archive",
+          "bytes": 3864607,
+          "sha256": "cd0a5d1bc9570a2d221dc0554d7cdcce2a1fadf0bc358d6bee88bdeafba25804",
+          "modified": false,
+          "source": "冰之神殿（Internet Archive 取得）",
+          "swfHeader": {
+            "signature": "CWS",
+            "swfVersion": 10,
+            "declaredLength": 5188368,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 640.0,
+              "height": 480.0
+            },
+            "frameRate": 25.0,
+            "frameCount": 3,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 634,
+              "audio": 37,
+              "fonts": 14,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "4-crystal-temple.swf",
+          "role": "archive",
+          "bytes": 4880228,
+          "sha256": "9d6bfb5cf2b7a2480842b67e356375a3d289d9dbf346e120aa2cc5d8cce1dabf",
+          "modified": false,
+          "source": "水晶神殿（Internet Archive 取得）",
+          "swfHeader": {
+            "signature": "CWS",
+            "swfVersion": 11,
+            "declaredLength": 7603789,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 640.0,
+              "height": 480.0
+            },
+            "frameRate": 25.0,
+            "frameCount": 2,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 815,
+              "audio": 46,
+              "fonts": 26,
+              "binaryData": 2
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        }
+      ],
+      "materialsAvailableToRemoteAgent": false,
+      "materialsAvailableToRemoteAgentMissing": [
+        "1-forest-temple_addictinggames.swf（1,864,205 B）",
+        "1-forest-temple_kizi.swf（1,994,152 B）",
+        "1-forest-temple_sikids.swf（1,857,391 B）"
+      ]
+    },
+    {
+      "gameId": "shanyi-core",
+      "displayName": "闪翼双星 正传（4399 发行）",
+      "versionDescription": "2011 年 Flash 原版，三层加载链；续作《闪电行动》不在本条目内",
+      "sourceVersionMatch": {
+        "status": "partial",
+        "basis": "源码目录结构与远程审计一致（987 个 .as、27,091 处 §§ 伪指令）；但正传原始 SWF 的哈希无法与远程核对，因为远程从未取得该文件。",
+        "note": "core_3.swf 由本地脱壳得到，SHA-256 可与本清单核对，不能与远程已有值比对。"
+      },
+      "materialsLocated": "complete",
+      "missing": [
+        "平台中立版本或移除 cdn.comment.4399pk.com 依赖的授权构建",
+        "原始 FLA / 可编译 AS3 工程（仅影响重新构建）"
+      ],
+      "entrypoint": "shanyi-binary.swf",
+      "launchParameters": [],
+      "dependencies": {
+        "assetsEmbedded": true,
+        "externalRuntimeDependency": "http://cdn.comment.4399pk.com/control/A4399dv_base.swf（CORS 拦截）",
+        "alchemyInSwf": true,
+        "detail": "cmodule.Box2D 的类都在 core_3.swf 的 DoABC 内，不需要外部 DLL；素材在 core_4.swf 内。运行只差绕开 4399 平台模块。"
+      },
+      "files": [
+        {
+          "relativePath": "shanyi-binary.swf",
+          "role": "entry+loader",
+          "bytes": 3485489,
+          "sha256": "cc23c8c09cfe86766ac7f8a1b2d18df5e9bc683da5645a3975713dfe7023c4ee",
+          "modified": false,
+          "source": "4399 发行版外层壳（Flash 保存计划原件，SHA-256 逐字节校验通过）",
+          "swfHeader": {
+            "signature": "CWS",
+            "swfVersion": 10,
+            "declaredLength": 3494673,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 800.0,
+              "height": 600.0
+            },
+            "frameRate": 30.0,
+            "frameCount": 2,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 0,
+              "audio": 0,
+              "fonts": 0,
+              "binaryData": 3
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "core-game.swf",
+          "role": "core",
+          "bytes": 3457698,
+          "sha256": "3db5fc09fdf3d8207e52c8c77274efb5957b5d6206ed9b8ba0af934dbdee40f5",
+          "modified": true,
+          "source": "从外层壳内嵌的 DefineBinaryData 剥出的第二层壳（派生）",
+          "swfHeader": {
+            "signature": "CWS",
+            "swfVersion": 10,
+            "declaredLength": 3499540,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 800.0,
+              "height": 600.0
+            },
+            "frameRate": 30.0,
+            "frameCount": 5,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 1,
+              "audio": 0,
+              "fonts": 4,
+              "binaryData": 4
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "core_1.swf",
+          "role": "asset",
+          "bytes": 2380,
+          "sha256": "d78a23e28b71838c341b4430d0626d9192db149f7de12fa6486d7d588b76338b",
+          "modified": true,
+          "source": "4399 分片脱壳产物：加载器（派生）",
+          "swfHeader": {
+            "signature": "FWS",
+            "swfVersion": 10,
+            "declaredLength": 2380,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 550.0,
+              "height": 400.0
+            },
+            "frameRate": 30.0,
+            "frameCount": 1,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 0,
+              "audio": 0,
+              "fonts": 0,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "core_2.swf",
+          "role": "asset",
+          "bytes": 2734,
+          "sha256": "5bc15b956f2825007175184220b40617c023d11caea05d1d2f3f050a3854ace3",
+          "modified": true,
+          "source": "4399 分片脱壳产物：提示页（派生）",
+          "swfHeader": {
+            "signature": "FWS",
+            "swfVersion": 9,
+            "declaredLength": 2734,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 700.0,
+              "height": 450.0
+            },
+            "frameRate": 30.0,
+            "frameCount": 1,
+            "avmType": "AVM2 (FileAttributes 声明 AS3，但未找到 DoABC)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 0,
+              "audio": 0,
+              "fonts": 2,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "core_3.swf",
+          "role": "core",
+          "bytes": 1917739,
+          "sha256": "98d06167b9947dd16d01885f15f5ec3319c188f8c2ef75d1dc7d6dd9bbf13478",
+          "modified": true,
+          "source": "4399 分片脱壳产物：纯代码包 3×DoABC（派生）",
+          "swfHeader": {
+            "signature": "FWS",
+            "swfVersion": 10,
+            "declaredLength": 1917739,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 800.0,
+              "height": 600.0
+            },
+            "frameRate": 30.0,
+            "frameCount": 3,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 0,
+              "audio": 0,
+              "fonts": 0,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "core_4.swf",
+          "role": "asset",
+          "bytes": 3278511,
+          "sha256": "9d2fdc3eaa671d3fec30fdcaa4aba271a764dc1bae1b72993e6fedc1a621dc4c",
+          "modified": true,
+          "source": "4399 分片脱壳产物：纯资源包（派生）",
+          "swfHeader": {
+            "signature": "FWS",
+            "swfVersion": 10,
+            "declaredLength": 3278511,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 800.0,
+              "height": 600.0
+            },
+            "frameRate": 30.0,
+            "frameCount": 2,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 0,
+              "audio": 0,
+              "fonts": 0,
+              "binaryData": 0
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        },
+        {
+          "relativePath": "extracted-C-lightning.swf",
+          "role": "archive",
+          "bytes": 5159778,
+          "sha256": "122e365c025cfb4f8fd2defd736be86568efd6505c551f115340a5f37e3234a1",
+          "modified": false,
+          "source": "《闪翼双星之闪电行动》续作，未加壳（派生自加壳版本，对照用）",
+          "swfHeader": {
+            "signature": "FWS",
+            "swfVersion": 12,
+            "declaredLength": 5159778,
+            "lengthMatchesDeclared": true,
+            "stage": {
+              "width": 800.0,
+              "height": 600.0
+            },
+            "frameRate": 30.0,
+            "frameCount": 1,
+            "avmType": "AVM2 (DoABC 存在)",
+            "fileAttributesAs3Flag": true,
+            "embedded": {
+              "graphics": 687,
+              "audio": 2,
+              "fonts": 6,
+              "binaryData": 8
+            }
+          },
+          "publicRedistribution": "restricted",
+          "basis": "原归档 README 注明仅供保存与学习研究、禁止再发布素材；未获得原作者或发行方的再分发授权。",
+          "repositoryPath": null,
+          "availability": "private-local"
+        }
+      ],
+      "materialsAvailableToRemoteAgent": false,
+      "materialsAvailableToRemoteAgentMissing": [
+        "shanyi-binary.swf（3,485,489 B）",
+        "core-game.swf（3,457,698 B）",
+        "core_1..core_4.swf（脱壳产物）"
+      ]
+    }
+  ]
+}
