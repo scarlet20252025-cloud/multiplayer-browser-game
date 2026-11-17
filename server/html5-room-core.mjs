@@ -1,0 +1,135 @@
+/** Original room-domain logic for a two-seat HTML5 research authority.
+ * No sockets, browser, game code, or copyrighted assets live in this module.
+ * The transport binds each socket to an opaque server-owned memberId.
+ */
+import {InputBuffer,INPUT_TIMEOUT_MS,MAX_INPUTS_PER_SECOND} from './protocol.mjs';
+
+export const HTML5_ROOM_VERSION=1;
+const commandKeys=new Set(['type','command','roomEpoch','commandId','baseRevision','desiredPaused']);
+const requiredInputKeys=new Set(['type','seq','moveX','moveY','buttons','pressed','released','aimX','aimY']);
+
+export class Html5RoomCore {
+  constructor({roomEpoch,inputTimeoutMs=INPUT_TIMEOUT_MS}={}){
+    if(typeof roomEpoch!=='string'||!/^[-\w]{6,80}$/.test(roomEpoch))
+      throw new TypeError('A server-generated roomEpoch is required');
+    if(!Number.isSafeInteger(inputTimeoutMs)||inputTimeoutMs<50||inputTimeoutMs>30000)
+      throw new RangeError('Invalid input timeout');
+    this.roomEpoch=roomEpoch;
+    this.inputTimeoutMs=inputTimeoutMs;
+    this.members=[null,null];
+    this.userPaused=false;
+    this.pauseRevision=0;
+    this.receipts=new Map();
+  }
+  seatFor(memberId){
+    const i=this.members.findIndex(m=>m?.id===memberId);
+    return i<0?null:i;
+  }
+  memberFor(memberId){
+    const slot=this.seatFor(memberId);
+    if(slot===null)throw new Error('NOT_JOINED');
+    return {slot,member:this.members[slot]};
+  }
+  attach(memberId){
+    if(typeof memberId!=='string'||memberId.length<8||memberId.length>128)
+      throw new TypeError('Expected opaque server-owned member id');
+    if(this.seatFor(memberId)!==null)throw new Error('ALREADY_JOINED');
+    const slot=this.members.findIndex(m=>!m);
+    if(slot<0)throw new Error('ROOM_FULL');
+    this.members[slot]={id:memberId,ready:false,input:new InputBuffer(),expired:false,
+      lastReceivedAt:0,rateStart:0,rateCount:0};
+    return slot;
+  }
+  markReady(memberId){
+    const {member}=this.memberFor(memberId);
+    member.ready=true;
+    return this.publicState();
+  }
+  get bothReady(){return this.members.every(m=>m?.ready===true);}
+  get effectivePaused(){return !this.bothReady||this.userPaused;}
+  get running(){return this.bothReady&&!this.userPaused;}
+  publicState(){
+    return {protocol:HTML5_ROOM_VERSION,roomEpoch:this.roomEpoch,ready:this.members.map(m=>!!m?.ready),
+      connected:this.members.map(m=>!!m),bothReady:this.bothReady,
+      userPaused:this.userPaused,effectivePaused:this.effectivePaused,pauseRevision:this.pauseRevision};
+  }
+  detach(memberId){
+    const seat=this.seatFor(memberId);
+    if(seat===null)return {detached:false};
+    this.members[seat].input.resetPending();
+    this.members[seat]=null;
+    for(const member of this.members)member?.input.resetPending();
+    return {detached:true,slot:seat,room:this.publicState()};
+  }
+  resetPending(){
+    for(const member of this.members)if(member)member.input.resetPending();
+  }
+  receiveInput(memberId,message,now=Date.now()){
+    const {slot,member}=this.memberFor(memberId);
+    if(!this.running)return {accepted:false,code:'NOT_RUNNING'};
+    if(!message||typeof message!=='object'||Array.isArray(message)
+      ||Object.keys(message).some(key=>!requiredInputKeys.has(key)))
+      return {accepted:false,code:'INVALID_INPUT_FIELDS'};
+    if(message.moveY!==0||((message.buttons??0)&~1)!==0)
+      return {accepted:false,code:'UNSUPPORTED_HTML5_ACTION'};
+    if(!Number.isFinite(now)||now<0)return {accepted:false,code:'INVALID_TIME'};
+    if(now-member.rateStart>=1000||now<member.rateStart){member.rateStart=now;member.rateCount=0;}
+    if(++member.rateCount>MAX_INPUTS_PER_SECOND)return {accepted:false,code:'RATE_LIMIT'};
+    const code=member.input.receive(message,now);
+    if(code)return {accepted:false,code};
+    // Change in pressed/released bits may be queued by InputBuffer. No slot id
+    // is accepted from the client; this member's socket fixes the seat.
+    member.expired=false;
+    member.lastReceivedAt=now;
+    return {accepted:true,slot,seq:member.input.seq};
+  }
+  /**
+   * Sample at the transport rate. ACK still comes from the real game bridge,
+   * not these sampled inputs. Input timeout emits a reset instruction, because
+   * it can preserve the previous seq while releasing buttons.
+   */
+  sample(now=Date.now()){
+    const resets=[];
+    const inputs=this.members.map((member,slot)=>{
+      if(!member||!member.ready||!this.running)return {seq:-1,moveX:0,buttons:0,pressed:0,released:0};
+      if(member.lastReceivedAt && now-member.lastReceivedAt>this.inputTimeoutMs && !member.expired){
+        member.expired=true;resets.push(slot);
+      }
+      const i=member.input.consume(now);
+      return {seq:i.seq,moveX:i.moveX,buttons:i.buttons&1,pressed:i.pressed&1,released:i.released&1};
+    });
+    return {inputs,resets};
+  }
+  proposePause(memberId,command){
+    this.memberFor(memberId);
+    if(!command||typeof command!=='object'||Array.isArray(command)||
+       Object.keys(command).some(key=>!commandKeys.has(key))||
+       command.type!=='room-command'||command.command!=='pause.set'||
+       typeof command.commandId!=='string'||command.commandId.length<1||command.commandId.length>128||
+       !Number.isSafeInteger(command.baseRevision)||typeof command.desiredPaused!=='boolean')
+      return {accepted:false,code:'INVALID_PAUSE_COMMAND'};
+    if(command.roomEpoch!==this.roomEpoch)return {accepted:false,code:'WRONG_EPOCH'};
+    const key=memberId+':'+command.commandId;
+    if(this.receipts.has(key))return {...this.receipts.get(key),replayed:true};
+    if(!this.bothReady)return {accepted:false,code:'NOT_READY'};
+    if(command.baseRevision!==this.pauseRevision)
+      return {accepted:false,code:'STALE_REVISION',pauseRevision:this.pauseRevision};
+    return {accepted:true,memberId,key,commandId:command.commandId,desiredPaused:command.desiredPaused,
+      baseRevision:this.pauseRevision,changed:command.desiredPaused!==this.userPaused};
+  }
+  commitPause(proposal){
+    if(!proposal?.accepted||proposal.baseRevision!==this.pauseRevision)
+      throw new Error('Pause command must be validated against current revision');
+    if(proposal.changed){
+      this.userPaused=proposal.desiredPaused;
+      this.pauseRevision++;
+      this.resetPending();
+    }
+    const receipt={accepted:true,changed:proposal.changed,commandId:proposal.commandId,
+      paused:this.userPaused,pauseRevision:this.pauseRevision};
+    this.receipts.set(proposal.key,receipt);
+    // Bounded replay cache. Once evicted, an old baseRevision remains stale.
+    if(this.receipts.size>1024)this.receipts.delete(this.receipts.keys().next().value);
+    return receipt;
+  }
+}
