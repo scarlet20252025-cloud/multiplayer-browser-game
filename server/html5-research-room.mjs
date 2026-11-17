@@ -112,6 +112,41 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
         authoredMapEntries:(level?.mapData?.objects?.Objects??[]).map(sample)
       };
     });
+    // Native lifecycle discovery is read-only and never invokes a game handler.
+    const inspectLifecycle=()=>page.evaluate(()=>{
+      const game=window.__game,level=game?.level;
+      const regex=/restart|reset|reload|menu|exit|end|finish|die|death|start|win|complete|lose|pause|return|retry/i;
+      function methods(object){
+        const output=new Set();
+        let target=object;
+        for(let depth=0;target&&depth<3;depth++,target=Object.getPrototypeOf(target)){
+          for(const name of Object.getOwnPropertyNames(target)){
+            if(name==='constructor'||!regex.test(name))continue;
+            const descriptor=Object.getOwnPropertyDescriptor(target,name);
+            if(descriptor && Object.hasOwn(descriptor,'value') &&
+              typeof descriptor.value==='function')output.add(name);
+          }
+        }
+        return [...output].sort().slice(0,100);
+      }
+      const snapshot=window.__html5RoomSnapshot?.capture();
+      return {
+        stateName:game?.state?.current??null,
+        stateKeys:Object.keys(game?.state?.states??{}).slice(0,50),
+        levelEpoch:snapshot?.levelEpoch??null,
+        levelEnded:level?.ended??null,
+        characters:[level?.pers1,level?.pers2].map(x=>({
+          dead:x?.isDead??null,dying:x?.dying??null,x:x?.body?.x??null,y:x?.body?.y??null
+        })),
+        levelMethods:methods(level),
+        levelStateMethods:methods(game?.state?.states?.level),
+        gameStateMethods:methods(game?.state),
+        levelObjectNames:Object.keys(level??{}).filter(x=>regex.test(x)).slice(0,100),
+        doorFlags:[level?.door1,level?.door2].map(x=>({
+          isOpen:x?.isOpen??null,isUp:x?.isUp??null,currentFrac:x?.currentFrac??null
+        }))
+      };
+    });
     const capture=()=>page.evaluate(()=>({
       snapshot:window.__html5RoomSnapshot.capture(),
       input:window.__html5RoomInput.inspect(),
@@ -200,7 +235,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
     return {
       url:'http://127.0.0.1:'+server.address().port,room,level,
       sourceSha256:host.sourceSha256,servedSha256:host.servedSha256,
-      readAuthority:capture,inspectMechanisms,
+      readAuthority:capture,inspectMechanisms,inspectLifecycle,
       close(){
         closing??=(async()=>{
           closed=true;clearInterval(timer);
