@@ -209,6 +209,45 @@ try{
       }
     }
   }finally{await second.keyboard.up('KeyA').catch(()=>{});}
+  // Verify real native pusher unpress and linked platform return; no direct state writes.
+  report.releaseProbe={status:'blocked',samples:[]};
+  const released=await until(async()=>{
+    const state=mechanism((await authority.readAuthority()).snapshot);
+    if(!state)return null;
+    if(report.releaseProbe.samples.length<100)report.releaseProbe.samples.push({
+      at:Date.now(),buttonState:state.pusher.state,buttonY:state.pusher.y,
+      platformY:state.platform.y
+    });
+    return state.pusher.state===0 &&
+      Math.abs(state.pusher.y-authorityBefore.pusher.y)<3 &&
+      Math.abs(state.platform.y-authorityBefore.platform.y)<3 ?state:null;
+  },13000);
+  report.releaseProbe.authority=released;
+  const releasedViews=await until(async()=>{
+    const [left,right]=await Promise.all([view(first),view(second)]);
+    if(left.error||right.error)throw Error('Viewer projection errored during pusher release');
+    if(!left.delivered||!right.delivered)return null;
+    if(left.delivered.pusher.state!==0||right.delivered.pusher.state!==0)return null;
+    if([left,right].some(v=>
+      !Number.isFinite(v.rendered.pusher.y)||!Number.isFinite(v.rendered.platform.y)||
+      Math.abs(v.rendered.platform.y-authorityBefore.platform.y)>=3||
+      Math.abs(v.rendered.pusher.y-authorityBefore.pusher.y)>=3||
+      Math.abs(v.rendered.platform.y-v.delivered.platform.y)>1||
+      Math.abs(v.rendered.pusher.y-v.delivered.pusher.y)>1))return null;
+    if(left.stepCount!==0||right.stepCount!==0)
+      throw Error('A spectator resumed its own Box2D simulation');
+    return {left,right};
+  },12000);
+  report.releaseProbe.status='passed';
+  report.releaseProbe.viewerY=[
+    releasedViews.left.rendered.platform.y,releasedViews.right.rendered.platform.y
+  ];
+  pass('native-button-release-and-two-viewer-platform-reset',{
+    authorityButtonState:released.pusher.state,
+    platformY:released.platform.y,
+    viewerY:report.releaseProbe.viewerY,
+    initialPlatformY:authorityBefore.platform.y
+  });
   const unknown=report.diagnostics.filter(x=>x.type==='pageerror'&&
     x.message!=='h5api is not defined');
   if(unknown.length)throw Error('Unexplained browser errors detected');
