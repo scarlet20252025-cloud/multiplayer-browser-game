@@ -6,6 +6,7 @@ on:
     paths:
       - 'adapters/fireboy-html5/spectator-*.mjs'
       - 'server/html5-research-room.mjs'
+      - 'server/html5-room-core.mjs'
       - 'scripts/html5-research-host.mjs'
       - 'scripts/verify-html5-viewers.mjs'
       - '.github/workflows/verify-html5-viewers.yml'
