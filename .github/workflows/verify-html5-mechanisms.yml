@@ -43,7 +43,7 @@ jobs:
           --root local/html5-candidate/output/A
           --script js/init.eb02fbdab2aa1d24.js
           --expected-sha256 337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677
-          --level-id 27 --seat 0 --direction -1
+          --level-id 27 --seat 0 --direction=-1
           --out local/html5-mechanism-results
       - name: Preserve failed or successful JSON traces
         if: always()
