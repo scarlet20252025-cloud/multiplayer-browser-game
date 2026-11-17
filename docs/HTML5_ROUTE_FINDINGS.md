@@ -96,11 +96,61 @@ HTML5 路线没有这类问题，代价是要在压缩 JS 上做适配。
 
 ### 仍需验证的项
 
-- [ ] `game.js` 是否能在 Node 中脱离 DOM 运行（决定能否去掉服务端浏览器）
+- [x] `game.js` 是否能在 Node 中脱离 DOM 运行（**已测，结论见下节**）
 - [ ] 输入读取点与主循环位置（决定 hook 点）
 - [ ] 关卡数据与运行逻辑的对应（GID → 碰撞/机关语义）
 - [ ] 6 部的 `game.js` 结构差异（5/6 与 1–4 不同）
 - [ ] 音频、动画、机关状态能否进快照
+
+---
+
+## 能否脱离 DOM 在 Node 里跑：不能，但也不需要 Ruffle
+
+### 实测的阻塞链
+
+直接 `require('js/game.js')`，按顺序撞到：
+
+| 步骤 | 错误 | 位置 |
+| --- | --- | --- |
+| 1 | `ReferenceError: localStorage is not defined` | `game.js:69`（读取作弊开关） |
+| 2 | 补 `localStorage` 后 → `ReferenceError: window is not defined` | `game.js:54`，`startGame()` 在顶层被调用 |
+| 3 | 后续待撞：jQuery 的 `$`、require.js 的 `define`、Phaser 的 canvas/WebGL | 静态分析确认 |
+
+`game.js` 在 IIFE 之前就有顶层执行（`GameConfig` 赋值、`startGame()` 调用），
+所以不是"加一层沙箱就能隔离"的结构。
+
+### 静态分析给出的依赖面
+
+| 项目 | 实际值 | 影响 |
+| --- | --- | --- |
+| 入口 | `index.html` 用 `require.js`，`data-main="js/game.js"` | AMD 而非 CommonJS |
+| AMD 模块数 | 164 个 | 需完整 require 环境 |
+| 渲染器 | `new h.Game({renderer: h.AUTO, …})` | 自动选 WebGL / Canvas |
+| 渲染模式常量 | 只有 `WEBGL_RENDERER = 0`、`CANVAS_RENDERER = 1` | **这个裁剪版没有 `HEADLESS`（3）** |
+| DOM 依赖 | `window.innerWidth`、`devicePixelRatio`、`document.` 114 处、`canvas` 170 处、`WebGL` 160 处 | 强耦合 |
+| jQuery | `$(window).width()`、`$.ajaxSetup` | 需 jQuery |
+| 页面事件 | `window.onblur` / `onfocus` / `onpagehide` / `onpageshow` | 依赖页面生命周期 |
+| 状态暴露 | 游戏实例在 IIFE 内，`window` 上只有 `Devices`/`URL`/`requestAnimationFrame` 等 | **外部无法读游戏状态** |
+
+### 一个积极发现：物理引擎是纯 JS
+
+164 个 AMD 模块里包含完整的 **p2.js**（`../objects/Body`、`../math/vec2`、`../collision/AABB`、
+`../constraints/*`、`../equations/*`）。p2.js 不依赖 DOM。
+
+这意味着"只跑权威逻辑"在原理上可行，但要把玩法逻辑从 Phaser 的 state 里剥出来，
+工作量远大于直接跑浏览器。
+
+### 结论与成本排序
+
+| 方案 | 可行性 | 成本 |
+| --- | --- | --- |
+| **Chromium 跑原生 JS（推荐）** | 已验证（本文件上面的实测） | 每房间一个 browser context，**但不需要 Ruffle 模拟 Flash/AS3**，明显轻于原方案 |
+| 剥离 p2.js 逻辑做纯 Node 权威端 | 原理可行 | 大：需拆 Phaser state、重建关卡与机关、对齐手感 |
+| 在 Node 里重建浏览器环境 | 不推荐 | 极高：localStorage → window → jQuery → require → canvas/WebGL 逐层补桩，最后仍要软件渲染 |
+
+**对项目决策的含义**：服务端仍然需要浏览器进程，但这条路的"浏览器"跑的是原生 JS，
+不需要 Flash 运行时，启动与 CPU 开销都低于 Ruffle 权威宿主。
+若长期要省掉浏览器，方向是第二条（剥离 p2.js），而不是第三条。
 
 ---
 
