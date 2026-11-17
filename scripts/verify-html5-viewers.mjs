@@ -344,17 +344,35 @@ try{
   // The replacement browser must also control only its reassigned seat.
   const priorWater=lateJoin.water.x;
   const priorFire=lateJoin.fire.x;
-  await replacement.keyboard.down('KeyD');
-  await sleep(650);
-  await replacement.keyboard.up('KeyD');
-  const rejoinedMotion=await until(async()=>{
-    const [newViewer,firstViewer]=await Promise.all([
-      viewerState(replacement),viewerState(first)]);
-    if(newViewer.water.x<=priorWater+15||firstViewer.water.x<=priorWater+15)
-      return null;
-    if(Math.abs(newViewer.water.x-firstViewer.water.x)>3)return null;
-    return {newViewer,firstViewer};
-  },12000);
+  // On this tutorial platform, right movement may enter an obstacle after the
+  // earlier interaction. Move toward the verified left-side open platform.
+  const direction=priorWater>140?'KeyA':'KeyD';
+  const sign=direction==='KeyA'?-1:1;
+  const beforeAck=(await authority.readAuthority()).input.slots[1].ackSeq;
+  await replacement.keyboard.down(direction);
+  await sleep(800);
+  await replacement.keyboard.up(direction);
+  let latestRejoinedState=null;
+  let rejoinedMotion;
+  try{
+    rejoinedMotion=await until(async()=>{
+      const [newViewer,firstViewer]=await Promise.all([
+        viewerState(replacement),viewerState(first)]);
+      const server=await authority.readAuthority();
+      latestRejoinedState={newViewer,firstViewer,
+        serverAck:server.input.slots[1].ackSeq,
+        serverWaterX:server.snapshot.characters.find(c=>c.slot===1).position.x,
+        gamePaused:server.gamePaused};
+      if(sign*(newViewer.water.x-priorWater)<=15||
+         sign*(firstViewer.water.x-priorWater)<=15)return null;
+      if(Math.abs(newViewer.water.x-firstViewer.water.x)>3)return null;
+      return {newViewer,firstViewer};
+    },12000);
+  }catch(error){
+    report.rejoinInputProbe={direction,priorWater,priorFire,beforeAck,latestRejoinedState};
+    throw error;
+  }
+  report.rejoinInputProbe={direction,priorWater,priorFire,beforeAck,latestRejoinedState};
   assert.ok(Math.abs(rejoinedMotion.newViewer.fire.x-priorFire)<3,
     'Rejoining Watergirl caused Fireboy to move');
   assert.equal(rejoinedMotion.newViewer.worldSteps,0);
