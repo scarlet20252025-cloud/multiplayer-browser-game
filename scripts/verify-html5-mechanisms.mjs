@@ -68,12 +68,21 @@ try{
     Number.isFinite(x.position?.x)&&Number.isFinite(x.position?.y));
   const platforms=before.snapshot.mechanisms.filter(x=>x.kind==='platform');
   const candidates=levers.map(lever=>({lever,
-    related:platforms.filter(platform=>platform.group===lever.group)}))
-    .filter(x=>x.related.length);
-  if(!candidates.length)throw Error('No lever associated with a readable platform on selected stage');
-  candidates.sort((a,b)=>Math.abs(a.lever.position.x-actor.position.x)-
-    Math.abs(b.lever.position.x-actor.position.x));
+    related:platforms.filter(platform=>platform.group===lever.group)}));
+  // Do not choose a remote lever just because its linked platform happened to
+  // have the same group. Preserve the entire runtime-discovered candidate set.
+  result.discovery={
+    actor:actor.position,
+    levers:candidates.map(x=>({id:x.lever.id,position:x.lever.position,
+      state:x.lever.state,group:x.lever.group,linkedPlatforms:x.related.map(p=>p.id)})),
+    platforms:platforms.map(x=>({id:x.id,position:x.position,group:x.group,state:x.state}))
+  };
+  if(!candidates.length)throw Error('Selected level has no runtime-observed lever');
+  const distance=x=>Math.hypot(x.lever.position.x-actor.position.x,
+    x.lever.position.y-actor.position.y);
+  candidates.sort((a,b)=>distance(a)-distance(b));
   const target=candidates[0];
+  if(!target.related.length)throw Error('Nearest reachable lever has no mapped platform: capture the discrepancy, do not choose a distant actuator');
   const leverId=target.lever.id,platformId=target.related[0].id;
   result.target={seat,direction,lever:{id:leverId,position:target.lever.position,
     group:target.lever.group,state:target.lever.state},
