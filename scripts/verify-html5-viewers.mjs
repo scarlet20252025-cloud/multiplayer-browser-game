@@ -84,6 +84,8 @@ async function viewerState(page){
     worldSteps:window.__localPhysicsSteps??null,
     fire:{x:window.__game?.level?.pers1?.sprite?.x,y:window.__game?.level?.pers1?.sprite?.y},
     water:{x:window.__game?.level?.pers2?.sprite?.x,y:window.__game?.level?.pers2?.sprite?.y},
+    crate:(()=>{const box=window.__game?.level?.objects?.find(x=>x?.options?.type==='box');
+      return box?{x:box.sprite?.x,y:box.sprite?.y,rotation:box.sprite?.rotation}:null;})(),
     activeCanvas:document.querySelectorAll('canvas').length,
   }));
 }
@@ -205,13 +207,21 @@ try{
     const swater=server.characters.find(c=>c.slot===1)?.display?.x;
     if(!Number.isFinite(sfire)||!Number.isFinite(swater))return null;
     if(Math.abs(v0.fire.x-sfire)>3||Math.abs(v0.water.x-swater)>3)return null;
-    return {v0,v1,sfire,swater,counts:server.counts};
+    const crate=server.mechanisms.find(x=>x.kind==='box');
+    if(!crate||!Number.isFinite(crate.display?.x)||!Number.isFinite(crate.display?.y))
+      throw Error('Real authority did not export the movable Box');
+    if(!v0.crate||!v1.crate)return null;
+    if([v0,v1].some(v=>Math.abs(v.crate.x-crate.display.x)>3||
+      Math.abs(v.crate.y-crate.display.y)>3))return null;
+    return {v0,v1,sfire,swater,crate,counts:server.counts};
   });
   assert.equal(matched.counts.diamonds,7);
   assert.equal(matched.counts.doors,2);
   assert.equal(matched.counts.mechanisms,6);
   pass('both-sprites-follow-one-authority',{fire:matched.sfire,water:matched.swater,
     counts:matched.counts,frames:[matched.v0.state.frames,matched.v1.state.frames]});
+  pass('movable-box-present-and-position-matches',{x:matched.crate.display.x,
+    y:matched.crate.display.y,kind:matched.crate.kind});
   assert.equal((await viewerState(first)).worldSteps,initialPhysics[0]);
   assert.equal((await viewerState(second)).worldSteps,initialPhysics[1]);
   pass('no-client-physics-resumed',{steps:initialPhysics});
