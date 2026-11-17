@@ -406,6 +406,7 @@ finally{
   report.finishedAt=new Date().toISOString();
   await writeFile(path.join(out,'viewer-report.json'),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({status:report.status,gameSha256:report.gameSha256,
-    checks:report.checks.map(c=>c.name),errors:report.errors}));
+    checks:report.checks.map(c=>c.name),errors:report.errors,
+    lifecycleDiagnostic:report.status==='failed'?report.lifecycleDiagnostic:undefined}));
   if(report.status!=='passed')process.exitCode=1;
 }
