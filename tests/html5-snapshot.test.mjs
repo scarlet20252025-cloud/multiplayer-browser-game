@@ -206,7 +206,7 @@ test('diamond spawn roster survives children-array shifts and preserves live IDs
   const {game,options,diamond}=fixture();
   const another=Object.assign(new Diamond(),sprite(160,165),{
     body:body(160,165),sprite:sprite(0,-3),data:{char:'fb'}});
-  game.layers.underGround.children.push(another);
+  game.layers.underGround.children.splice(1,0,another);
   const exporter=createSnapshotExporter(game,options);
   const before=exporter.capture();
   assert.equal(before.diamondRoster.length,2);
@@ -220,5 +220,5 @@ test('diamond spawn roster survives children-array shifts and preserves live IDs
   assert.equal(after.diamondRoster.find(d=>d.id===first.id).present,false);
   assert.equal(after.diamondRoster.find(d=>d.id===second.id).present,true);
   assert.deepEqual(after.diamondRoster.find(d=>d.id===second.id).spawn,{x:160,y:165});
-  assert.ok(after.diamonds[0].sourcePaths.some(s=>s.endsWith('[1]')===false));
+  assert.equal(after.diamonds[0].sourcePaths[0], 'game.layers.underGround.children[0]');
 });
