@@ -13,7 +13,8 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
   const ws=new WebSocket(wsUrl);
   const keys=new Set();
   let seq=0,commandSeq=0,closed=false,seat=null,room=null,roomEpoch=null,
-    initial=false,latestState=null,lastApply=null,lastError=null,frames=0;
+    initial=false,latestState=null,lastApply=null,lastError=null,frames=0,
+    lifecycle=null;
   let jumpHeld=false,edgePressed=0,edgeReleased=0;
   const statusListeners=new Set();
   const notify=()=>{
@@ -38,7 +39,7 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     jumpHeld=down;
   }
   function sendInput(){
-    if(closed||seat===null||!room?.bothReady||room.effectivePaused)return false;
+    if(closed||lifecycle||seat===null||!room?.bothReady||room.effectivePaused)return false;
     reconcileEdges();
     const packet={type:'input',seq:seq++,moveX:moveDirection(),moveY:0,
       buttons:jumpHeld?1:0,pressed:edgePressed,released:edgeReleased};
@@ -47,7 +48,7 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     return true;
   }
   function issuePause(){
-    if(!room?.bothReady||roomEpoch===null||closed)return;
+    if(!room?.bothReady||roomEpoch===null||closed||lifecycle)return;
     send({type:'room-command',command:'pause.set',
       roomEpoch,commandId:'view-'+seat+'-'+(++commandSeq),
       baseRevision:room.pauseRevision,desiredPaused:!room.userPaused});
@@ -70,7 +71,8 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     keys.clear();reconcileEdges();sendInput();
   }
   function status(){
-    return {seat,room,initial,frames,lastError,latestSeq:latestState?.snapshot?.snapshotSeq??null,
+    return {seat,room,initial,frames,lastError,lifecycle,
+      latestSeq:latestState?.snapshot?.snapshotSeq??null,
       lastApply,readyState:ws.readyState,viewerGamePaused:game.paused};
   }
   ws.onmessage=event=>{
@@ -82,6 +84,18 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
       room=message.room;send({type:'ready'});notify();return;
     }
     if(message.type==='room'){room=message.room;notify();return;}
+    if(message.type==='lifecycle'){
+      if(message.roomEpoch!==roomEpoch||
+        typeof message.reason!=='string'||!/^[-A-Z_]{3,64}$/.test(message.reason)){
+        lastError='BAD_LIFECYCLE_EVENT';notify();return;
+      }
+      // Do not send obsolete key states after the native authority has rebuilt
+      // its level. A future re-arm handshake must reinstall this projection.
+      lifecycle={reason:message.reason,levelEpoch:message.levelEpoch??null,
+        snapshotSeq:message.snapshotSeq??null,restartSupported:false};
+      keys.clear();jumpHeld=false;edgePressed=0;edgeReleased=0;
+      notify();return;
+    }
     if(message.type==='state'){
       try{
         if(!initial){lastApply=projection.initialize(message.snapshot);initial=true;}
