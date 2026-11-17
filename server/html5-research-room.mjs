@@ -63,7 +63,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
         throw Error('Original level did not expose its initial diamond spawn roster');
       return snapshot;
     });
-    const sceneGuard=new Html5SceneGuard(baseline);
+    let sceneGuard=new Html5SceneGuard(baseline);
     await page.evaluate(()=>{
       if(!__game.paused)__game.level.togglePause();
       if(!__game.paused)throw Error('Waiting room did not pause');
@@ -189,6 +189,56 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
         inputStale:stale,levelStarted:level?.levelStarted??null,
         ended:level?.ended??null};
     });
+
+    // Two-player vote is required even after a natural death. The old
+    // native bridge must be detached before retry() creates a fresh Phaser
+    // level. The room resumes only after both new viewers acknowledge the
+    // same round and have installed their new frozen projections.
+    const restartNativeRound=async()=>{
+      if(!room.restartPending)throw Error('ROUND_RESTART_NOT_APPROVED');
+      const priorEpoch=sceneGuard.levelEpoch;
+      await page.evaluate(()=>{
+        const game=window.__game,old=game?.level;
+        if(typeof old?.retry!=='function')throw Error('Original native retry missing');
+        window.__researchRestartOld={level:old,root:old.root,
+          fire:old.pers1,water:old.pers2};
+        window.__html5RoomInput?.uninstall();
+        old.retry.call(old);
+      });
+      await page.waitForFunction(()=>{
+        const old=window.__researchRestartOld,game=window.__game;
+        return game?.state?.current==='level' && !game.state.fading &&
+          game.level?.levelStarted && game.level?.pers1?.body &&
+          game.level?.pers2?.body &&
+          (game.level!==old.level||game.level.root!==old.root||
+           game.level.pers1!==old.fire||game.level.pers2!==old.water);
+      },null,{timeout:45000});
+      const baseline=await page.evaluate(async()=>{
+        const game=window.__game;
+        const {installHtml5AuthorityInput}=await import(
+          '/adapters/fireboy-html5/authority-input.mjs');
+        window.__html5RoomInput=installHtml5AuthorityInput(game);
+        const snapshot=window.__html5RoomSnapshot.capture();
+        if(!snapshot.coverage?.requiredPresent ||
+           snapshot.diamondRoster?.length<1 ||
+           !snapshot.characters.every(c=>Number.isFinite(c.position?.x)&&
+             Number.isFinite(c.position?.y)))
+          throw Error('Restart baseline missing real game entities');
+        if(!game.paused)game.level.togglePause();
+        if(!game.paused)throw Error('Restarted authority was not frozen');
+        return snapshot;
+      });
+      if(baseline.levelEpoch<=priorEpoch)
+        throw Error('Native retry did not advance level epoch');
+      sceneGuard=new Html5SceneGuard(baseline);
+      const roomState=room.beginNewRound();
+      broadcast({type:'round-reset',roomEpoch,
+        roundNumber:roomState.roundNumber,levelEpoch:baseline.levelEpoch,
+        gameSha256:host.sourceSha256,level,
+        snapshot:baseline,room:roomState});
+      notify();
+      return roomState;
+    };
     const server=http.createServer((req,res)=>{
       const okay=req.url==='/health'&&['GET','HEAD'].includes(req.method);
       const body=JSON.stringify({researchOnly:true,gameAssetsHosted:false,noVideo:true,
@@ -233,9 +283,20 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
           const result=room.receiveInput(memberId,msg);
           if(!result.accepted)reject(result.code);
         }else if(msg.type==='ready'){
-          room.markReady(memberId);void enqueue(syncPause);
+          try{
+            room.markReady(memberId,msg.roundNumber);
+            void enqueue(syncPause);
+          }catch(err){reject(err.message==='WRONG_ROUND'?'WRONG_ROUND':'ROOM_SUSPENDED');}
         }else if(msg.type==='room-command'){
           void enqueue(async()=>{
+            if(msg.command==='round.restart.vote'){
+              const vote=room.voteRestart(memberId,msg);
+              if(!vote.accepted){reject(vote.code);return;}
+              send(ws,{type:'restart-vote-receipt',...vote});
+              notify();
+              if(vote.execute)await restartNativeRound();
+              return;
+            }
             const proposal=room.proposePause(memberId,msg);
             if(!proposal.accepted)return reject(proposal.code);
             if(!proposal.replayed){
