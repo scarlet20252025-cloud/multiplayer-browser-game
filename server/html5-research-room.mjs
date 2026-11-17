@@ -297,13 +297,15 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
               if(vote.execute)await restartNativeRound();
               return;
             }
-            const proposal=room.proposePause(memberId,msg);
+            const evaluator=msg.command==='pause.toggle'?
+              room.proposePauseToggle.bind(room):room.proposePause.bind(room);
+            const proposal=evaluator(memberId,msg);
             if(!proposal.accepted)return reject(proposal.code);
             if(!proposal.replayed){
               await enginePause(proposal.desiredPaused);room.commitPause(proposal);
               if(proposal.changed)await page.evaluate(()=>window.__html5RoomInput.resetAll());
             }
-            send(ws,{type:'pause-receipt',...room.proposePause(memberId,msg)});
+            send(ws,{type:'pause-receipt',...evaluator(memberId,msg)});
             notify();
           });
         }else if(msg.type==='ping')send(ws,{type:'pong',id:msg.id});

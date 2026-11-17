@@ -186,6 +186,22 @@ export class Html5RoomCore {
     return {accepted:true,memberId,key,commandId:command.commandId,desiredPaused:command.desiredPaused,
       baseRevision:this.pauseRevision,changed:command.desiredPaused!==this.userPaused};
   }
+  proposePauseToggle(memberId,command){
+    this.memberFor(memberId);
+    if(this.suspendedReason)return {accepted:false,code:'ROOM_SUSPENDED'};
+    if(!command||typeof command!=='object'||Array.isArray(command)||
+       Object.keys(command).some(key=>!['type','command','roomEpoch','commandId'].includes(key))||
+       command.type!=='room-command'||command.command!=='pause.toggle'||
+       typeof command.commandId!=='string'||command.commandId.length<1||
+       command.commandId.length>128)
+      return {accepted:false,code:'INVALID_PAUSE_COMMAND'};
+    if(command.roomEpoch!==this.roomEpoch)return {accepted:false,code:'WRONG_EPOCH'};
+    const key=memberId+':'+command.commandId;
+    if(this.receipts.has(key))return {...this.receipts.get(key),replayed:true};
+    if(!this.bothReady)return {accepted:false,code:'NOT_READY'};
+    return {accepted:true,memberId,key,commandId:command.commandId,
+      desiredPaused:!this.userPaused,baseRevision:this.pauseRevision,changed:true};
+  }
   commitPause(proposal){
     if(!proposal?.accepted||proposal.baseRevision!==this.pauseRevision)
       throw new Error('Pause command must be validated against current revision');

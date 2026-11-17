@@ -49,9 +49,10 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
   }
   function issuePause(){
     if(!room?.bothReady||roomEpoch===null||closed||lifecycle||resetting)return;
-    send({type:'room-command',command:'pause.set',
-      roomEpoch,commandId:'view-'+seat+'-'+(++commandSeq),
-      baseRevision:room.pauseRevision,desiredPaused:!room.userPaused});
+    // The authoritative room toggles its most current pause state in the
+    // serialized command queue. Another tab may not yet have the new revision.
+    send({type:'room-command',command:'pause.toggle',
+      roomEpoch,commandId:'view-'+seat+'-'+(++commandSeq)});
   }
   function requestRestart(){
     if(closed||resetting||roomEpoch===null||seat===null||

@@ -142,3 +142,35 @@ test('restart cannot be spoofed, replayed across round or initiated by one seat'
   core.detach('client-bbbb');
   assert.equal(core.voteRestart('client-aaaa',cmd).code,'NEED_TWO_MEMBERS');
 });
+
+
+test('two near-simultaneous P requests atomically toggle the authoritative room',()=>{
+  const x=room();x.attach('client-aaaa');x.attach('client-bbbb');
+  x.markReady('client-aaaa');x.markReady('client-bbbb');
+  const toggle=id=>({type:'room-command',command:'pause.toggle',
+    roomEpoch:'fixture-room-1',commandId:id});
+  const a=x.proposePauseToggle('client-aaaa',toggle('A-1'));
+  assert.equal(a.desiredPaused,true);
+  assert.equal(x.commitPause(a).pauseRevision,1);
+  // Second viewer still thinks the room is unpaused; its P key must toggle
+  // current SERVER state back to false, not submit stale absolute state.
+  const b=x.proposePauseToggle('client-bbbb',toggle('B-1'));
+  assert.equal(b.desiredPaused,false);
+  assert.equal(x.commitPause(b).pauseRevision,2);
+  assert.equal(x.running,true);
+  assert.equal(x.userPaused,false);
+  assert.equal(x.proposePauseToggle('client-aaaa',toggle('A-1')).replayed,true);
+  assert.equal(x.pauseRevision,2);
+});
+test('native pause.toggle rejects malformed, spoofed and suspended commands',()=>{
+  const x=room();x.attach('client-aaaa');x.attach('client-bbbb');
+  x.markReady('client-aaaa');x.markReady('client-bbbb');
+  const cmd={type:'room-command',command:'pause.toggle',
+    roomEpoch:'fixture-room-1',commandId:'c-1'};
+  assert.equal(x.proposePauseToggle('client-aaaa',{...cmd,slot:1}).code,
+    'INVALID_PAUSE_COMMAND');
+  assert.equal(x.proposePauseToggle('client-aaaa',{...cmd,roomEpoch:'other'}).code,
+    'WRONG_EPOCH');
+  x.suspend('CHARACTER_DYING');
+  assert.equal(x.proposePauseToggle('client-aaaa',cmd).code,'ROOM_SUSPENDED');
+});
