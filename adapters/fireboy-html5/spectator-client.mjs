@@ -25,7 +25,7 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     if(ws.readyState!==WebSocket.OPEN||closed)return false;
     ws.send(JSON.stringify(value));return true;
   };
-  const allowedKeys=new Set(['ArrowLeft','ArrowRight','ArrowUp','KeyA','KeyD','KeyW','Space','KeyP','KeyR']);
+  const allowedKeys=new Set(['ArrowLeft','ArrowRight','ArrowUp','KeyA','KeyD','KeyW','Space','KeyP','KeyR','KeyN']);
   function moveDirection(){
     const left=keys.has('ArrowLeft')||keys.has('KeyA');
     const right=keys.has('ArrowRight')||keys.has('KeyD');
@@ -60,9 +60,19 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     return send({type:'room-command',command:'round.restart.vote',
       roomEpoch,roundNumber,commandId:'view-'+seat+'-restart-'+(++commandSeq)});
   }
+  function requestAdvance(){
+    if(closed||resetting||roomEpoch===null||seat===null||
+       (room?.suspendedReason??lifecycle?.reason)!=='LEVEL_WON')return false;
+    return send({type:'room-command',command:'round.advance.vote',
+      roomEpoch,roundNumber,commandId:'view-'+seat+'-advance-'+(++commandSeq)});
+  }
   function keyDown(event){
     if(!allowedKeys.has(event.code))return;
     event.preventDefault();
+    if(event.code==='KeyN'){
+      if(!event.repeat)requestAdvance();
+      return;
+    }
     if(event.code==='KeyR'){
       if(!event.repeat)requestRestart();
       return;
@@ -98,6 +108,8 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
        message.gameSha256!==latestBuildSha256)
       throw Error('Wrong restart round, session, or source build');
     if(resetting)throw Error('Concurrent restart refused');
+    if(!['restart','advance'].includes(message.action))
+      throw Error('Unrecognized native scene action');
     resetting=true;
     keys.clear();jumpHeld=false;edgePressed=0;edgeReleased=0;
     const oldLevel=game.level;
@@ -107,8 +119,21 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
       // The existing native retry() must run its own Phaser scene transition.
       // No character location, physics body or gameplay status is fabricated.
       game.paused=false;
-      if(typeof oldLevel?.retry!=='function')throw Error('Native retry missing from spectator');
-      oldLevel.retry.call(oldLevel);
+      if(message.action==='advance'){
+        if(!(Number.isSafeInteger(message.level?.id)&&message.level.id>=2&&
+             message.level.id<=32&&game.level?.levelData?.id===message.level.id-1))
+          throw Error('Unexpected native next-level progression');
+        const menu=game.state?.states?.levelMenu;
+        const temple=game.progress.get('temples').find(t=>t.id==='forest');
+        const selected=temple?.levels?.find(x=>x.id===message.level.id);
+        if(!menu||typeof menu.startLevel!=='function'||
+           !selected||selected.filename!==message.level.filename)
+          throw Error('Original native next-level menu is unavailable');
+        menu.startLevel({data:selected});
+      }else{
+        if(typeof oldLevel?.retry!=='function')throw Error('Native retry missing from spectator');
+        oldLevel.retry.call(oldLevel);
+      }
       const deadline=Date.now()+45000;
       while(Date.now()<deadline){
         if(game.state?.current==='level'&&!game.state.fading &&
@@ -208,6 +233,6 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices}={}
     window.removeEventListener('blur',blur);
     ws.close();projection.uninstall();notify();
   }
-  return Object.freeze({status,onStatus,close,sendInput,requestRestart,
+  return Object.freeze({status,onStatus,close,sendInput,requestRestart,requestAdvance,
     get projection(){return projection;},lastSnapshot:()=>latestState?.snapshot??null});
 }
