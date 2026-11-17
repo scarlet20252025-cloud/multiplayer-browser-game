@@ -86,8 +86,11 @@ try{
   a.send({...input(2,0),slot:1});
   await waitFor(()=>a.first(x=>x.type==='error'&&x.code==='INVALID_INPUT_FIELDS'));
   pass('spoofed-seat-rejected',{code:'INVALID_INPUT_FIELDS'});
+  const messageBoundary=a.messages.length;
   b.ws.close();
-  await waitFor(()=>a.first(x=>x.type==='room'&&!x.room?.bothReady));
+  await waitFor(()=>a.messages.slice(messageBoundary).find(x=>
+    x.type==='room'&&x.room?.connected?.[1]===false&&!x.room.bothReady));
+  await waitFor(()=>room.room.effectivePaused);
   assert.equal(room.room.effectivePaused,true);
   pass('disconnect-pauses-room',{effectivePaused:true});
   report.status='passed';
