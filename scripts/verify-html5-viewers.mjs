@@ -381,7 +381,23 @@ try{
     seat:lateJoin.state.seat,waterDeltaX:rejoinedMotion.newViewer.water.x-priorWater,
     syncedWaterX:[rejoinedMotion.newViewer.water.x,rejoinedMotion.firstViewer.water.x]});
   report.status='passed';
-}catch(error){report.status='failed';report.errors.push(String(error.stack||error));}
+}catch(error){
+  report.status='failed';report.errors.push(String(error.stack||error));
+  if(authority){
+    report.lifecycleDiagnostic={room:authority.room.publicState()};
+    try{
+      const current=await authority.readAuthority();
+      report.lifecycleDiagnostic.native={
+        level:current.snapshot.level,
+        levelEpoch:current.snapshot.levelEpoch,
+        firstPlayer:current.snapshot.characters.map(x=>({
+          slot:x.slot,dead:x.gameplay?.dead,dying:x.gameplay?.dying,
+          x:x.position?.x,y:x.position?.y
+        }))
+      };
+    }catch(nativeError){report.lifecycleDiagnostic.readError=String(nativeError);}
+  }
+}
 finally{
   for(const page of viewers)await page.close().catch(()=>{});
   await browser?.close().catch(()=>{});
