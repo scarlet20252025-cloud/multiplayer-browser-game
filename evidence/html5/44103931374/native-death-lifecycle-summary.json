@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "project": "Native HTML5 Forest Temple scene lifecycle and remote input guard",
+  "sourceGameSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "differentUserUploadSha256": "98666cf499473dfadb9b708af10ef2e5e13b50300881a32b7c8d65d7756a5700",
+  "controlledConditions": {
+    "levelId": 1,
+    "authoritativeNativePhaserBox2d": true,
+    "clientRenderType": "two locally loaded and frozen native HTML5 Phaser scenes",
+    "noVideoStream": true,
+    "originalAssetsCommitted": false
+  },
+  "verified": [
+    {
+      "runId": 44101050713,
+      "type": "real native retry method through CI research interface",
+      "levelEpochBefore": 1,
+      "levelEpochAfter": 2,
+      "roomReason": "LEVEL_EPOCH_CHANGED",
+      "oldInputRejected": true,
+      "checksPassed": 4
+    },
+    {
+      "runId": 44103065516,
+      "type": "ordinary Fireboy movement into a native hazard",
+      "sourceCommit": "190c824e9fd91644d55173735eb9d3f473699026",
+      "marker": {
+        "fireX": 881.2334420297734,
+        "fireY": 874.9571072,
+        "dying": true
+      },
+      "roomReason": "CHARACTER_DYING",
+      "checksPassed": 3
+    },
+    {
+      "runId": 44103065554,
+      "type": "whole earlier three-browser gameplay regression after input hold coalescing",
+      "old14ChecksPassed": true,
+      "errors": []
+    },
+    {
+      "runId": 44103931374,
+      "type": "one original native authority and two browser viewers witness death",
+      "sourceCommit": "24dc275b2e5b985ba4c607a879401defa4ae50cb",
+      "roomReason": "CHARACTER_DYING",
+      "checksPassed": 4,
+      "passedCheckNames": [
+        "two-real-frozen-native-viewers",
+        "actual-native-death-suspended-the-authority",
+        "both-browsers-received-the-same-native-death",
+        "both-browsers-refused-old-scene-controls"
+      ],
+      "artifactId": 14336504472,
+      "artifactZipSha256": "5eed797709f72063d8496743fcb14e1992216b70ed0f757e1379edcb8afce54b"
+    }
+  ],
+  "regressionHistory": [
+    {
+      "runId": 44102070692,
+      "status": "failed",
+      "reason": "A Fireboy actually entered native endGame while a former test expected P to remain available; death guard correctly suspended room"
+    },
+    {
+      "runId": 44103572869,
+      "status": "failed",
+      "reason": "Initial viewer physics counter began before async spectator freeze; adjusted start point; later CI passed"
+    }
+  ],
+  "codeChanges": [
+    "server/html5-scene-guard.mjs",
+    "server/html5-room-core.mjs",
+    "server/html5-research-room.mjs",
+    "adapters/fireboy-html5/spectator-client.mjs",
+    "adapters/fireboy-html5/authority-input.mjs",
+    "scripts/verify-html5-native-retry.mjs",
+    "scripts/verify-html5-native-death.mjs",
+    "scripts/verify-html5-death-viewers.mjs"
+  ],
+  "notVerified": [
+    "Browser players initiating room restart through a supported authenticated command",
+    "Rebuilding the native authority input bridge after retry",
+    "All spectators recreating the next native level with a new level epoch and resuming safely",
+    "Real dual-door level victory, next-level progression, and replay after defeat",
+    "User uploaded ZIP browser/playability baseline, WAN conditions, distribution rights"
+  ]
+}

@@ -80,3 +80,7 @@ node scripts/verify-html5-viewers.mjs --root "E:\肥鱼不乐园\flash-archive\0
 ## 2026-11-17：按钮复位及动态箱子双端最终收敛（两轮成功）
 
 [CI #44085651969](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44085651969) 运行及第二次重跑都 passed：原游戏按钮离开后回到 state=0，平台 Y≈912；两个冻结的游戏画面同步返回，箱子在连续运动后最终收敛到同一位置，且与权威状态相符。首轮箱子 X 898.216/898.216（权威 898.194）；第二轮 906.906/906.906（权威 906.906）。两端 Box2D 步进始终 0。查看 [HTML5_BOX_PUSH.md](HTML5_BOX_PUSH.md) 的复现与证据边界，聚合数据在 `evidence/html5/44085651969/reset-convergence-summary.json`。此结果不代表用户上传游戏原包已在浏览器验收。
+
+## 2026-11-17：自然死亡和 native retry 的安全边界
+
+固定研究版本已验证真实 native retry 创建新的 `levelEpoch`，旧房间不再消费输入；火娃通过正常方向操作触发 `dying` 后，两个真实浏览器都接收到相同的 `CHARACTER_DYING` 生命周期事件并停止旧操作。详见 [HTML5_NATIVE_RETRY.md](HTML5_NATIVE_RETRY.md) 及对应 JSON 数值证据。**尚未实现死亡后自动让两端重开并恢复游玩**，原游戏用户上传 ZIP 的实机回归仍缺失。
