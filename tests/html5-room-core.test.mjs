@@ -110,7 +110,7 @@ test('two authenticated votes start a new round and invalidate previous held inp
   const vote=id=>({type:'room-command',command:'round.restart.vote',
     roomEpoch:'fixture-room-1',roundNumber:0,commandId:id});
   assert.deepEqual(core.voteRestart('client-aaaa',vote('vote-1')),
-    {accepted:true,roundNumber:0,votes:1,execute:false});
+    {accepted:true,roundNumber:0,votes:1,execute:false,action:'restart'});
   assert.equal(core.voteRestart('client-aaaa',vote('vote-1')).votes,1);
   assert.equal(core.voteRestart('client-bbbb',vote('vote-2')).execute,true);
   assert.equal(core.publicState().restartPending,true);
@@ -173,4 +173,35 @@ test('native pause.toggle rejects malformed, spoofed and suspended commands',()=
     'WRONG_EPOCH');
   x.suspend('CHARACTER_DYING');
   assert.equal(x.proposePauseToggle('client-aaaa',cmd).code,'ROOM_SUSPENDED');
+});
+
+
+test('native dual-door LEVEL_WON is mandatory before two players may advance',()=>{
+  const x=room();x.attach('client-aaaa');x.attach('client-bbbb');
+  x.markReady('client-aaaa');x.markReady('client-bbbb');
+  const vote=(id,action='round.advance.vote')=>({type:'room-command',command:action,
+    roomEpoch:'fixture-room-1',roundNumber:0,commandId:id});
+  x.suspend('CHARACTER_DYING');
+  assert.equal(x.voteRestart('client-aaaa',vote('bad')).code,'NATIVE_WIN_REQUIRED');
+  const failed=x.voteRestart('client-aaaa',vote('restart','round.restart.vote'));
+  assert.equal(failed.action,'restart');
+  assert.equal(x.voteRestart('client-bbbb',vote('mix')).code,'NATIVE_WIN_REQUIRED');
+  assert.equal(x.publicState().restartVotes,1);
+});
+test('two valid advance votes select same action, clear old leases and reject mixed intentions',()=>{
+  const x=room();x.attach('client-aaaa');x.attach('client-bbbb');
+  x.markReady('client-aaaa');x.markReady('client-bbbb');
+  x.suspend('LEVEL_WON');
+  const vote=(member,action,cmd)=>x.voteRestart(member,{
+    type:'room-command',command:action,roomEpoch:'fixture-room-1',
+    roundNumber:0,commandId:cmd
+  });
+  assert.equal(vote('client-aaaa','round.advance.vote','advance-a').action,'advance');
+  assert.equal(vote('client-bbbb','round.restart.vote','restart-b').code,'ROUND_ACTION_CONFLICT');
+  assert.equal(vote('client-bbbb','round.advance.vote','advance-b').execute,true);
+  const newRoom=x.beginNewRound();
+  assert.equal(newRoom.completedAction,'advance');
+  assert.equal(newRoom.roundNumber,1);
+  assert.equal(newRoom.roundAction,null);
+  assert.deepEqual(newRoom.ready,[false,false]);
 });

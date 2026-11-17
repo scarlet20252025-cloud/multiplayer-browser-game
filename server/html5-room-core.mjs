@@ -24,6 +24,7 @@ export class Html5RoomCore {
     this.roundNumber=0;
     this.restartVotes=new Set();
     this.restartPending=false;
+    this.roundAction=null;
   }
   seatFor(memberId){
     const i=this.members.findIndex(m=>m?.id===memberId);
@@ -59,7 +60,8 @@ export class Html5RoomCore {
       connected:this.members.map(m=>!!m),bothReady:this.bothReady,
       userPaused:this.userPaused,effectivePaused:this.effectivePaused,pauseRevision:this.pauseRevision,
       suspendedReason:this.suspendedReason,roundNumber:this.roundNumber,
-      restartVotes:this.restartVotes.size,restartPending:this.restartPending};
+      restartVotes:this.restartVotes.size,restartPending:this.restartPending,
+      roundAction:this.roundAction};
   }
   suspend(reason){
     if(typeof reason!=='string'||!/^[-A-Z_]{3,64}$/.test(reason))
@@ -73,26 +75,36 @@ export class Html5RoomCore {
     this.memberFor(memberId);
     if(!command||typeof command!=='object'||Array.isArray(command)||
        Object.keys(command).some(key=>!['type','command','roomEpoch','roundNumber','commandId'].includes(key))||
-       command.type!=='room-command'||command.command!=='round.restart.vote'||
+       command.type!=='room-command'||!['round.restart.vote','round.advance.vote'].includes(command.command)||
        command.roomEpoch!==this.roomEpoch||
        !Number.isSafeInteger(command.roundNumber)||command.roundNumber!==this.roundNumber||
        typeof command.commandId!=='string'||command.commandId.length<1||command.commandId.length>128)
       return {accepted:false,code:'INVALID_RESTART_COMMAND'};
     if(!this.suspendedReason)return {accepted:false,code:'ROUND_NOT_SUSPENDED'};
     if(!this.members.every(member=>!!member))return {accepted:false,code:'NEED_TWO_MEMBERS'};
+    const action=command.command==='round.advance.vote'?'advance':'restart';
+    if(action==='advance'&&this.suspendedReason!=='LEVEL_WON')
+      return {accepted:false,code:'NATIVE_WIN_REQUIRED'};
+    if(this.roundAction&&this.roundAction!==action)
+      return {accepted:false,code:'ROUND_ACTION_CONFLICT'};
+    this.roundAction=action;
     this.restartVotes.add(memberId);
     if(this.restartVotes.size===2)this.restartPending=true;
     return {accepted:true,roundNumber:this.roundNumber,
-      votes:this.restartVotes.size,execute:this.restartPending};
+      votes:this.restartVotes.size,execute:this.restartPending,action:this.roundAction};
   }
   beginNewRound(){
     if(!this.restartPending||this.restartVotes.size!==2||!this.suspendedReason)
       throw new Error('ROUND_RESTART_NOT_APPROVED');
+    const completedAction=this.roundAction;
+    if(!['restart','advance'].includes(completedAction))
+      throw new Error('ROUND_ACTION_INVALID');
     this.roundNumber++;
     this.pauseRevision++;
     this.userPaused=false;
     this.suspendedReason=null;
     this.restartPending=false;
+    this.roundAction=null;
     this.restartVotes.clear();
     this.receipts.clear();
     for(const member of this.members){
@@ -104,13 +116,14 @@ export class Html5RoomCore {
       member.rateStart=0;
       member.rateCount=0;
     }
-    return this.publicState();
+    return {...this.publicState(),completedAction};
   }
   detach(memberId){
     const seat=this.seatFor(memberId);
     if(seat===null)return {detached:false};
     this.members[seat].input.resetPending();
     this.restartVotes.delete(memberId);
+    if(!this.restartVotes.size){this.restartPending=false;this.roundAction=null;}
     this.members[seat]=null;
     for(const member of this.members)member?.input.resetPending();
     return {detached:true,slot:seat,room:this.publicState()};
