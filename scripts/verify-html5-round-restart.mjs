@@ -181,7 +181,21 @@ try{
   const initialWater=afterRound.b.waterX;
   const viewerSteps=[afterRound.a.physicsSteps,afterRound.b.physicsSteps];
   await water.keyboard.down('KeyD');
-  await pause(700);
+  await pause(300);
+  const pressed=await authority.readAuthority();
+  const waterPage=await state(water);
+  report.restartDuringKey={
+    waterX:pressed.snapshot.characters.find(x=>x.slot===1)?.position?.x,
+    nativeCursor:pressed.snapshot.characters.find(x=>x.slot===1)?.input,
+    slot:pressed.input.slots[1],clientStatus:waterPage.status
+  };
+  await pause(450);
+  const held=await authority.readAuthority();
+  report.restartAfterHold={
+    waterX:held.snapshot.characters.find(x=>x.slot===1)?.position?.x,
+    cursor:held.snapshot.characters.find(x=>x.slot===1)?.input,
+    slot:held.input.slots[1]
+  };
   await water.keyboard.up('KeyD');
   const moved=await until(async()=>{
     const [a,b,server]=await Promise.all([state(fire),state(water),authority.readAuthority()]);
@@ -229,6 +243,8 @@ finally{
     checks:report.checks,
     restartAfter:report.status==='blocked'?report.restartAfter:undefined,
     restartInputDiagnostic:report.status==='blocked'?report.restartInputDiagnostic:undefined,
+    restartDuringKey:report.status==='blocked'?report.restartDuringKey:undefined,
+    restartAfterHold:report.status==='blocked'?report.restartAfterHold:undefined,
     errors:report.errors}));
   if(report.status!=='passed')process.exitCode=1;
 }

@@ -199,6 +199,7 @@ try{
   const screenshotEvidence={idleDelta,movedDelta,region:combinedRegion,
     sha256:{before:pngSha(beforePixels),idle:pngSha(idlePixels),moved:pngSha(movedPixels)}};
   report.visualPixels=screenshotEvidence;
+  report.pixelMovementState=await viewerState(first);
   assert.ok(movedDelta.pixelsChanged>=Math.max(100,idleDelta.pixelsChanged+80),
     'Sprite positions changed but rendered Fireboy region did not show additional pixel changes');
   pass('rendered-fireboy-pixels-change',{idlePixelsChanged:idleDelta.pixelsChanged,
@@ -417,6 +418,8 @@ finally{
   await writeFile(path.join(out,'viewer-report.json'),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({status:report.status,gameSha256:report.gameSha256,
     checks:report.checks.map(c=>c.name),errors:report.errors,
-    lifecycleDiagnostic:report.status==='failed'?report.lifecycleDiagnostic:undefined}));
+    lifecycleDiagnostic:report.status==='failed'?report.lifecycleDiagnostic:undefined,
+    visualPixels:report.status==='failed'?report.visualPixels:undefined,
+    pixelMovementState:report.status==='failed'?report.pixelMovementState:undefined}));
   if(report.status!=='passed')process.exitCode=1;
 }
