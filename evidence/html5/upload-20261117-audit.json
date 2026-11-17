@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "source": "user-upload html5-online-20261117.zip",
+  "fileBytes": 26432078,
+  "archiveSha256": "d084d355d327a39293c9f9252c2f9c34dfaaa9b1c6145bf991f8ae2397def592",
+  "fileCount": 453,
+  "expandedFileBytes": 41490562,
+  "unsafePaths": 0,
+  "symlinks": 0,
+  "duplicatePaths": 0,
+  "gameScripts": [
+    {
+      "game": "1-forest-temple",
+      "path": "js/game.js",
+      "bytes": 2273198,
+      "sha256": "98666cf499473dfadb9b708af10ef2e5e13b50300881a32b7c8d65d7756a5700"
+    },
+    {
+      "game": "2-light-temple",
+      "path": "js/game.js",
+      "bytes": 2274993,
+      "sha256": "8555c8a58347f22b8c055d758a034b67ac336c581853b7f589bbebeb066f1a6e"
+    },
+    {
+      "game": "3-ice-temple",
+      "path": "js/game.js",
+      "bytes": 2275187,
+      "sha256": "2ed1af4bc9449801d51a3927cd4fea562a417ccf49bf5501f696eabcd7420ff8"
+    },
+    {
+      "game": "4-crystal-temple",
+      "path": "js/game.js",
+      "bytes": 2276960,
+      "sha256": "5e741621b1d530ab74f59c5ae5c05883949a219f49599db5ffece454c6d95811"
+    },
+    {
+      "game": "5-elements",
+      "path": "js/game.js",
+      "bytes": 2332156,
+      "sha256": "4ab7fed39ff91b6942e13744a25b63866063caa84b76e9ea4660f21bcbae3cb3"
+    },
+    {
+      "game": "6-fairy-tales",
+      "path": "game.js",
+      "bytes": 2409831,
+      "sha256": "36ed1b99a76c2835aabfe99fe9814725362f1d7a0335ab5347904a4d396813bd"
+    }
+  ],
+  "firstGame": {
+    "crlfLines": 54323,
+    "uniqueGameInstanceAnchor": true,
+    "jumpAndPauseSourceAnchorsPresent": true,
+    "sourceSha256": "98666cf499473dfadb9b708af10ef2e5e13b50300881a32b7c8d65d7756a5700",
+    "researchCandidateByteIdentical": false
+  },
+  "status": "static-audit-complete",
+  "actualUserPackagePlaywright": "blocked-by-browser-page-policy",
+  "netplayVerified": false,
+  "originalAssetsCommitted": false
+}

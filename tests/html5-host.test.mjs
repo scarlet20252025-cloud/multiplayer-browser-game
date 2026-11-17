@@ -126,3 +126,33 @@ test('HTML5 host: adapter modules only come from the fixed repository allowlist'
   else assert.equal(response.status,404);
   assert.notEqual(response.body.toString(),fake);
 });
+
+
+test('archive layout serves shared RequireJS and assets while protecting unmodified originals',async t=>{
+  const temp=await mkdtemp(path.join(os.tmpdir(),'html5-archive-layout-'));
+  const root=path.join(temp,'games');
+  await mkdir(path.join(root,'1-forest-temple/js'),{recursive:true});
+  await mkdir(path.join(root,'1-forest-temple/assets'),{recursive:true});
+  await mkdir(path.join(root,'lib'),{recursive:true});
+  await writeFile(path.join(root,'1-forest-temple/js/game.js'),original);
+  await writeFile(path.join(root,'lib/require.js'),'// fixture shared loader');
+  await writeFile(path.join(root,'1-forest-temple/assets/map.json'),'{"fixture":true}');
+  let app;
+  t.after(async()=>{await app?.close();await rm(temp,{recursive:true,force:true});});
+  app=await startHtml5ResearchHost({root,script:'1-forest-temple/js/game.js',
+    requireScript:'lib/require.js',entryPath:'/1-forest-temple/index.html'});
+  const page=await request(app.url,'/1-forest-temple/index.html');
+  assert.equal(page.status,200);
+  assert.match(page.body.toString(),/data-main="\/1-forest-temple\/js\/game.js"/);
+  assert.match(page.body.toString(),/src="\/lib\/require.js"/);
+  assert.equal((await request(app.url,'/lib/require.js')).status,200);
+  assert.equal((await request(app.url,'/1-forest-temple/assets/map.json')).status,200);
+  assert.equal((await request(app.url,'/1-forest-temple/js/game.js')).status,200);
+  assert.equal((await request(app.url,'/')).status,403);
+  assert.equal((await request(app.url,'/1-forest-temple/other.html')).status,404);
+  assert.deepEqual(await readFile(path.join(root,'1-forest-temple/js/game.js')),original);
+  const manifest=JSON.parse((await request(app.url,'/__research__/manifest')).body);
+  assert.equal(manifest.entryPath,'/1-forest-temple/index.html');
+  assert.equal(manifest.requireScript,'lib/require.js');
+  assert.equal(manifest.originalPackageBaseline,false);
+});

@@ -13,7 +13,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MODULE_NAMES = new Set(['pause-bridge.mjs', 'state-snapshot.mjs', 'jump-observer.mjs', 'jump-analysis.mjs']);
+const MODULE_NAMES = new Set(['pause-bridge.mjs', 'state-snapshot.mjs', 'jump-observer.mjs', 'jump-analysis.mjs', 'authority-input.mjs']);
 const MODULE_PREFIX = 'adapters/fireboy-html5/';
 const INSTANCE_ANCHOR = '(o = new h.Game(m)),';
 const INSTANCE_EXPOSURE = '(o = window.__game = new h.Game(m)),';
@@ -69,7 +69,7 @@ async function readContainedFile(root, relative) {
   } finally { await handle.close(); }
 }
 
-function authoredPage(script) {
+function authoredPage(script, requireScript) {
   const scriptUrl = script.split('/').map(encodeURIComponent).join('/');
   return `<!doctype html>
 <html lang="zh-CN">
@@ -79,7 +79,7 @@ function authoredPage(script) {
 </head><body>
 <div id="root"><div id="container"></div><div id="hammer"></div><div id="debug-fps"></div></div>
 <div id="research-notice">Instrumented research harness · 非原包基准</div>
-<script data-main="/${scriptUrl}" src="/${REQUIRE_SCRIPT}"></script>
+<script data-main="/${scriptUrl}" src="/${requireScript}"></script>
 </body></html>\n`;
 }
 
@@ -87,10 +87,14 @@ function authoredPage(script) {
  * @param {{root:string,script:string,port?:number}} options
  * @returns {Promise<{url:string,sourceSha256:string,servedSha256:string,sourceBytes:number,close:()=>Promise<void>}>}
  */
-export async function startHtml5ResearchHost({root, script, port = 0} = {}) {
+export async function startHtml5ResearchHost({root, script, port = 0, requireScript = REQUIRE_SCRIPT, entryPath = '/'} = {}) {
   if (typeof root !== 'string' || !root.trim()) throw failure('HTML5_ROOT_REQUIRED', 'Provide the private first-game directory with --root.');
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw failure('HTML5_INVALID_PORT', 'port must be an integer from 0 to 65535.');
   script = relativePath(script);
+  requireScript = relativePath(requireScript);
+  if (path.extname(requireScript) !== '.js') throw failure('HTML5_INVALID_REQUIRE', 'requireScript must be a local JS file');
+  if (typeof entryPath !== 'string' || !entryPath.startsWith('/') || entryPath.startsWith('//')) throw failure('HTML5_INVALID_ENTRY', 'entryPath must be a URL path');
+  if (entryPath !== '/') relativePath(entryPath.slice(1));
   if (path.extname(script) !== '.js') throw failure('HTML5_INVALID_SCRIPT', 'script must identify a .js file inside the selected root.');
   const gameRoot = path.resolve(root);
   let source;
@@ -101,7 +105,7 @@ export async function startHtml5ResearchHost({root, script, port = 0} = {}) {
     }
     throw error;
   }
-  try { await readContainedFile(gameRoot, REQUIRE_SCRIPT); }
+  try { await readContainedFile(gameRoot, requireScript); }
   catch (error) {
     if (error.code === 'ENOENT' || error.code === 'ENOTDIR') {
       throw failure('HTML5_REQUIREJS_NOT_FOUND', `Required local loader is missing: ${REQUIRE_SCRIPT}.`);
@@ -114,9 +118,9 @@ export async function startHtml5ResearchHost({root, script, port = 0} = {}) {
   if (occurrences !== 1) throw failure('HTML5_INSTANCE_ANCHOR_COUNT', `Expected exactly one Game instance anchor; found ${occurrences}. No source was changed.`);
   const served = Buffer.from(text.replace(INSTANCE_ANCHOR, INSTANCE_EXPOSURE), 'utf8');
   const sourceSha256 = sha256(source), servedSha256 = sha256(served), sourceBytes = source.length;
-  const html = Buffer.from(authoredPage(script), 'utf8');
+  const html = Buffer.from(authoredPage(script, requireScript), 'utf8');
   const manifest = Buffer.from(JSON.stringify({schema:1, kind:'instrumented-research-harness', originalPackageBaseline:false,
-    script, sourceSha256, servedSha256, sourceBytes,
+    script, requireScript, entryPath, sourceSha256, servedSha256, sourceBytes,
     transformation:'Expose the existing Game instance as window.__game in the HTTP response only; original files unchanged.'}) + '\n');
   let actualPort;
   const server = http.createServer(async (req, res) => {
@@ -138,7 +142,7 @@ export async function startHtml5ResearchHost({root, script, port = 0} = {}) {
       let pathname;
       try { pathname = decodeURIComponent(rawPath); }
       catch { throw failure('HTML5_INVALID_ENCODING', 'Invalid URL encoding.'); }
-      if (pathname === '/' || pathname === '/index.html') return send(200, 'text/html; charset=utf-8', html);
+      if (pathname === entryPath || (entryPath === '/' && pathname === '/index.html')) return send(200, 'text/html; charset=utf-8', html);
       if (pathname === '/__research__/manifest') return send(200, 'application/json; charset=utf-8', manifest);
       const relative = relativePath(pathname.slice(1));
       if (relative.startsWith(MODULE_PREFIX)) {
@@ -166,7 +170,7 @@ export async function startHtml5ResearchHost({root, script, port = 0} = {}) {
   });
   let closing;
   return {
-    url:`http://127.0.0.1:${actualPort}`, sourceSha256, servedSha256, sourceBytes,
+    url:`http://127.0.0.1:${actualPort}`, entryUrl:`http://127.0.0.1:${actualPort}${entryPath}`, sourceSha256, servedSha256, sourceBytes,
     close() {
       if (!closing) {
         closing = new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
@@ -179,10 +183,10 @@ export async function startHtml5ResearchHost({root, script, port = 0} = {}) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
-    const {values} = parseArgs({options:{root:{type:'string'},script:{type:'string'},port:{type:'string'},help:{type:'boolean'}}});
+    const {values} = parseArgs({options:{root:{type:'string'},script:{type:'string'},port:{type:'string'},'require-script':{type:'string'},'entry-path':{type:'string'},help:{type:'boolean'}}});
     if (values.help) console.log('Usage: node scripts/html5-research-host.mjs --root <private first-game directory> --script <relative game.js> [--port 8802]\nInstrumented research harness only; original package is never modified.');
     else {
-      const app = await startHtml5ResearchHost({root:values.root, script:values.script, port:values.port === undefined ? 0 : Number(values.port)});
+      const app = await startHtml5ResearchHost({root:values.root, script:values.script, port:values.port === undefined ? 0 : Number(values.port), requireScript:values['require-script'] ?? REQUIRE_SCRIPT, entryPath:values['entry-path'] ?? '/'});
       console.log(JSON.stringify({kind:'instrumented-research-harness',originalPackageBaseline:false,url:app.url,
         sourceSha256:app.sourceSha256,servedSha256:app.servedSha256,sourceBytes:app.sourceBytes}));
       for (const signal of ['SIGINT','SIGTERM']) process.once(signal, () => { void app.close().then(() => process.exit(0)); });
