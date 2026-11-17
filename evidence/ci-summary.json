@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "testedCommit": "b1779ed50d5d222a61b5e95d7388c1bec9425801",
+  "runUrl": "https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44033828759",
+  "runId": 44033828759,
+  "artifactId": 14305839568,
+  "artifactSha256": "9d25701f1c5db7d79331ce0b09bc4f0fe2d64cfa76056f932ad19b451c38537f",
+  "environment": {
+    "os": "Ubuntu 26.04.1",
+    "node": "v24.22.2",
+    "browser": "151.0.7922.34",
+    "graphics": "headless Chromium with SwiftShader software rendering",
+    "ruffle": "0.7.1",
+    "playwright": "1.62.1",
+    "ws": "8.23.0"
+  },
+  "checks": {
+    "nodeProtocolAndLifecycle": 18,
+    "pythonExtractor": 13,
+    "browserE2E": 13,
+    "realAuthorityNetwork": 8,
+    "utf8": "passed"
+  },
+  "scope": "Authored AS3 fixture only; original game code and assets are not included in the runnable experiment",
+  "originalGamesVerified": false,
+  "deployedToUserServer": false,
+  "visualReview": {
+    "status": "reviewed",
+    "bothViewsUnobstructed": true,
+    "screenshotsTakenSequentially": true,
+    "runtimeNotices": [
+      {
+        "page": "1",
+        "notice": "Ruffle software-rendering notice",
+        "action": "clicked the visible close control"
+      }
+    ]
+  },
+  "files": {
+    "evidence/e2e-results.json": {
+      "bytes": 6305,
+      "sha256": "e66ed9ad3d0c95eedf1332583856574e2e7bf99c9a388281202078d24f1f69b8"
+    },
+    "evidence/network-results.json": {
+      "bytes": 2906,
+      "sha256": "d3de7f436c62917a6524b91fc6b7ec1b95cc2e68a989348b3e8f9c46ec78a9ee"
+    },
+    "evidence/screenshots/lab-player-a.png": {
+      "bytes": 137678,
+      "sha256": "1642bd3fda1581ff877b53c28544402da9f4772ccc3084da30c2cd1993ceb198"
+    },
+    "evidence/screenshots/lab-player-b.png": {
+      "bytes": 138013,
+      "sha256": "37018dabcb0ee6bffad11173d50c6e508382bca9f65fe1231e8c9b8363223a6c"
+    }
+  },
+  "runHistory": [
+    {
+      "runId": 44033069420,
+      "commit": "c09ca4ff25e83803657cfb7b2826bd388260391b",
+      "conclusion": "success",
+      "finding": "Logic assertions passed, but visual review found an informational software-rendering dialog over one screenshot."
+    },
+    {
+      "runId": 44033488037,
+      "commit": "2619879215b0ef9bce6cafc38d44086873342d3c",
+      "conclusion": "failure",
+      "finding": "Final client error assertion caught a NOT_JOINED input heartbeat racing after leave."
+    },
+    {
+      "runId": 44033828759,
+      "commit": "b1779ed50d5d222a61b5e95d7388c1bec9425801",
+      "conclusion": "success",
+      "finding": "Leave now immediately disables local sending; all assertions and screenshot review passed."
+    }
+  ]
+}

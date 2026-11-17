@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-11-17T10:11:30.728Z",
+  "status": "passed",
+  "scope": "two WebSocket control clients -> one real HTML5 game -> shared structured snapshots",
+  "completeClientRenderingVerified": false,
+  "originalPackageBaseline": false,
+  "publicNetworkVerified": false,
+  "checks": [
+    {
+      "name": "seat-and-baseline",
+      "status": "passed",
+      "value": {
+        "fireX": 96,
+        "waterX": 96
+      }
+    },
+    {
+      "name": "water-input-isolated",
+      "status": "passed",
+      "value": {
+        "waterDeltaX": 41.02446929653436
+      }
+    },
+    {
+      "name": "identical-authority-broadcast",
+      "status": "passed",
+      "value": {
+        "seq": 4,
+        "counts": {
+          "characters": 2,
+          "diamonds": 7,
+          "doors": 2,
+          "mechanisms": 5
+        }
+      }
+    },
+    {
+      "name": "fire-input-isolated",
+      "status": "passed",
+      "value": {
+        "fireDeltaX": 34.647864985330415
+      }
+    },
+    {
+      "name": "room-pause-with-engine-gate",
+      "status": "passed",
+      "value": {
+        "revision": 1
+      }
+    },
+    {
+      "name": "room-resume",
+      "status": "passed",
+      "value": {
+        "revision": 2
+      }
+    },
+    {
+      "name": "short-jump-ACK-after-update",
+      "status": "passed",
+      "value": {
+        "ack": 4
+      }
+    },
+    {
+      "name": "spoofed-seat-rejected",
+      "status": "passed",
+      "value": {
+        "code": "INVALID_INPUT_FIELDS"
+      }
+    },
+    {
+      "name": "disconnect-pauses-room",
+      "status": "passed",
+      "value": {
+        "effectivePaused": true
+      }
+    }
+  ],
+  "errors": [],
+  "gameSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "level": {
+    "id": 1,
+    "filename": "tutorials/levels/forest_01.json"
+  },
+  "finishedAt": "2026-11-17T10:11:41.455Z"
+}

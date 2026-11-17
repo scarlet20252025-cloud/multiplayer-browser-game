@@ -1,0 +1,59 @@
+name: Verify genuine native dual-door HTML5 win
+
+on:
+  push:
+    branches: ['work/flash-netplay-lab']
+    paths:
+      - 'scripts/verify-html5-native-win.mjs'
+      - 'server/html5-scene-guard.mjs'
+      - 'server/html5-research-room.mjs'
+      - '.github/workflows/verify-html5-native-win.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  win:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout authored project
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Node 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Guard and protocol regression
+        run: npm test
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium-headless-shell
+      - name: Fetch research-only pinned game privately
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: 1224HuangJin/Fireboy-and-Watergirl
+          ref: 8568034556f567b5c429c0223dc1bf6dd2409277
+          path: local/html5-candidate
+          sparse-checkout: output/A
+          persist-credentials: false
+      - name: Genuine two-player gameplay must raise both native exit doors
+        run: >-
+          node scripts/verify-html5-native-win.mjs
+          --root local/html5-candidate/output/A
+          --script js/init.eb02fbdab2aa1d24.js
+          --expected-sha256 337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677
+          --level-id 13
+          --out local/html5-win-observations
+      - name: Preserve JSON trajectory even if native route is blocked
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-dual-door-win-${{ github.run_id }}
+          path: local/html5-win-observations/*.json
+          retention-days: 14
+          if-no-files-found: warn

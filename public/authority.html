@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>AS3 authority probe</title></head>
+<body style="margin:0;background:#111827"><div id="player"></div>
+<script src="/runtime/ruffle.js"></script>
+<script type="module">
+  const player=window.RufflePlayer.newest().createPlayer();
+  player.style.width='640px';player.style.height='360px';
+  document.querySelector('#player').append(player);
+  const api=player.ruffle();
+  api.config={autoplay:'on',unmuteOverlay:'hidden',allowScriptAccess:true,logLevel:'error'};
+  await api.load({url:'/experiments/as3-probe/probe.swf',parameters:{mode:'authority'},allowScriptAccess:true});
+  const deadline=Date.now()+20000;
+  let hello;
+  while(!(hello=api.callExternalInterface('netHello'))){
+    if(Date.now()>deadline)throw new Error('AS3 authority handshake timed out');
+    await new Promise(requestAnimationFrame);
+  }
+  window.probeHello=hello;
+  window.probeRead=()=>api.callExternalInterface('netReadState');
+  window.probeStep=inputs=>api.callExternalInterface('netStep',inputs[0],inputs[1]);
+  window.probeReady=true;
+</script></body></html>

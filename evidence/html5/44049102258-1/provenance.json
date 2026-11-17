@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "workflowRun": "https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44049102258",
+  "artifactId": 14311754417,
+  "artifactSha256": "2fbcd6d7a7dc4dcb7ee67d03bc7bfa76f3c8e81dea13bc5a3d24b3b7f8f89401",
+  "testedCommit": "3eda8336c89c1b0969d668325ce6b89f77ce1e17",
+  "candidateRepository": "https://github.com/1224HuangJin/Fireboy-and-Watergirl",
+  "candidateCommit": "8568034556f567b5c429c0223dc1bf6dd2409277",
+  "candidateScriptSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "userLocalPackageByteMatch": "unknown",
+  "originalPackageBaseline": false,
+  "rawResultsUnchanged": true,
+  "workflowConclusion": "failure",
+  "reportedStatus": "blocked",
+  "scope": "Three observations on a third-party research candidate with existing upstream modifications; not original-package or production netplay validation."
+}

@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "kind": "summarized-measured-CI-original-game-state",
+  "status": "passed",
+  "scope": "Forest Temple HTML5 level 52, one original-game authority and two independent frozen native browser viewers",
+  "gameScriptSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "userUploadedDifferentGameScriptSha256": "98666cf499473dfadb9b708af10ef2e5e13b50300881a32b7c8d65d7756a5700",
+  "roomInput": "Watergirl seat 1, ordinary keyboard movement only, no teleport or direct object writes",
+  "ciUrl": "https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44085651969",
+  "attempts": [
+    {
+      "runAttempt": 1,
+      "artifactId": 14328888351,
+      "artifactZipSha256": "a1317a78c9bbceab1d551f11ae925d40f9c233e5f8d8017f9ea705e1837651d5",
+      "sourceCommit": "e3a2dd3b60848303b49db75365a332eba8f7da1a",
+      "serverChecksPassed": 3,
+      "viewerChecksPassed": 7,
+      "buttonReleased": {
+        "state": 0,
+        "y": 159.744
+      },
+      "platformReturned": {
+        "authorityY": 912.064,
+        "viewersY": [
+          912.064,
+          912.064
+        ],
+        "initialY": 912
+      },
+      "boxAfterMotion": {
+        "authorityX": 898.1942948710251,
+        "viewersX": [
+          898.216264541604,
+          898.216264541604
+        ],
+        "authorityY": 602.0856921135146,
+        "viewersY": [
+          602.1754317085243,
+          602.1754317085243
+        ]
+      },
+      "spectatorBox2dSteps": [
+        0,
+        0
+      ]
+    },
+    {
+      "runAttempt": 2,
+      "artifactId": 14328758954,
+      "artifactZipSha256": "1d702714bb396621e412232f1bf6a2d5b0993bcf5d66ff851c9a6bee27d2e1a0",
+      "sourceCommit": "e3a2dd3b60848303b49db75365a332eba8f7da1a",
+      "serverChecksPassed": 3,
+      "viewerChecksPassed": 7,
+      "buttonReleased": {
+        "state": 0,
+        "y": 159.744
+      },
+      "platformReturned": {
+        "authorityY": 912.128,
+        "viewersY": [
+          912.128,
+          912.128
+        ],
+        "initialY": 912
+      },
+      "boxAfterMotion": {
+        "authorityX": 906.906217327521,
+        "viewersX": [
+          906.9062302282908,
+          906.9062302282908
+        ],
+        "authorityY": 601.7671606038053,
+        "viewersY": [
+          601.9827865912753,
+          601.9827865912753
+        ]
+      },
+      "spectatorBox2dSteps": [
+        0,
+        0
+      ]
+    }
+  ],
+  "limitations": [
+    "Authoritative and viewer observations may differ by sampling time during motion; convergence is explicitly measured after movement",
+    "Only stage 52, not all levels or complete win/death semantics",
+    "The user's original HTML5 ZIP is not byte-identical to the CI research candidate and remains untested in this browser runtime",
+    "Six known h5api is not defined progress callback exceptions remain",
+    "No public-distribution license, WAN latency, or full game completion evidence"
+  ],
+  "thirdPartyAssetsCommitted": false
+}

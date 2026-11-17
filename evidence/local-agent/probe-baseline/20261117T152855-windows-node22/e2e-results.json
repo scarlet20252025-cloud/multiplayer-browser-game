@@ -1,0 +1,268 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "recordedAt": "2026-11-17T07:29:04.545Z",
+  "scope": "Authored AS3 probe only; original games have NOT been run",
+  "environment": {
+    "node": "v22.22.2",
+    "browser": "151.0.7922.34",
+    "graphics": "headless Chromium with SwiftShader software rendering",
+    "network": "local loopback; not an Internet latency result"
+  },
+  "checks": [
+    {
+      "name": "honest capability reporting",
+      "status": "passed",
+      "detail": {
+        "ok": true,
+        "protocol": 1,
+        "build": "as3-probe-1",
+        "originalGamesVerified": false,
+        "probePresent": true,
+        "activeRooms": 0
+      }
+    },
+    {
+      "name": "waiting viewer applies the complete tick-zero initial state",
+      "status": "passed",
+      "detail": {
+        "hello": {
+          "height": 360,
+          "protocol": 1,
+          "role": "client",
+          "stepHz": 25,
+          "version": "as3-probe-1",
+          "width": 640
+        },
+        "state": {
+          "players": [
+            {
+              "aimX": 0.25,
+              "aimY": 0.5,
+              "buttons": 0,
+              "id": 0,
+              "pressedCount": 0,
+              "releasedCount": 0,
+              "x": 160,
+              "y": 180
+            },
+            {
+              "aimX": 0.75,
+              "aimY": 0.5,
+              "buttons": 0,
+              "id": 1,
+              "pressedCount": 0,
+              "releasedCount": 0,
+              "x": 480,
+              "y": 180
+            }
+          ],
+          "protocol": 1,
+          "tick": 0,
+          "version": "as3-probe-1"
+        },
+        "display": {
+          "players": [
+            {
+              "id": 0,
+              "pointerScaleX": 1,
+              "pointerScaleY": 1,
+              "pointerX": 160,
+              "pointerY": 180,
+              "x": 160,
+              "y": 180
+            },
+            {
+              "id": 1,
+              "pointerScaleX": 1,
+              "pointerScaleY": 1,
+              "pointerX": 480,
+              "pointerY": 180,
+              "x": 480,
+              "y": 180
+            }
+          ],
+          "protocol": 1,
+          "tick": 0,
+          "version": "as3-probe-1"
+        }
+      }
+    },
+    {
+      "name": "server AS3 authority and two distinct client renderers",
+      "status": "passed",
+      "detail": {
+        "room": "E19D00",
+        "roles": [
+          {
+            "height": 360,
+            "protocol": 1,
+            "role": "client",
+            "stepHz": 25,
+            "version": "as3-probe-1",
+            "width": 640
+          },
+          {
+            "height": 360,
+            "protocol": 1,
+            "role": "client",
+            "stepHz": 25,
+            "version": "as3-probe-1",
+            "width": 640
+          }
+        ]
+      }
+    },
+    {
+      "name": "simultaneous inputs control separate seats",
+      "status": "passed",
+      "detail": {
+        "players": [
+          {
+            "aimX": 0.5,
+            "aimY": 0.5,
+            "buttons": 0,
+            "id": 0,
+            "pressedCount": 0,
+            "releasedCount": 0,
+            "x": 176,
+            "y": 180
+          },
+          {
+            "aimX": 0.5,
+            "aimY": 0.5,
+            "buttons": 0,
+            "id": 1,
+            "pressedCount": 0,
+            "releasedCount": 0,
+            "x": 480,
+            "y": 164
+          }
+        ],
+        "protocol": 1,
+        "tick": 7,
+        "version": "as3-probe-1"
+      }
+    },
+    {
+      "name": "independent mouse coordinates and button ownership",
+      "status": "passed",
+      "detail": [
+        {
+          "aimX": 0.20000000737663626,
+          "aimY": 0.299999986114567,
+          "buttons": 0,
+          "id": 0,
+          "pressedCount": 1,
+          "releasedCount": 1,
+          "x": 176,
+          "y": 180
+        },
+        {
+          "aimX": 0.800000029506545,
+          "aimY": 0.6999999444582682,
+          "buttons": 0,
+          "id": 1,
+          "pressedCount": 0,
+          "releasedCount": 0,
+          "x": 480,
+          "y": 164
+        }
+      ]
+    },
+    {
+      "name": "viewer cannot advance authoritative simulation",
+      "status": "passed",
+      "detail": {
+        "returned": null,
+        "tick": 12
+      }
+    },
+    {
+      "name": "both clients, AS3 models and actual DisplayObject positions match",
+      "status": "passed",
+      "detail": {
+        "comparedTicks": 13
+      }
+    },
+    {
+      "name": "focus loss releases input",
+      "status": "passed",
+      "detail": {}
+    },
+    {
+      "name": "refresh reconnect preserves seat and authoritative room",
+      "status": "passed",
+      "detail": {
+        "room": "E19D00",
+        "previousTick": 15
+      }
+    },
+    {
+      "name": "both viewers are visibly unobstructed before screenshots",
+      "status": "passed",
+      "detail": {
+        "runtimeNotices": [
+          {
+            "page": "1",
+            "notice": "Ruffle software-rendering notice",
+            "action": "clicked the visible close control"
+          }
+        ]
+      }
+    },
+    {
+      "name": "leave synchronously stops local input before its network acknowledgement",
+      "status": "passed",
+      "detail": {}
+    },
+    {
+      "name": "quick match pairs two independent browsers",
+      "status": "passed",
+      "detail": [
+        {
+          "room": "1DF763",
+          "slot": 0
+        },
+        {
+          "room": "1DF763",
+          "slot": 1
+        }
+      ]
+    },
+    {
+      "name": "no browser or application errors through the final matched room",
+      "status": "passed",
+      "detail": {
+        "browserErrors": [],
+        "clientErrors": [
+          [],
+          []
+        ]
+      }
+    }
+  ],
+  "metrics": {
+    "createdRooms": 2,
+    "rejectedMessages": 0,
+    "staleInputs": 0,
+    "droppedSnapshots": 0,
+    "statePayloadBytes": 18948,
+    "stateMessages": 55,
+    "missedTickSlots": 0,
+    "inputMessages": 128,
+    "stepSamples": 28,
+    "stepP50Ms": 4.264,
+    "stepP95Ms": 13.195,
+    "activeRooms": 1,
+    "nodeRssBytes": 145977344
+  },
+  "browserErrors": [],
+  "runtimeNotices": [
+    {
+      "page": "1",
+      "notice": "Ruffle software-rendering notice",
+      "action": "clicked the visible close control"
+    }
+  ]
+}

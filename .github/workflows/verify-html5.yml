@@ -1,0 +1,69 @@
+name: Verify HTML5 candidate adaptation
+
+on:
+  push:
+    branches: ['work/flash-netplay-lab']
+    paths:
+      - 'adapters/fireboy-html5/**'
+      - 'scripts/html5-research-host.mjs'
+      - 'scripts/verify-html5-adaptation.mjs'
+      - 'tests/html5-*.test.mjs'
+      - '.github/workflows/verify-html5.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  html5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out authored experiment
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Test authored adapters and research host
+        run: node --test tests/html5-*.test.mjs
+
+      - name: Install real browser
+        run: npx playwright install --with-deps chromium-headless-shell
+
+      # Source identified in the user's archive README. This is a research
+      # candidate from a third-party mirror, not an authorized publisher release.
+      # Nothing from this private runtime checkout is committed or uploaded.
+      - name: Obtain pinned first-game candidate in ignored temporary storage
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: 1224HuangJin/Fireboy-and-Watergirl
+          ref: 8568034556f567b5c429c0223dc1bf6dd2409277
+          path: local/html5-candidate
+          sparse-checkout: output/A
+          persist-credentials: false
+
+      - name: Verify jump, pause interception and actual state export
+        run: >-
+          node scripts/verify-html5-adaptation.mjs
+          --root local/html5-candidate/output/A
+          --script js/init.eb02fbdab2aa1d24.js
+          --expected-sha256 337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677
+          --out local/html5-results/${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload generated observations only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: html5-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: local/html5-results/*/*.json
+          if-no-files-found: warn
+          retention-days: 14

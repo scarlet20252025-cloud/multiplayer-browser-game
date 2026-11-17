@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "Two client WebSocket control and two native browser spectators with a single real HTML5 Phaser/Box2D authority",
+  "date": "2026-11-17",
+  "ciRun": 44082985364,
+  "ciUrl": "https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44082985364",
+  "ciSourceCommit": "4e3e4246589ce329c416a3d9c5393b2585e22a25",
+  "ciArtifactId": 14327563214,
+  "ciArchiveSha256": "ae2329a5983cad82dfa249df5e6d5ac0fb4b44bb4f18c1140d1d94d51b454d2e",
+  "gameScriptSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "userUploadedGameScriptSha256": "98666cf499473dfadb9b708af10ef2e5e13b50300881a32b7c8d65d7756a5700",
+  "testLevel": {
+    "id": 52,
+    "file": "forest/levels/forest_04_1.json"
+  },
+  "serverInput": {
+    "slot": 1,
+    "direction": -1,
+    "appliedSeq": 6,
+    "packets": 8,
+    "waterHorizontalDeltaPixels": -102.0623906869464
+  },
+  "mechanism": {
+    "group": 2,
+    "button": {
+      "before": {
+        "state": 0,
+        "x": 1120,
+        "y": 160
+      },
+      "trigger": {
+        "state": 1,
+        "x": 1120,
+        "y": 173.18597579770133
+      }
+    },
+    "linkedPlatform": {
+      "before": {
+        "state": 0,
+        "x": 496,
+        "y": 912
+      },
+      "trigger": {
+        "state": 1,
+        "x": 496,
+        "y": 900.4800000000002
+      }
+    }
+  },
+  "viewers": [
+    {
+      "seat": 0,
+      "buttonState": 1,
+      "renderedButtonY": 173.18597579770133,
+      "renderedPlatformY": 900.4800000000002,
+      "localBox2DSteps": 0
+    },
+    {
+      "seat": 1,
+      "buttonState": 1,
+      "renderedButtonY": 173.18597579770133,
+      "renderedPlatformY": 900.4800000000002,
+      "localBox2DSteps": 0
+    }
+  ],
+  "checks": [
+    "real-character-consumed-input",
+    "pusher-physically-changed-state",
+    "linked-platform-physically-moved",
+    "two-frozen-native-viewers",
+    "button-state-observed-on-both-viewers",
+    "linked-platform-rendered-on-both-viewers",
+    "local-physics-stays-frozen"
+  ],
+  "errors": [],
+  "knownPageErrors": {
+    "count": 6,
+    "message": "h5api is not defined"
+  },
+  "limits": [
+    "Fixed research candidate version only; user-uploaded ZIP still has no original-package browser baseline",
+    "No test of platform reversing, box pushing, full completion, across public Internet, or commercial distribution rights"
+  ]
+}

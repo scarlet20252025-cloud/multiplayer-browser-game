@@ -1,0 +1,1096 @@
+{
+  "fromSnapshotSeq": 1,
+  "toSnapshotSeq": 2,
+  "sameLevel": true,
+  "added": [],
+  "removed": [],
+  "removalMeaning": "absent-from-observed-containers; cause-not-inferred",
+  "changes": [
+    {
+      "id": "research-forest-1/1/1",
+      "kind": "character",
+      "before": {
+        "id": "research-forest-1/1/1",
+        "kind": "character",
+        "position": {
+          "x": 96,
+          "y": 860.5440326409971
+        },
+        "rotation": 0,
+        "display": {
+          "x": 96,
+          "y": 860.5440326409971,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 0.95,
+            "y": 0.95
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        },
+        "slot": 0,
+        "character": "fb",
+        "gameplay": {
+          "diamonds": 0,
+          "silverDiamonds": 0,
+          "prohibitJump": null,
+          "dead": null,
+          "dying": null,
+          "facing": "idle"
+        },
+        "input": {
+          "left": false,
+          "right": false,
+          "up": false
+        },
+        "bodyParts": {
+          "head": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": true,
+            "alpha": 1,
+            "frame": 69,
+            "frameName": "fire_head_idle0013",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "idle",
+              "playing": true,
+              "frameIndex": 69
+            }
+          },
+          "legs": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": true,
+            "alpha": 1,
+            "frame": 94,
+            "frameName": "fire_legs_idle0000",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "running",
+              "playing": false,
+              "frameIndex": 94
+            }
+          },
+          "ice": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": false,
+            "alpha": 1,
+            "frame": 0,
+            "frameName": "_default0000",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "loop",
+              "playing": false,
+              "frameIndex": 0
+            }
+          }
+        }
+      },
+      "after": {
+        "id": "research-forest-1/1/1",
+        "kind": "character",
+        "position": {
+          "x": 96,
+          "y": 860.5440326409971
+        },
+        "rotation": 0,
+        "display": {
+          "x": 96,
+          "y": 860.5440326409971,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 0.95,
+            "y": 0.95
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        },
+        "slot": 0,
+        "character": "fb",
+        "gameplay": {
+          "diamonds": 0,
+          "silverDiamonds": 0,
+          "prohibitJump": null,
+          "dead": null,
+          "dying": null,
+          "facing": "idle"
+        },
+        "input": {
+          "left": false,
+          "right": false,
+          "up": false
+        },
+        "bodyParts": {
+          "head": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": true,
+            "alpha": 1,
+            "frame": 56,
+            "frameName": "fire_head_idle0000",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "idle",
+              "playing": true,
+              "frameIndex": 56
+            }
+          },
+          "legs": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": true,
+            "alpha": 1,
+            "frame": 94,
+            "frameName": "fire_legs_idle0000",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "running",
+              "playing": false,
+              "frameIndex": 94
+            }
+          },
+          "ice": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": false,
+            "alpha": 1,
+            "frame": 0,
+            "frameName": "_default0000",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "loop",
+              "playing": false,
+              "frameIndex": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "research-forest-1/1/2",
+      "kind": "character",
+      "before": {
+        "id": "research-forest-1/1/2",
+        "kind": "character",
+        "position": {
+          "x": 96,
+          "y": 732.5440245090822
+        },
+        "rotation": 0,
+        "display": {
+          "x": 96,
+          "y": 732.5440245090822,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 0.95,
+            "y": 0.95
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        },
+        "slot": 1,
+        "character": "wg",
+        "gameplay": {
+          "diamonds": 0,
+          "silverDiamonds": 0,
+          "prohibitJump": false,
+          "dead": null,
+          "dying": null,
+          "facing": "idle"
+        },
+        "input": {
+          "left": false,
+          "right": false,
+          "up": false
+        },
+        "bodyParts": {
+          "head": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": true,
+            "alpha": 1,
+            "frame": 153,
+            "frameName": "water_head_idle0008",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "idle",
+              "playing": true,
+              "frameIndex": 153
+            }
+          },
+          "legs": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": true,
+            "alpha": 1,
+            "frame": 200,
+            "frameName": "water_legs_idle0000",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "onice",
+              "playing": false,
+              "frameIndex": 200
+            }
+          },
+          "ice": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": false,
+            "alpha": 1,
+            "frame": 0,
+            "frameName": "_default0000",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "loop",
+              "playing": false,
+              "frameIndex": 0
+            }
+          }
+        }
+      },
+      "after": {
+        "id": "research-forest-1/1/2",
+        "kind": "character",
+        "position": {
+          "x": 117.85678547996322,
+          "y": 732.7639708429136
+        },
+        "rotation": 0,
+        "display": {
+          "x": 117.85678547996322,
+          "y": 732.7639708429136,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 0.95,
+            "y": 0.95
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        },
+        "slot": 1,
+        "character": "wg",
+        "gameplay": {
+          "diamonds": 0,
+          "silverDiamonds": 0,
+          "prohibitJump": false,
+          "dead": null,
+          "dying": null,
+          "facing": "right"
+        },
+        "input": {
+          "left": false,
+          "right": true,
+          "up": false
+        },
+        "bodyParts": {
+          "head": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": true,
+            "alpha": 1,
+            "frame": 178,
+            "frameName": "water_head_jumping0003",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "jumping",
+              "playing": true,
+              "frameIndex": 178
+            }
+          },
+          "legs": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": true,
+            "alpha": 1,
+            "frame": 204,
+            "frameName": "water_legs_running0003",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "running",
+              "playing": true,
+              "frameIndex": 204
+            }
+          },
+          "ice": {
+            "x": 0,
+            "y": 0,
+            "rotation": 0,
+            "visible": false,
+            "alpha": 1,
+            "frame": 0,
+            "frameName": "_default0000",
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "animation": {
+              "name": "loop",
+              "playing": false,
+              "frameIndex": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "research-forest-1/1/5",
+      "kind": "diamond",
+      "before": {
+        "id": "research-forest-1/1/5",
+        "kind": "diamond",
+        "position": {
+          "x": 752,
+          "y": 464
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -4.081696253585921,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 49,
+          "frameName": "diamond_wg0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 49
+          }
+        },
+        "character": "wg",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 752,
+          "y": 464,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      },
+      "after": {
+        "id": "research-forest-1/1/5",
+        "kind": "diamond",
+        "position": {
+          "x": 752,
+          "y": 464
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -4.997773335794417,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 49,
+          "frameName": "diamond_wg0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 49
+          }
+        },
+        "character": "wg",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 752,
+          "y": 464,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "research-forest-1/1/6",
+      "kind": "diamond",
+      "before": {
+        "id": "research-forest-1/1/6",
+        "kind": "diamond",
+        "position": {
+          "x": 760,
+          "y": 144
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -4.327506651265095,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 49,
+          "frameName": "diamond_wg0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 49
+          }
+        },
+        "character": "wg",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 760,
+          "y": 144,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      },
+      "after": {
+        "id": "research-forest-1/1/6",
+        "kind": "diamond",
+        "position": {
+          "x": 760,
+          "y": 144
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -2.2208306233788933,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 49,
+          "frameName": "diamond_wg0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 49
+          }
+        },
+        "character": "wg",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 760,
+          "y": 144,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "research-forest-1/1/7",
+      "kind": "diamond",
+      "before": {
+        "id": "research-forest-1/1/7",
+        "kind": "diamond",
+        "position": {
+          "x": 72,
+          "y": 184
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -1.3420773651734228,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 49,
+          "frameName": "diamond_wg0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 49
+          }
+        },
+        "character": "wg",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 72,
+          "y": 184,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      },
+      "after": {
+        "id": "research-forest-1/1/7",
+        "kind": "diamond",
+        "position": {
+          "x": 72,
+          "y": 184
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": 1.5450849718747373,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 49,
+          "frameName": "diamond_wg0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 49
+          }
+        },
+        "character": "wg",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 72,
+          "y": 184,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "research-forest-1/1/8",
+      "kind": "diamond",
+      "before": {
+        "id": "research-forest-1/1/8",
+        "kind": "diamond",
+        "position": {
+          "x": 370,
+          "y": 80
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -4.081696253585921,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 46,
+          "frameName": "diamond_fb0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 46
+          }
+        },
+        "character": "fb",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 370,
+          "y": 80,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      },
+      "after": {
+        "id": "research-forest-1/1/8",
+        "kind": "diamond",
+        "position": {
+          "x": 370,
+          "y": 80
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -4.997773335794417,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 46,
+          "frameName": "diamond_fb0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 46
+          }
+        },
+        "character": "fb",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 370,
+          "y": 80,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "research-forest-1/1/9",
+      "kind": "diamond",
+      "before": {
+        "id": "research-forest-1/1/9",
+        "kind": "diamond",
+        "position": {
+          "x": 240,
+          "y": 424
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -5,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 46,
+          "frameName": "diamond_fb0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 46
+          }
+        },
+        "character": "fb",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 240,
+          "y": 424,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      },
+      "after": {
+        "id": "research-forest-1/1/9",
+        "kind": "diamond",
+        "position": {
+          "x": 240,
+          "y": 424
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -4.166054408297145,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 46,
+          "frameName": "diamond_fb0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 46
+          }
+        },
+        "character": "fb",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 240,
+          "y": 424,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "research-forest-1/1/10",
+      "kind": "diamond",
+      "before": {
+        "id": "research-forest-1/1/10",
+        "kind": "diamond",
+        "position": {
+          "x": 656,
+          "y": 848
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -4.081696253585921,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 46,
+          "frameName": "diamond_fb0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 46
+          }
+        },
+        "character": "fb",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 656,
+          "y": 848,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      },
+      "after": {
+        "id": "research-forest-1/1/10",
+        "kind": "diamond",
+        "position": {
+          "x": 656,
+          "y": 848
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -4.997773335794417,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 46,
+          "frameName": "diamond_fb0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 46
+          }
+        },
+        "character": "fb",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 656,
+          "y": 848,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "research-forest-1/1/11",
+      "kind": "diamond",
+      "before": {
+        "id": "research-forest-1/1/11",
+        "kind": "diamond",
+        "position": {
+          "x": 912,
+          "y": 846
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -2.9452766377105806,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 49,
+          "frameName": "diamond_wg0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 49
+          }
+        },
+        "character": "wg",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 912,
+          "y": 846,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      },
+      "after": {
+        "id": "research-forest-1/1/11",
+        "kind": "diamond",
+        "position": {
+          "x": 912,
+          "y": 846
+        },
+        "rotation": 0,
+        "display": {
+          "x": 0,
+          "y": -0.21984059158932467,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 49,
+          "frameName": "diamond_wg0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 49
+          }
+        },
+        "character": "wg",
+        "presence": "present-in-underGround",
+        "rootDisplay": {
+          "x": 912,
+          "y": 846,
+          "rotation": 0,
+          "visible": true,
+          "alpha": 1,
+          "frame": 0,
+          "frameName": "_default0000",
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "animation": {
+            "name": null,
+            "playing": null,
+            "frameIndex": 0
+          }
+        }
+      }
+    }
+  ]
+}
