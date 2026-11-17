@@ -49,16 +49,33 @@ async function pixelChange(page, before, after, regions=null){
     if(first.width!==second.width||first.height!==second.height)
       throw Error('Screenshot sizes changed');
     const d1=first.data,d2=second.data;
-    let pixelsChanged=0,pixelsConsidered=0;
+    let pixelsChanged=0,pixelsConsidered=0,minX=first.width,minY=first.height,maxX=-1,maxY=-1;
     for(let y=0;y<first.height;y++)for(let x=0;x<first.width;x++){
       if(regions && !regions.some(r=>x>=r.left&&x<r.right&&y>=r.top&&y<r.bottom))continue;
       const i=(y*first.width+x)*4;
       pixelsConsidered++;
       if(Math.max(Math.abs(d1[i]-d2[i]),Math.abs(d1[i+1]-d2[i+1]),
-        Math.abs(d1[i+2]-d2[i+2]))>=16)pixelsChanged++;
+        Math.abs(d1[i+2]-d2[i+2]))>=16){
+        pixelsChanged++;minX=Math.min(minX,x);minY=Math.min(minY,y);
+        maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+      }
     }
-    return {pixelsChanged,pixelsConsidered,width:first.width,height:first.height};
+    return {pixelsChanged,pixelsConsidered,width:first.width,height:first.height,
+      changedBounds:pixelsChanged?{left:minX,top:minY,right:maxX+1,bottom:maxY+1}:null};
   },{a:before.toString('base64'),b:after.toString('base64'),regions});
+}
+async function realSpriteScreenGeometry(page){
+  return page.evaluate(()=>{
+    const game=window.__game,sp=game?.level?.pers1?.sprite;
+    const canvas=game?.canvas,rect=canvas?.getBoundingClientRect();
+    const b=sp?.getBounds?.(),wt=sp?.worldTransform;
+    return {sprite:{x:sp?.x,y:sp?.y,width:sp?.width,height:sp?.height,
+       visible:sp?.visible,worldX:wt?.tx,worldY:wt?.ty,
+       bounds:b?{x:b.x,y:b.y,width:b.width,height:b.height}:null},
+       canvas:canvas&&rect?{width:canvas.width,height:canvas.height,
+         left:rect.left,top:rect.top,widthCss:rect.width,heightCss:rect.height}:null,
+       gameWidth:game?.width,gameHeight:game?.height};
+  });
 }
 async function fireScreenRegion(page,aroundX=null){
   return page.evaluate(otherX=>{
@@ -174,6 +191,7 @@ try{
   pass('viewer-physics-remains-frozen',{steps:initialPhysics});
   const initialFire=aIdle.fire.x,initialWater=bIdle.water.x;
   const fireRegionBefore=await fireScreenRegion(first);
+  const fireGeometryBefore=await realSpriteScreenGeometry(first);
   const beforePixels=await first.screenshot({animations:'disabled'});
   await sleep(350);
   const idlePixels=await first.screenshot({animations:'disabled'});
@@ -189,6 +207,7 @@ try{
   pass('keyboard-from-viewer-zero-controls-fire',{fireDeltaX:fireMoved.fire.x-initialFire});
   await sleep(300);
   const fireRegionAfter=await fireScreenRegion(first);
+  const fireGeometryAfter=await realSpriteScreenGeometry(first);
   const movedPixels=await first.screenshot({animations:'disabled'});
   const combinedRegion={left:Math.min(fireRegionBefore.left,fireRegionAfter.left),
     top:Math.min(fireRegionBefore.top,fireRegionAfter.top),
@@ -196,7 +215,9 @@ try{
     bottom:Math.max(fireRegionBefore.bottom,fireRegionAfter.bottom)};
   const idleDelta=await pixelChange(first,beforePixels,idlePixels,[combinedRegion]);
   const movedDelta=await pixelChange(first,idlePixels,movedPixels,[combinedRegion]);
-  const screenshotEvidence={idleDelta,movedDelta,region:combinedRegion,
+  const fullFrameDelta=await pixelChange(first,idlePixels,movedPixels);
+  const screenshotEvidence={idleDelta,movedDelta,fullFrameDelta,
+    fireGeometryBefore,fireGeometryAfter,region:combinedRegion,
     sha256:{before:pngSha(beforePixels),idle:pngSha(idlePixels),moved:pngSha(movedPixels)}};
   report.visualPixels=screenshotEvidence;
   report.pixelMovementState=await viewerState(first);
