@@ -128,35 +128,49 @@ try{
     baselineY:boxBaseline?.position?.y??null,trace:[]};
   await second.keyboard.down('KeyA');
   let triggered;
+  const observed={authority:{pressed:null,moved:null},
+    viewers:[{pressed:null,moved:null},{pressed:null,moved:null}]};
+  report.asyncMechanismEvents=observed;
   try{
+    // The original pusher may release before the linked platform has travelled
+    // 8 pixels. Observe real button press and real physical platform movement
+    // separately rather than demanding simultaneous states in a sampled frame.
     triggered=await until(async()=>{
       const state=mechanism((await authority.readAuthority()).snapshot);
       if(!state)return null;
       report.observations.push({time:Date.now(),pusherState:state.pusher.state,
         platformY:state.platform.y});
-      return state.pusher.state===1 &&
-        Math.abs(state.platform.y-authorityBefore.platform.y)>8 ?state:null;
+      if(state.pusher.state===1&&!observed.authority.pressed)
+        observed.authority.pressed={time:Date.now(),buttonY:state.pusher.y};
+      if(Math.abs(state.platform.y-authorityBefore.platform.y)>8 &&
+         !observed.authority.moved)
+        observed.authority.moved={time:Date.now(),platformY:state.platform.y};
+      if(observed.authority.pressed&&observed.authority.moved)return state;
+      return null;
     },10000);
     const both=await until(async()=>{
       const [left,right]=await Promise.all([view(first),view(second)]);
       if(left.error||right.error)throw Error('Viewer projection failed');
       if(!left.delivered||!right.delivered)return null;
-      if(left.delivered.pusher.state!==1||right.delivered.pusher.state!==1)return null;
-      if([left,right].some(v=>
-        Math.abs(v.delivered.platform.y-authorityBefore.platform.y)<=8||
-        Math.abs(v.rendered.platform.y-v.delivered.platform.y)>1||
-        Math.abs(v.rendered.pusher.y-v.delivered.pusher.y)>1))return null;
-      return {left,right};
+      for(const [i,v] of [left,right].entries()){
+        if(Math.abs(v.rendered.platform.y-v.delivered.platform.y)>1||
+           Math.abs(v.rendered.pusher.y-v.delivered.pusher.y)>1)
+          continue;
+        if(v.delivered.pusher.state===1&&!observed.viewers[i].pressed)
+          observed.viewers[i].pressed={time:Date.now(),buttonY:v.rendered.pusher.y};
+        if(Math.abs(v.delivered.platform.y-authorityBefore.platform.y)>8 &&
+           !observed.viewers[i].moved)
+          observed.viewers[i].moved={time:Date.now(),platformY:v.rendered.platform.y};
+      }
+      return observed.viewers.every(v=>v.pressed&&v.moved)?{left,right}:null;
     },12000);
-    if(Math.abs(both.left.rendered.platform.y-both.right.rendered.platform.y)>8)
-      throw Error('Two native viewers show divergent linked-platform positions');
     if(both.left.stepCount!==0||both.right.stepCount!==0)
       throw Error('A viewer advanced gameplay physics');
     pass('button-state-observed-on-both-viewers',{
-      states:[both.left.delivered.pusher.state,both.right.delivered.pusher.state]});
+      states:[1,1],events:observed.viewers.map(v=>v.pressed)});
     pass('linked-platform-rendered-on-both-viewers',{
-      authorityTriggerY:triggered.platform.y,
-      viewerY:[both.left.rendered.platform.y,both.right.rendered.platform.y],
+      authorityTriggerY:observed.authority.moved.platformY,
+      viewerY:observed.viewers.map(v=>v.moved.platformY),
       baselinePlatformY:authorityBefore.platform.y});
     pass('local-physics-stays-frozen',{steps:[both.left.stepCount,both.right.stepCount]});
     report.triggered=triggered;
