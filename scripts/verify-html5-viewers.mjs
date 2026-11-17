@@ -3,6 +3,7 @@
  * Third-party assets remain in ignored research-only folder; JSON evidence only.
  */
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
@@ -31,6 +32,49 @@ async function until(asyncPredicate,ms=15000){
   throw Error('Timed out waiting for original viewer/authority synchronization');
 }
 function pass(name,value){report.checks.push({name,status:'passed',value});}
+// Compare decoded screenshots; never save or upload copyrighted game pixels.
+function pngSha(bytes){return createHash('sha256').update(bytes).digest('hex');}
+async function pixelChange(page, before, after, regions=null){
+  return page.evaluate(async ({a,b,regions})=>{
+    async function pixels(base64){
+      const bytes=Uint8Array.from(atob(base64),letter=>letter.charCodeAt(0));
+      const bitmap=await createImageBitmap(new Blob([bytes],{type:'image/png'}));
+      const canvas=document.createElement('canvas');
+      canvas.width=bitmap.width;canvas.height=bitmap.height;
+      const context=canvas.getContext('2d',{willReadFrequently:true});
+      context.drawImage(bitmap,0,0);
+      return context.getImageData(0,0,bitmap.width,bitmap.height);
+    }
+    const first=await pixels(a),second=await pixels(b);
+    if(first.width!==second.width||first.height!==second.height)
+      throw Error('Screenshot sizes changed');
+    const d1=first.data,d2=second.data;
+    let pixelsChanged=0,pixelsConsidered=0;
+    for(let y=0;y<first.height;y++)for(let x=0;x<first.width;x++){
+      if(regions && !regions.some(r=>x>=r.left&&x<r.right&&y>=r.top&&y<r.bottom))continue;
+      const i=(y*first.width+x)*4;
+      pixelsConsidered++;
+      if(Math.max(Math.abs(d1[i]-d2[i]),Math.abs(d1[i+1]-d2[i+1]),
+        Math.abs(d1[i+2]-d2[i+2]))>=16)pixelsChanged++;
+    }
+    return {pixelsChanged,pixelsConsidered,width:first.width,height:first.height};
+  },{a:before.toString('base64'),b:after.toString('base64'),regions});
+}
+async function fireScreenRegion(page,aroundX=null){
+  return page.evaluate(otherX=>{
+    const game=window.__game,canvas=game.canvas;
+    const rect=canvas.getBoundingClientRect(),sprite=game.level.pers1.sprite;
+    const localX=sprite.worldTransform?.tx??sprite.x;
+    const localY=sprite.worldTransform?.ty??sprite.y;
+    const scaleX=rect.width/game.width,scaleY=rect.height/game.height;
+    const x=rect.left+localX*scaleX, y=rect.top+localY*scaleY;
+    if(!Number.isFinite(x)||!Number.isFinite(y)||rect.width<=0||rect.height<=0)
+      throw Error('Cannot locate visible Fireboy sprite region');
+    const x2=otherX===null?x:rect.left+otherX*scaleX;
+    return {left:Math.floor(Math.min(x,x2)-90),top:Math.floor(y-110),
+      right:Math.ceil(Math.max(x,x2)+90),bottom:Math.ceil(y+110)};
+  },aroundX);
+}
 async function viewerState(page){
   return page.evaluate(()=>({
     state:window.__spec?.status()??null,
@@ -114,6 +158,10 @@ try{
   assert.equal(bIdle.worldSteps,initialPhysics[1]);
   pass('viewer-physics-remains-frozen',{steps:initialPhysics});
   const initialFire=aIdle.fire.x,initialWater=bIdle.water.x;
+  const fireRegionBefore=await fireScreenRegion(first);
+  const beforePixels=await first.screenshot({animations:'disabled'});
+  await sleep(350);
+  const idlePixels=await first.screenshot({animations:'disabled'});
   await first.keyboard.down('ArrowRight');
   await sleep(700);
   await first.keyboard.up('ArrowRight');
@@ -124,6 +172,22 @@ try{
   const waterDuringFire=await viewerState(second);
   assert.ok(Math.abs(waterDuringFire.water.x-initialWater)<2);
   pass('keyboard-from-viewer-zero-controls-fire',{fireDeltaX:fireMoved.fire.x-initialFire});
+  await sleep(300);
+  const fireRegionAfter=await fireScreenRegion(first);
+  const movedPixels=await first.screenshot({animations:'disabled'});
+  const combinedRegion={left:Math.min(fireRegionBefore.left,fireRegionAfter.left),
+    top:Math.min(fireRegionBefore.top,fireRegionAfter.top),
+    right:Math.max(fireRegionBefore.right,fireRegionAfter.right),
+    bottom:Math.max(fireRegionBefore.bottom,fireRegionAfter.bottom)};
+  const idleDelta=await pixelChange(first,beforePixels,idlePixels,[combinedRegion]);
+  const movedDelta=await pixelChange(first,idlePixels,movedPixels,[combinedRegion]);
+  const screenshotEvidence={idleDelta,movedDelta,region:combinedRegion,
+    sha256:{before:pngSha(beforePixels),idle:pngSha(idlePixels),moved:pngSha(movedPixels)}};
+  report.visualPixels=screenshotEvidence;
+  assert.ok(movedDelta.pixelsChanged>=Math.max(100,idleDelta.pixelsChanged+80),
+    'Sprite positions changed but rendered Fireboy region did not show additional pixel changes');
+  pass('rendered-fireboy-pixels-change',{idlePixelsChanged:idleDelta.pixelsChanged,
+    movementPixelsChanged:movedDelta.pixelsChanged});
   await second.keyboard.down('KeyD');
   await sleep(700);
   await second.keyboard.up('KeyD');
