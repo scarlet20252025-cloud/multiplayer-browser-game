@@ -72,3 +72,7 @@ node scripts/verify-html5-viewers.mjs --root "E:\肥鱼不乐园\flash-archive\0
 ## 2026-11-17 — 晚加入钻石恢复与重新接管
 
 真实测试首先发现后加入浏览器错误显示 7 颗钻石（权威只剩 6），见 [CI #44074796969](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44074796969)；已通过初始钻石稳定登记表和 tombstone 修复。最新 [CI #44076714653](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44076714653) 14 项通过，涵盖真实拾取、晚加入显示与按键重新接管水娃，详细见 [HTML5_REJOIN_FIX.md](HTML5_REJOIN_FIX.md)。
+
+## 2026-11-17：实际推箱子与联动平台的三浏览器回归
+
+[CI #44084005637](https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44084005637) 真实让水娃踩下 group2 按钮，并继续向左推动动态箱子。服务器侧原生箱子从 X≈1039.998 到 X≈962.904；两份冻结观看端在随后同一权威状态中显示箱子 X≈979.847，客户端物理仍为零。事件时刻不同，不可误报为服务器/客户端延迟误差。完整字段、来源版本和未完成项详见 [HTML5_BOX_PUSH.md](HTML5_BOX_PUSH.md)。
