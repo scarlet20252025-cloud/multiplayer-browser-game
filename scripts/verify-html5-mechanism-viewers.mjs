@@ -69,21 +69,25 @@ async function view(page){
       o.options.properties?.group===2);
     const platform=__game.level.objects.find(o=>o.options?.type==='platform'&&
       o.options.properties?.group===2);
+    const box=__game.level.objects.find(o=>o.options?.type==='box');
     const snap=window.__spec?.lastSnapshot?.();
     const delivered={
       pusher:snap?.mechanisms?.find(o=>o.kind==='pusher'&&o.group===2),
-      platform:snap?.mechanisms?.find(o=>o.kind==='platform'&&o.group===2)
+      platform:snap?.mechanisms?.find(o=>o.kind==='platform'&&o.group===2),
+      box:snap?.mechanisms?.find(o=>o.kind==='box')
     };
     return {seat:window.__spec.status().seat,initial:window.__spec.status().initial,
       error:window.__spec.status().lastError,stepCount:window.__localPhysicsSteps,
       gamePaused:__game.paused,canvasCount:document.querySelectorAll('canvas').length,
       rendered:{pusher:pusher?{x:pusher.button?.x,y:pusher.button?.y}:null,
-        platform:platform?{x:platform.sprite?.x,y:platform.sprite?.y}:null},
+        platform:platform?{x:platform.sprite?.x,y:platform.sprite?.y}:null,
+        box:box?{x:box.sprite?.x,y:box.sprite?.y}:null},
       delivered:delivered.pusher&&delivered.platform?{
         pusher:{state:delivered.pusher.state,
           x:delivered.pusher.display?.x,y:delivered.pusher.display?.y},
         platform:{state:delivered.platform.state,
-          x:delivered.platform.display?.x,y:delivered.platform.display?.y}
+          x:delivered.platform.display?.x,y:delivered.platform.display?.y},
+        box:delivered.box?{x:delivered.box.display?.x,y:delivered.box.display?.y}:null
       }:null};
   });
 }
@@ -119,6 +123,9 @@ try{
   if(!authorityBefore||authorityBefore.pusher.state!==0)
     throw Error('Native button must be unpressed at the baseline');
   report.baseline=authorityBefore;
+  const boxBaseline=(await authority.readAuthority()).snapshot.mechanisms.find(o=>o.kind==='box');
+  report.boxProbe={status:'not-tested',boxFound:!!boxBaseline,baselineX:boxBaseline?.position?.x??null,
+    baselineY:boxBaseline?.position?.y??null,trace:[]};
   await second.keyboard.down('KeyA');
   let triggered;
   try{
@@ -154,6 +161,53 @@ try{
     pass('local-physics-stays-frozen',{steps:[both.left.stepCount,both.right.stepCount]});
     report.triggered=triggered;
     report.viewersAtTrigger=both;
+    // Optional next interaction: continue REAL water movement toward the
+    // map's dynamic box. A lack of push does not invalidate the proven button test.
+    if(boxBaseline&&Number.isFinite(boxBaseline.position?.x)){
+      const trace=report.boxProbe.trace;
+      let pushed=null;
+      for(let sample=0;sample<26;sample++){
+        await sleep(100);
+        const snap=(await authority.readAuthority()).snapshot;
+        const boxNow=snap.mechanisms.find(m=>m.id===boxBaseline.id);
+        const water=snap.characters.find(m=>m.slot===1);
+        const row={sample,waterX:water?.position?.x??null,
+          boxX:boxNow?.position?.x??null,boxY:boxNow?.position?.y??null};
+        trace.push(row);
+        if(boxNow&&Number.isFinite(water?.position?.x)&&
+          Math.abs(boxNow.position.x-boxBaseline.position.x)>8 &&
+          Math.abs(water.position.x-boxNow.position.x)<80){
+          pushed={boxX:boxNow.position.x,waterX:water.position.x,deltaX:boxNow.position.x-boxBaseline.position.x};
+          break;
+        }
+      }
+      if(pushed){
+        try{
+          const bothBox=await until(async()=>{
+            const [left,right]=await Promise.all([view(first),view(second)]);
+            if(left.error||right.error)throw Error('Viewer failed during box projection');
+            if(!left.delivered?.box||!right.delivered?.box||
+              !left.rendered.box||!right.rendered.box)return null;
+            if([left,right].some(v=>Math.abs(v.rendered.box.x-v.delivered.box.x)>1 ||
+              Math.abs(v.rendered.box.y-v.delivered.box.y)>1))return null;
+            if([left,right].some(v=>Math.abs(v.rendered.box.x-boxBaseline.display.x)<8))return null;
+            if(left.stepCount!==0||right.stepCount!==0)return null;
+            return {left,right};
+          },8000);
+          report.boxProbe.status='passed';
+          report.boxProbe.pushed=pushed;
+          report.boxProbe.viewerBoxX=[bothBox.left.rendered.box.x,bothBox.right.rendered.box.x];
+          pass('real-dynamic-box-moved-and-rendered-on-both-viewers',{
+            deltaX:pushed.deltaX,viewerX:report.boxProbe.viewerBoxX});
+        }catch(err){
+          report.boxProbe.status='blocked';
+          report.boxProbe.reason='Box changed in authority but both viewer projections were not verified: '+err.message;
+        }
+      }else{
+        report.boxProbe.status='blocked';
+        report.boxProbe.reason='No >8 px authoritative horizontal box displacement during normal movement';
+      }
+    }
   }finally{await second.keyboard.up('KeyA').catch(()=>{});}
   const unknown=report.diagnostics.filter(x=>x.type==='pageerror'&&
     x.message!=='h5api is not defined');
