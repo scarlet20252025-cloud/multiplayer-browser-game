@@ -43,12 +43,15 @@ export function analyzeJumpTrace(trace, options = {}) {
   }
   for (const name of ['hold', 'repress']) {
     const phaseRows = rows.filter(row => row.phase === name);
-    const held = phaseRows.filter(row => row.water?.up === true);
-    const heldStart = held[0]?.timeMs ?? Infinity;
-    const heldEnd = held.at(-1)?.timeMs ?? -Infinity;
-    const windowRows = phaseRows.filter(row => row.timeMs >= heldStart && row.timeMs <= heldEnd);
+    const firstHeldIndex = phaseRows.findIndex(row => row.water?.up === true);
+    const lastHeldIndex = phaseRows.findLastIndex(row => row.water?.up === true);
+    // Distinct observations can share a timestamp. Their recorded order defines
+    // the input edges; keep every row between them, including any intervening release.
+    const windowRows = firstHeldIndex < 0 ? [] : phaseRows.slice(firstHeldIndex, lastHeldIndex + 1);
+    const heldStart = windowRows[0]?.timeMs ?? Infinity;
+    const heldEnd = windowRows.at(-1)?.timeMs ?? -Infinity;
     const active = physics(windowRows);
-    const durationMs = held.length > 1 ? held.at(-1).timeMs - held[0].timeMs : 0;
+    const durationMs = windowRows.length > 1 ? heldEnd - heldStart : 0;
     if (durationMs < config.holdMs) blockers.push(`${name}: requested hold duration was not observed`);
     if (active.length < config.minimumPhysicsSamples) blockers.push(`${name}: insufficient real physics updates`);
     if (windowRows.some(row => !row.water.up || row.gamePaused || row.physicsPaused)) blockers.push(`${name}: input was released or game/physics was paused`);

@@ -28,6 +28,40 @@ test('complete landings and a consumed release establish two distinct presses',(
   assert.equal(result.phases.repress.excursions.length,1);
   assert.equal(result.releaseConsumed,true);
 });
+test('an unpressed phase boundary sharing the press timestamp is outside the held window',()=>{
+  const data=fixture();
+  for(const phase of ['hold','repress']){
+    const index=data.samples.findIndex(row=>row.phase===phase);
+    const boundary=structuredClone(data.samples[index]);
+    boundary.kind='phase-boundary';
+    boundary.observedPhysicsSteps--;
+    boundary.water.up=false;
+    boundary.water.prohibitJump=false;
+    const press=structuredClone(boundary);
+    press.kind='input-write';
+    press.water.up=true;
+    data.samples.splice(index,0,boundary,press);
+  }
+  const result=analyzeJumpTrace(data);
+  assert.equal(result.status,'passed');
+  assert.deepEqual(result.blockers,[]);
+  for(const phase of ['hold','repress'])assert.equal(result.phases[phase].durationMs,2000);
+});
+test('an intervening release cannot disappear when its timestamp matches held observations',()=>{
+  for(const phase of ['hold','repress']){
+    const data=fixture();
+    const held=data.samples.filter(row=>row.phase===phase)[50];
+    const release=structuredClone(held);
+    release.kind='input-write';
+    release.water.up=false;
+    const press=structuredClone(release);
+    press.water.up=true;
+    data.samples.splice(data.samples.indexOf(held)+1,0,release,press);
+    const result=analyzeJumpTrace(data);
+    assert.equal(result.status,'blocked');
+    assert.ok(result.blockers.includes(`${phase}: input was released or game/physics was paused`));
+  }
+});
 test('auto jumping while held fails, even when there are only two input writes',()=>{
   assert.equal(analyzeJumpTrace(fixture({repeat:true})).status,'failed');
 });

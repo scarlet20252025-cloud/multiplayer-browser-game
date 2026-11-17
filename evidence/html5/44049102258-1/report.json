@@ -1,0 +1,449 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-17T08:43:26.245Z",
+  "status": "blocked",
+  "scope": "Instrumented HTML5 candidate: jump trajectory, pause request interface, read-only state export",
+  "originalPackageBaseline": false,
+  "userLocalPackageByteMatch": "unknown",
+  "originalGameNetplayVerified": false,
+  "actualRoomTransportTested": false,
+  "source": {
+    "script": "js/init.eb02fbdab2aa1d24.js",
+    "sha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+    "bytes": 2218873,
+    "servedSha256": "d22c25a0e70e044e21b685737ac4ad22b311c8dd2e1b5713fa6adaf3f70e55ea",
+    "originalUnchanged": true
+  },
+  "environment": {
+    "node": "v24.22.2",
+    "platform": "linux",
+    "arch": "x64",
+    "browser": "151.0.7922.34"
+  },
+  "instrumentation": {
+    "instanceExposure": "HTTP response only",
+    "physicsStep": "delegating observation wrapper; timestep unchanged",
+    "fullUnlock": true,
+    "invulnerable": false,
+    "upstreamHtmlEntryLoaded": false
+  },
+  "tasks": [
+    {
+      "name": "jump-edge",
+      "status": "blocked",
+      "startedAt": "2026-11-17T08:43:32.420Z",
+      "analysis": {
+        "status": "blocked",
+        "scope": "Observed jump edge behavior for one instrumented game build and level only",
+        "config": {
+          "holdMs": 2000,
+          "minimumHeightPx": 10,
+          "landingTolerancePx": 3,
+          "minimumHeldStepsAfterLanding": 10,
+          "minimumHeldMsAfterLanding": 200,
+          "minimumPhysicsSamples": 20,
+          "maximumSampleGapMs": 250
+        },
+        "failures": [],
+        "blockers": [
+          "hold: input was released or game/physics was paused",
+          "repress: input was released or game/physics was paused"
+        ],
+        "releaseConsumed": true,
+        "fireMaximumVerticalDeviationPx": 0,
+        "phases": {
+          "hold": {
+            "durationMs": 2101.5,
+            "heldStartMs": 425.29999999999563,
+            "heldEndMs": 2526.7999999999956,
+            "physicsSamples": 110,
+            "baselineY": 732.5440326409971,
+            "minimumY": 693.984,
+            "finalY": 732.5440967140657,
+            "excursions": [
+              {
+                "takeoffTimeMs": 426.79999999999563,
+                "takeoffStep": 24,
+                "minimumY": 693.984,
+                "landingTimeMs": 780.5999999999985,
+                "landingStep": 42
+              }
+            ],
+            "stillHeldUpdatesAfterLanding": 90,
+            "stillHeldMsAfterLanding": 1677.300000000003
+          },
+          "repress": {
+            "durationMs": 2109.5,
+            "heldStartMs": 2956,
+            "heldEndMs": 5065.5,
+            "physicsSamples": 109,
+            "baselineY": 732.5440326409971,
+            "minimumY": 693.984,
+            "finalY": 732.5440245090822,
+            "excursions": [
+              {
+                "takeoffTimeMs": 2957.199999999997,
+                "takeoffStep": 156,
+                "minimumY": 693.984,
+                "landingTimeMs": 3312.5999999999985,
+                "landingStep": 174
+              }
+            ],
+            "stillHeldUpdatesAfterLanding": 89,
+            "stillHeldMsAfterLanding": 1682.4000000000015
+          }
+        }
+      },
+      "finishedAt": "2026-11-17T08:43:37.789Z"
+    },
+    {
+      "name": "pause-interception",
+      "status": "passed",
+      "startedAt": "2026-11-17T08:43:37.789Z",
+      "productionRoomTransport": "not-integrated",
+      "nativeGamePauseAffectsPhysicsByEngineGate": true,
+      "box2dPauseFlagDirectlyChanged": false,
+      "finishedAt": "2026-11-17T08:43:40.588Z"
+    },
+    {
+      "name": "state-export",
+      "status": "passed",
+      "startedAt": "2026-11-17T08:43:40.588Z",
+      "counts": {
+        "characters": 2,
+        "diamonds": 7,
+        "doors": 2,
+        "mechanisms": 5
+      },
+      "mechanismKinds": [
+        "pusher",
+        "lever",
+        "platform"
+      ],
+      "stableCharacterIds": true,
+      "waterDeltaX": 21.85678547996322,
+      "observedChanges": 9,
+      "unsupported": [
+        {
+          "path": "level.objects[4]",
+          "reason": "mechanism-type-not-projected:box"
+        }
+      ],
+      "completeDisplaySeparation": false,
+      "completeGameState": false,
+      "finishedAt": "2026-11-17T08:43:41.220Z"
+    }
+  ],
+  "files": [
+    {
+      "path": "jump-trace.json",
+      "bytes": 196408,
+      "sha256": "bdd8021e187b0172adc27bb7b1a288b657a475fdf09523be737ac5e6816805c5"
+    },
+    {
+      "path": "pause-observations.json",
+      "bytes": 4368,
+      "sha256": "e21e768c78b23cc0455b08c7b2d00e88a48faaf72c49163ab4233c8f71b810c9"
+    },
+    {
+      "path": "snapshot-a.json",
+      "bytes": 21523,
+      "sha256": "98d3f419b090d6ced9727a07ac07a9ee141d67666e57568906ee06e051adf48e"
+    },
+    {
+      "path": "snapshot-b.json",
+      "bytes": 21582,
+      "sha256": "bfc7f96870eafbda4e3ab005d5cfaa6d45a5f0c618697d7ea0913af3cbfe68ec"
+    },
+    {
+      "path": "snapshot-diff.json",
+      "bytes": 25286,
+      "sha256": "f118d84a566b23871d4b3adde6ae29bcf2a232e4af78b87ea3ac39f1e03f234b"
+    }
+  ],
+  "pageErrors": [
+    {
+      "message": "h5api is not defined",
+      "stack": "ReferenceError: h5api is not defined\n    at http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:52779:9\n    at c.SignalBinding.execute (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:9270:118)\n    at c.Signal.dispatch (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:9228:53)\n    at c.Loader.processLoadQueue (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19099:57)\n    at c.Loader.asyncComplete (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19141:169)\n    at c.Loader.fileComplete (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19466:16)\n    at a.data.onload (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19264:77)"
+    },
+    {
+      "message": "h5api is not defined",
+      "stack": "ReferenceError: h5api is not defined\n    at http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:52779:9\n    at c.SignalBinding.execute (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:9270:118)\n    at c.Signal.dispatch (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:9228:53)\n    at c.Loader.processLoadQueue (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19099:57)\n    at c.Loader.asyncComplete (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19141:169)\n    at c.Loader.fileComplete (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19466:16)\n    at a.data.onload (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19264:77)"
+    },
+    {
+      "message": "h5api is not defined",
+      "stack": "ReferenceError: h5api is not defined\n    at http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:52779:9\n    at c.SignalBinding.execute (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:9270:118)\n    at c.Signal.dispatch (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:9228:53)\n    at c.Loader.processLoadQueue (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19099:57)\n    at c.Loader.asyncComplete (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19141:169)\n    at c.Loader.fileComplete (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19466:16)\n    at a.data.onload (http://127.0.0.1:37947/js/init.eb02fbdab2aa1d24.js:19264:77)"
+    }
+  ],
+  "badResponses": [],
+  "failedRequests": [],
+  "blockedExternalRequests": [],
+  "consoleWarnings": [
+    {
+      "type": "warning",
+      "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+    },
+    {
+      "type": "warning",
+      "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x2c240013bc00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x2c240013bc00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x2c240013bc00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x2c240013bc00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - textureatlas[MenuAssets]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - textureatlas[PopupAssets]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - bitmapfont[font]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - bitmapfont[fontStone]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - bitmapfont[font_large]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - bitmapfont[fontStone_large]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - textureatlas[MenuBackgrounds]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - json[Ground]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - textureatlas[CharAssets]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - json[Objects]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - json[LargeObjects]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - json[Chars]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[menuMusic]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - textureatlas[MechAssets]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - textureatlas[GroundAssets]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - textureatlas[TempleAssets]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[levelMusic_speed]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[levelMusic_dark]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[levelMusicFinish_speed]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[levelMusicOver]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[levelMusicFinish]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[charToggle1]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[levelMusic]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[charToggle2]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[endPass]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[endFail]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[endDiamond]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[jump_fb]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[jump_wg]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[waterSteps]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[iceSteps_fb]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[iceSteps_wg]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[death]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[diamond]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[door]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[freeze]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[melt]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[lever]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[pusher]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[platform]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[portalOpen]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[wind]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[portalLoop]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[portalClose]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[portalTransport]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[clock]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[slider]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Phaser.Loader - audio[lightPusher]: h5api is not defined"
+    },
+    {
+      "type": "warning",
+      "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+    },
+    {
+      "type": "warning",
+      "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+    },
+    {
+      "type": "warning",
+      "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+    },
+    {
+      "type": "warning",
+      "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+    }
+  ],
+  "testedCommit": "3eda8336c89c1b0969d668325ce6b89f77ce1e17",
+  "workingTreeDirty": false,
+  "temple": {
+    "id": "forest"
+  },
+  "level": {
+    "id": 1,
+    "filename": "tutorials/levels/forest_01.json",
+    "state": 1
+  },
+  "runtimeReady": {
+    "state": "level",
+    "phaser": "2.6.2",
+    "gamePaused": false,
+    "physicsPaused": false,
+    "canvasCount": 1
+  },
+  "lastRuntime": {
+    "state": "level",
+    "gamePaused": false,
+    "physicsPaused": false,
+    "observerErrors": []
+  },
+  "diagnostics": {
+    "knownProgressSdkErrors": 3,
+    "knownProgressSdkScope": "Inspected h5api.progress callback only; loading-progress UI and hosting SDK are not validated or stubbed",
+    "unexplainedPageErrors": [],
+    "missingGameResources": [],
+    "failedResourceRequests": [],
+    "blockedExternalRequests": [],
+    "unexplainedConsoleErrors": [],
+    "observerErrors": []
+  },
+  "finishedAt": "2026-11-17T08:43:41.403Z"
+}
