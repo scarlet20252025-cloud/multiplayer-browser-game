@@ -118,6 +118,7 @@ python3 scripts/audit_fireboy.py \
 
 | 路径 | 内容 |
 | --- | --- |
+| [本地 Agent 交接任务](docs/LOCAL_AGENT_HANDOFF.md) | 补齐原游戏材料、复现基准、提交结果及回报格式；可直接交给本地 Agent 执行 |
 | [架构决策](docs/ARCHITECTURE_DECISION.md) | 非视频同步路线、取舍、原游戏改造与验收顺序 |
 | [实际验证报告](docs/VERIFICATION_REPORT.md) | CI 来源、通过项、延迟/载荷测量及未覆盖范围 |
 | [自建服务器部署](docs/DEPLOYMENT.md) | 单机、局域网、公网代理和指标边界 |
