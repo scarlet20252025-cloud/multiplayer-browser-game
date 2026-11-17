@@ -341,6 +341,27 @@ try{
   assert.equal(lateJoin.worldSteps,0);
   pass('late-join-does-not-resurrect-collected-diamond',{
     viewers:lateJoin.visibleDiamonds,authority:authorityNow.counts.diamonds});
+  // The replacement browser must also control only its reassigned seat.
+  const priorWater=lateJoin.water.x;
+  const priorFire=lateJoin.fire.x;
+  await replacement.keyboard.down('KeyD');
+  await sleep(650);
+  await replacement.keyboard.up('KeyD');
+  const rejoinedMotion=await until(async()=>{
+    const [newViewer,firstViewer]=await Promise.all([
+      viewerState(replacement),viewerState(first)]);
+    if(newViewer.water.x<=priorWater+15||firstViewer.water.x<=priorWater+15)
+      return null;
+    if(Math.abs(newViewer.water.x-firstViewer.water.x)>3)return null;
+    return {newViewer,firstViewer};
+  },12000);
+  assert.ok(Math.abs(rejoinedMotion.newViewer.fire.x-priorFire)<3,
+    'Rejoining Watergirl caused Fireboy to move');
+  assert.equal(rejoinedMotion.newViewer.worldSteps,0);
+  assert.equal(rejoinedMotion.firstViewer.worldSteps,0);
+  pass('late-joiner-resumes-own-controls-only',{
+    seat:lateJoin.state.seat,waterDeltaX:rejoinedMotion.newViewer.water.x-priorWater,
+    syncedWaterX:[rejoinedMotion.newViewer.water.x,rejoinedMotion.firstViewer.water.x]});
   report.status='passed';
 }catch(error){report.status='failed';report.errors.push(String(error.stack||error));}
 finally{
