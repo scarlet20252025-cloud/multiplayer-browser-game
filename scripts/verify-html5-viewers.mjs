@@ -89,6 +89,12 @@ async function viewerState(page){
       return proto?window.__game?.layers?.underGround?.children?.filter(child=>
         Object.prototype.isPrototypeOf.call(proto,child)&&child.visible!==false).length:null;
     })(),
+    visibleDiamondPositions:(()=>{
+      const proto=window.Devices?.Diamond?.prototype;
+      return proto?window.__game?.layers?.underGround?.children?.filter(child=>
+        Object.prototype.isPrototypeOf.call(proto,child)&&child.visible!==false)
+        .map(child=>({x:child.x,y:child.y,char:child.data?.char})):null;
+    })(),
     crate:(()=>{const box=window.__game?.level?.objects?.find(x=>x?.options?.type==='box');
       return box?{x:box.sprite?.x,y:box.sprite?.y,rotation:box.sprite?.rotation}:null;})(),
     activeCanvas:document.querySelectorAll('canvas').length,
@@ -312,6 +318,29 @@ try{
   },10000);
   assert.equal((await authority.readAuthority()).gamePaused,true);
   pass('browser-leave-pauses-authority',{seatLeft:1,gamePaused:true});
+  // New player joins after collection with a freshly loaded uncollected level.
+  // They must not resurrect already collected diamonds.
+  const replacement=await openViewer();
+  const lateJoin=await until(async()=>{
+    const view=await viewerState(replacement);
+    if(view.state?.lastError)throw Error('Late-join spectator projection rejected: '+view.state.lastError);
+    return view.state?.initial ?view:null;
+  },15000);
+  const authorityNow=(await authority.readAuthority()).snapshot;
+  report.lateJoinProbe={viewerSeat:lateJoin.state.seat,
+    visibleDiamonds:lateJoin.visibleDiamonds,
+    authorityDiamonds:authorityNow.counts.diamonds,
+    visibleDiamondPositions:lateJoin.visibleDiamondPositions};
+  assert.equal(lateJoin.state.seat,1);
+  assert.equal(lateJoin.visibleDiamonds,authorityNow.counts.diamonds);
+  const authoritativeDiamonds=authorityNow.diamonds.map(d=>d.rootDisplay);
+  for(const visual of lateJoin.visibleDiamondPositions){
+    assert.ok(authoritativeDiamonds.some(d=>Math.abs(d.x-visual.x)<2 &&
+      Math.abs(d.y-visual.y)<2),'Late joiner displayed an absent/wrong diamond');
+  }
+  assert.equal(lateJoin.worldSteps,0);
+  pass('late-join-does-not-resurrect-collected-diamond',{
+    viewers:lateJoin.visibleDiamonds,authority:authorityNow.counts.diamonds});
   report.status='passed';
 }catch(error){report.status='failed';report.errors.push(String(error.stack||error));}
 finally{
