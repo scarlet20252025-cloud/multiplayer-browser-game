@@ -150,11 +150,45 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
         }))
       };
     });
-    const capture=()=>page.evaluate(()=>({
-      snapshot:window.__html5RoomSnapshot.capture(),
-      input:window.__html5RoomInput.inspect(),
-      gamePaused:window.__game.paused,physicsPaused:window.__game.physics.box2d.paused
-    }));
+    const capture=()=>page.evaluate(()=>{
+      const snapshot=window.__html5RoomSnapshot.capture();
+      let input;
+      try{input=window.__html5RoomInput.inspect();}
+      catch(error){
+        // The existing input bridge is bound to the PREVIOUS level. Surface
+        // its staleness so the server can halt before applying any old inputs.
+        input={stale:true,reason:String(error.message),slots:[]};
+      }
+      return {snapshot,input,gamePaused:window.__game.paused,
+        physicsPaused:window.__game.physics.box2d.paused};
+    });
+    const invokeNativeRetryForResearch=()=>enqueue(async()=>{
+      await page.evaluate(()=>{
+        const level=window.__game?.level;
+        if(typeof level?.retry!=='function')throw Error('Native retry handler missing');
+        window.__researchPreviousNativeScene={
+          level,root:level.root,fire:level.pers1,water:level.pers2
+        };
+        // Invoke the already-registered native game handler; never modify
+        // position, collision, death flags, or game.js bytes in CI.
+        level.retry.call(level);
+      });
+    });
+    const observeNativeSceneForResearch=()=>page.evaluate(()=>{
+      const previous=window.__researchPreviousNativeScene;
+      const level=window.__game?.level;
+      const snapshot=window.__html5RoomSnapshot?.capture();
+      let stale=false;
+      try{window.__html5RoomInput.inspect();}catch{stale=true;}
+      return {sceneName:window.__game?.state?.current??null,
+        epoch:snapshot?.levelEpoch??null,
+        levelChanged:previous?previous.level!==level:null,
+        rootChanged:previous?previous.root!==level?.root:null,
+        fireChanged:previous?previous.fire!==level?.pers1:null,
+        waterChanged:previous?previous.water!==level?.pers2:null,
+        inputStale:stale,levelStarted:level?.levelStarted??null,
+        ended:level?.ended??null};
+    });
     const server=http.createServer((req,res)=>{
       const okay=req.url==='/health'&&['GET','HEAD'].includes(req.method);
       const body=JSON.stringify({researchOnly:true,gameAssetsHosted:false,noVideo:true,
@@ -220,28 +254,32 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
       server.once('error',reject);
       server.listen(port,'127.0.0.1',()=>{server.off('error',reject);resolve();});
     });
+    const evaluateBoundary=async state=>{
+      const decision=sceneGuard.observe(state.snapshot);
+      if(decision.status!=='suspended')return false;
+      room.suspend(decision.reason);
+      notify();
+      broadcast({type:'lifecycle',roomEpoch,reason:decision.reason,
+        levelEpoch:state.snapshot?.levelEpoch??null,
+        snapshotSeq:state.snapshot?.snapshotSeq??null,
+        restartSupported:false});
+      // Fatal room state is latched. A future protocol revision must explicitly
+      // reinstall native input and require new viewer baselines.
+      return true;
+    };
     const timer=setInterval(()=>{
       if(closed||failed||!room.running||pendingTick)return;
       pendingTick=true;
       void enqueue(async()=>{
+        const guardState=await capture();
+        if(await evaluateBoundary(guardState))return;
         const sampled=room.sample(Date.now());
         await page.evaluate(({inputs,resets})=>{
           for(const seat of resets)window.__html5RoomInput.resetSlot(seat);
           inputs.forEach((input,slot)=>{if(input.seq>=0)window.__html5RoomInput.accept(slot,input);});
         },sampled);
         const state=await capture();
-        const decision=sceneGuard.observe(state.snapshot);
-        if(decision.status==='suspended'){
-          // Do not send player input into a changed native scene. A deliberate
-          // restart handshake (not implemented here) must rearm both clients.
-          room.suspend(decision.reason);
-          notify();
-          broadcast({type:'lifecycle',roomEpoch,reason:decision.reason,
-            levelEpoch:state.snapshot?.levelEpoch??null,
-            snapshotSeq:state.snapshot?.snapshotSeq??null,
-            restartSupported:false});
-          return;
-        }
+        if(await evaluateBoundary(state))return;
         broadcast({type:'state',roomEpoch,broadcastSeq:++broadcastSeq,
           ...state,ack:state.input.slots.map(x=>x.ackSeq)});
       }).finally(()=>{pendingTick=false;});
@@ -251,6 +289,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
       url:'http://127.0.0.1:'+server.address().port,room,level,
       sourceSha256:host.sourceSha256,servedSha256:host.servedSha256,
       readAuthority:capture,inspectMechanisms,inspectLifecycle,
+      invokeNativeRetryForResearch,observeNativeSceneForResearch,
       close(){
         closing??=(async()=>{
           closed=true;clearInterval(timer);
