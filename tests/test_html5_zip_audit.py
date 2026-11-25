@@ -22,7 +22,10 @@ def build_zip(path, entries=None):
         }
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as stream:
         for name, data in entries.items():
-            stream.writestr(name, data)
+            entry = zipfile.ZipInfo(name)
+            # Keep the test's literal separator in the archive on Windows.
+            entry.filename = name
+            stream.writestr(entry, data, compress_type=zipfile.ZIP_DEFLATED)
     return path
 
 

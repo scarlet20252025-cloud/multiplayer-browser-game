@@ -132,12 +132,13 @@ export function createSnapshotExporter(game, {
       };
     };
     let scanned = 0;
+    let limitsHit = false;
     const dataEntries = (container, path) => {
       if (!objectLike(container)) { report(path, 'container-unavailable'); return []; }
       const output = [];
       for (const key of Object.keys(container)) {
         if (Array.isArray(container) && !/^(0|[1-9]\d*)$/.test(key)) continue;
-        if (++scanned > maxContainerEntries) { report(path, 'container-scan-limit'); break; }
+        if (++scanned > maxContainerEntries) { limitsHit = true; report(path, 'container-scan-limit'); break; }
         const descriptor = Object.getOwnPropertyDescriptor(container, key);
         if (!Object.hasOwn(descriptor, 'value')) { report(`${path}[${JSON.stringify(key)}]`, 'accessor-skipped'); continue; }
         output.push([key, descriptor.value]);
@@ -174,7 +175,7 @@ export function createSnapshotExporter(game, {
         if (!prior.paths.includes(path)) prior.paths.push(path);
         return;
       }
-      if (entities.size >= maxEntities) { report(path, 'entity-limit'); return; }
+      if (entities.size >= maxEntities) { limitsHit = true; report(path, 'entity-limit'); return; }
       let id = identities.get(object);
       if (!id) {
         id = `${sessionEpoch}/${levelEpoch}/${++nextEntity}`;
@@ -187,9 +188,15 @@ export function createSnapshotExporter(game, {
 
     const layers = ownData(game, 'layers');
     const underGround = ownData(layers, 'underGround');
+    const children = ownData(underGround, 'children');
     const Diamond = ownData(devices, 'Diamond');
     const diamondPrototype = ownData(Diamond, 'prototype');
+    // Trials and bonus levels can legitimately have no diamonds. Track whether
+    // the registry was actually observable instead of demanding a nonempty
+    // roster; a missing constructor or unreadable layer must still fail closed.
+    const diamondLayerReadable = Array.isArray(children);
     if (!objectLike(diamondPrototype)) report('Devices.Diamond', 'constructor-unavailable; diamonds-not-inferred-from-names');
+    if (!diamondLayerReadable) report('game.layers.underGround.children', 'diamond-container-unavailable');
     for (const [index, child] of dataEntries(ownData(underGround, 'children'), 'game.layers.underGround.children')) {
       if (objectLike(child) && objectLike(diamondPrototype) && Object.prototype.isPrototypeOf.call(diamondPrototype, child)) {
         add(child, 'diamonds', 'diamond', `game.layers.underGround.children[${index}]`);
@@ -218,7 +225,8 @@ export function createSnapshotExporter(game, {
       sourceGameSha256, sessionEpoch, levelEpoch, snapshotSeq: ++snapshotSeq,
       capturedAt: scalar(now(), 'capturedAt'),
       observedGameUpdate: null,
-      coordinates: { bodyPosition: 'pixels, via Phaser Box2D body.x/y getters', displayPosition: 'local pixels in each existing parent', rotation: 'radians' },
+      coordinates: { bodyPosition: 'pixels, via Phaser Box2D body.x/y getters', displayPosition: 'local pixels in each existing parent', rotation: 'radians', camera: 'world scroll top-left plus view size and scale' },
+      camera: null,
       level: {
         started: field(level, 'levelStarted', 'level'),
         sceneName: field(ownData(game, 'state'), 'current', 'game.state'),
@@ -305,12 +313,27 @@ export function createSnapshotExporter(game, {
       present: presentDiamonds.has(row.id),
     }));
     snapshot.counts = Object.fromEntries(CATEGORIES.map(category => [category, snapshot[category].length]));
+    const positionsFinite = CATEGORIES.every(category => snapshot[category].every(entity => Number.isFinite(entity.position?.x) && Number.isFinite(entity.position?.y)));
     snapshot.coverage = {
       requiredPresent: snapshot.characters.length === 2 && snapshot.diamondRoster.length > 0 && snapshot.doors.length === 2 && snapshot.mechanisms.length > 0,
-      allObservedPositionsFinite: CATEGORIES.every(category => snapshot[category].every(entity => Number.isFinite(entity.position?.x) && Number.isFinite(entity.position?.y))),
+      allObservedPositionsFinite: positionsFinite,
+      diamondApparatusObservable: diamondLayerReadable && objectLike(diamondPrototype) && !limitsHit,
+      // Two actors and two exits with their real positions are enough to run
+      // and project a level; diamonds and mechanisms may legitimately be absent.
+      playableCore: snapshot.characters.length === 2 && snapshot.doors.length === 2 &&
+        positionsFinite && diamondLayerReadable && objectLike(diamondPrototype) && !limitsHit,
       sourceBuildAudited: sourceGameSha256 === SNAPSHOT_SOURCE_SHA256,
       completeGameState: false,
     };
+    const camera=ownData(game,'camera');
+    snapshot.camera=camera?{
+      x: field(camera,'x','game.camera'),
+      y: field(camera,'y','game.camera'),
+      width: field(camera,'width','game.camera'),
+      height: field(camera,'height','game.camera'),
+      scaleX: field(ownData(camera,'scale'),'x','game.camera.scale'),
+      scaleY: field(ownData(camera,'scale'),'y','game.camera.scale'),
+    }:null;
     return snapshot;
   }
 

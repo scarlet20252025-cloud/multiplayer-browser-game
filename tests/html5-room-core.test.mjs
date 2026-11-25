@@ -144,6 +144,64 @@ test('restart cannot be spoofed, replayed across round or initiated by one seat'
 });
 
 
+test('return-to-selection requires a second seat and freezes gameplay',()=>{
+  const core=room();core.attach('client-aaaa');core.attach('client-bbbb');
+  core.markReady('client-aaaa');core.markReady('client-bbbb');
+  const cmd=(command,id='r1')=>({type:'room-command',command,
+    roomEpoch:'fixture-room-1',roundNumber:0,commandId:id});
+  const first=core.voteReturn('client-aaaa',cmd('return.request'));
+  assert.equal(first.accepted,true);
+  assert.equal(first.returnVotes,1);
+  assert.equal(core.voteReturn('client-aaaa',cmd('return.request')).returnVotes,1);
+  assert.equal(core.voteReturn('client-aaaa',{...cmd('return.request'),seat:1}).code,
+    'INVALID_RETURN_COMMAND');
+  assert.equal(core.voteReturn('client-bbbb',cmd('return.request','r3')).code,
+    'RETURN_VOTE_PENDING');
+  assert.equal(core.voteReturn('client-aaaa',cmd('return.confirm','r4')).code,
+    'CANNOT_CONFIRM_OWN');
+  const approved=core.voteReturn('client-bbbb',cmd('return.confirm','r5'));
+  assert.equal(approved.execute,true);
+  assert.equal(approved.returnVotes,2);
+  assert.equal(core.returnApproved,true);
+  assert.equal(core.running,false);
+  assert.equal(core.effectivePaused,true);
+  assert.equal(core.receiveInput('client-aaaa',input(0,1),100).code,'NOT_RUNNING');
+  assert.equal(core.voteReturn('client-aaaa',cmd('return.request','r6')).code,
+    'RETURN_IN_PROGRESS');
+});
+test('return-to-selection can be cancelled and tolerates a departing seat',()=>{
+  const core=room();core.attach('client-aaaa');core.attach('client-bbbb');
+  core.markReady('client-aaaa');core.markReady('client-bbbb');
+  const cmd=(command,id)=>({type:'room-command',command,
+    roomEpoch:'fixture-room-1',roundNumber:0,commandId:id});
+  assert.equal(core.voteReturn('client-aaaa',cmd('return.request','a1')).returnVotes,1);
+  core.suspend('CHARACTER_DEAD');
+  assert.equal(core.voteReturn('client-bbbb',cmd('return.confirm','b1')).execute,true);
+  const cancelled=core.voteReturn('client-aaaa',cmd('return.cancel','a2'));
+  assert.equal(cancelled.cancelled,true);
+  assert.equal(core.returnApproved,false);
+  assert.equal(core.publicState().returnRequestedBy,null);
+  assert.equal(core.running,false,'death suspension still applies after cancelling');
+  core.detach('client-bbbb');
+  assert.equal(core.voteReturn('client-aaaa',cmd('return.request','a3')).code,
+    'NEED_TWO_MEMBERS');
+});
+test('a new round clears any prior return vote',()=>{
+  const core=room();core.attach('client-aaaa');core.attach('client-bbbb');
+  core.markReady('client-aaaa');core.markReady('client-bbbb');
+  const ret={type:'room-command',command:'return.request',
+    roomEpoch:'fixture-room-1',roundNumber:0,commandId:'return-1'};
+  assert.equal(core.voteReturn('client-aaaa',ret).accepted,true);
+  core.suspend('CHARACTER_DYING');
+  const restart=id=>({type:'room-command',command:'round.restart.vote',
+    roomEpoch:'fixture-room-1',roundNumber:0,commandId:id});
+  core.voteRestart('client-aaaa',restart('one'));
+  core.voteRestart('client-bbbb',restart('two'));
+  const next=core.beginNewRound();
+  assert.equal(next.returnVotes,0);
+  assert.equal(next.returnRequestedBy,null);
+  assert.equal(next.returnApproved,false);
+});
 test('two near-simultaneous P requests atomically toggle the authoritative room',()=>{
   const x=room();x.attach('client-aaaa');x.attach('client-bbbb');
   x.markReady('client-aaaa');x.markReady('client-bbbb');
@@ -187,6 +245,18 @@ test('native dual-door LEVEL_WON is mandatory before two players may advance',()
   assert.equal(failed.action,'restart');
   assert.equal(x.voteRestart('client-bbbb',vote('mix')).code,'NATIVE_WIN_REQUIRED');
   assert.equal(x.publicState().restartVotes,1);
+});
+test('death auto-restart needs no votes but still requires a suspended round',()=>{
+  const x=room();x.attach('client-aaaa');x.attach('client-bbbb');
+  x.markReady('client-aaaa');x.markReady('client-bbbb');
+  x.suspend('CHARACTER_DEAD');
+  assert.equal(x.prepareAutoRestart().action,'restart');
+  assert.equal(x.publicState().restartPending,true);
+  const next=x.beginNewRound({force:true});
+  assert.equal(next.completedAction,'restart');
+  assert.equal(next.roundNumber,1);
+  assert.equal(next.suspendedReason,null);
+  assert.throws(()=>x.prepareAutoRestart('advance'),/ROUND_NOT_SUSPENDED|NATIVE_WIN_REQUIRED/);
 });
 test('two valid advance votes select same action, clear old leases and reject mixed intentions',()=>{
   const x=room();x.attach('client-aaaa');x.attach('client-bbbb');

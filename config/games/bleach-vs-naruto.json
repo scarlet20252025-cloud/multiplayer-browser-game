@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "bleach-vs-naruto",
+  "title": "死神 vs 火影",
+  "subtitle": "双人帧同步",
+  "runtime": "browser-lockstep",
+  "adapter": "frame-lockstep",
+  "online": true,
+  "seats": 2,
+  "capabilities": {
+    "lockstep": true,
+    "levelVote": true
+  },
+  "package": {
+    "dir": "bleach-vs-naruto",
+    "entry": "index.html",
+    "levels": "levels.json",
+    "templeId": "bleach-vs-naruto",
+    "storagePrefix": "bvn-lockstep",
+    "bridge": "netplay.mjs"
+  },
+  "evidence": ["docs/BVN_LOCKSTEP.md"]
+}

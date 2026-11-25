@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "crystal",
+  "title": "水晶神庙",
+  "subtitle": "Fireboy & Watergirl in The Crystal Temple",
+  "runtime": "html5-phaser",
+  "adapter": "fireboy-html5",
+  "order": 4,
+  "seats": 2,
+  "online": true,
+  "capabilities": {
+    "authority": true,
+    "spectator": true,
+    "levelVote": true,
+    "restartVote": true,
+    "returnVote": true,
+    "save": true
+  },
+  "package": {
+    "dir": "4-crystal-temple",
+    "entry": "index.html",
+    "levels": "data/crystal/temple.json",
+    "templeId": "crystal",
+    "storagePrefix": "fb-crystal"
+  },
+  "evidence": [
+    "docs/HTML5_ROUTE_FINDINGS.md",
+    "docs/INPUT_AND_CLOCK_CONTRACT.md"
+  ],
+  "notes": "Verified in the loopback lobby with authority + frozen spectator clients."
+}

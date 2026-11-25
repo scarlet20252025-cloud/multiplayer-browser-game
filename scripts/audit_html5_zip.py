@@ -65,7 +65,7 @@ def inspect(archive_path):
         if len(infos) > MAX_ENTRIES:
             raise UnsafeArchive("Too many archive entries")
         for info in infos:
-            name = safe_path(info.filename)
+            name = safe_path(info.orig_filename)
             folded = name.casefold()
             if folded in seen:
                 raise UnsafeArchive("Duplicate or case-conflicting entry")

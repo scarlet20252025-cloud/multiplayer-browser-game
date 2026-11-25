@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "tank-trouble",
+  "title": "迷宫坦克",
+  "subtitle": "2–6 人随机迷宫对战 · 反弹炮弹与补给争夺",
+  "runtime": "tank-arena",
+  "adapter": "tank-arena",
+  "online": true,
+  "order": 200,
+  "seats": 6,
+  "minSeats": 2,
+  "capabilities": {
+    "authority": true,
+    "levelVote": true,
+    "returnVote": true
+  },
+  "package": {
+    "dir": "tank-arena",
+    "entry": "index.html",
+    "levels": "levels.json",
+    "templeId": "tank-trouble",
+    "storagePrefix": "tank-trouble"
+  },
+  "evidence": [
+    "scripts/verify-tank-trouble.mjs"
+  ],
+  "notes": "原创多人迷宫坦克游戏。两至六人可开局，服务端判定移动、反弹、命中和得分。玩家在对局内投票切换模式，结算后在同一房间自动续局。"
+}

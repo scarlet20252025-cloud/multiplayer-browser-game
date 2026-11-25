@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "platform-brawl",
+  "title": "云台乱斗",
+  "subtitle": "2–6 人平台乱斗 · 击出场外得分",
+  "runtime": "platform-brawl",
+  "adapter": "platform-brawl",
+  "online": true,
+  "listed": false,
+  "order": 210,
+  "seats": 6,
+  "minSeats": 2,
+  "capabilities": {
+    "authority": true,
+    "levelVote": true,
+    "returnVote": true
+  },
+  "package": {
+    "dir": "platform-brawl",
+    "entry": "index.html",
+    "levels": "levels.json",
+    "templeId": "platform-brawl",
+    "storagePrefix": "platform-brawl"
+  }
+}

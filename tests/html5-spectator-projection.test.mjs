@@ -55,6 +55,17 @@ test('viewer does not invent diamond mapping from constructor names or incomplet
   const g=fixture(),c=installHtml5Spectator(g.game,{devices:g.devices});
   assert.throws(()=>c.initialize({...g.snapshot,coverage:{requiredPresent:false,allObservedPositionsFinite:true}}),/incomplete/);
 });
+test('spectator accepts a playable level with no diamonds or mechanisms',()=>{
+  const f=fixture();
+  f.game.layers.underGround.children=[];
+  const snapshot={...f.snapshot,diamonds:[],diamondRoster:[],mechanisms:[],
+    coverage:{playableCore:true,requiredPresent:false,allObservedPositionsFinite:true}};
+  const bridge=installHtml5Spectator(f.game,{devices:f.devices});
+  const result=bridge.initialize(snapshot);
+  assert.equal(result.applied,4);
+  assert.equal(bridge.apply({...snapshot,snapshotSeq:2}).accepted,true);
+  assert.equal(bridge.uninstall(),true);
+});
 test('freeze fails closed when local game resumes or scene changes',()=>{
   const f=fixture(),b=installHtml5Spectator(f.game,{devices:f.devices});
   b.initialize(f.snapshot);

@@ -1,22 +1,28 @@
-/** Original room-domain logic for a two-seat HTML5 research authority.
+/** Original room-domain logic for a multi-seat HTML5 research authority.
  * No sockets, browser, game code, or copyrighted assets live in this module.
  * The transport binds each socket to an opaque server-owned memberId.
  */
 import {InputBuffer,INPUT_TIMEOUT_MS,MAX_INPUTS_PER_SECOND} from './protocol.mjs';
 
 export const HTML5_ROOM_VERSION=1;
+export const DEFAULT_SEATS=2;
+export const MAX_SEATS=4;
 const commandKeys=new Set(['type','command','roomEpoch','commandId','baseRevision','desiredPaused']);
 const requiredInputKeys=new Set(['type','seq','moveX','moveY','buttons','pressed','released','aimX','aimY']);
 
+const normalizeSeats=value=>
+  Number.isInteger(value)&&value>=1&&value<=MAX_SEATS?value:DEFAULT_SEATS;
+
 export class Html5RoomCore {
-  constructor({roomEpoch,inputTimeoutMs=INPUT_TIMEOUT_MS}={}){
+  constructor({roomEpoch,inputTimeoutMs=INPUT_TIMEOUT_MS,seats=DEFAULT_SEATS}={}){
     if(typeof roomEpoch!=='string'||!/^[-\w]{6,80}$/.test(roomEpoch))
       throw new TypeError('A server-generated roomEpoch is required');
     if(!Number.isSafeInteger(inputTimeoutMs)||inputTimeoutMs<50||inputTimeoutMs>30000)
       throw new RangeError('Invalid input timeout');
     this.roomEpoch=roomEpoch;
     this.inputTimeoutMs=inputTimeoutMs;
-    this.members=[null,null];
+    this.capacity=normalizeSeats(seats);
+    this.members=new Array(this.capacity).fill(null);
     this.userPaused=false;
     this.suspendedReason=null;
     this.pauseRevision=0;
@@ -24,8 +30,16 @@ export class Html5RoomCore {
     this.roundNumber=0;
     this.restartVotes=new Set();
     this.restartPending=false;
+    this.restartRequestedBy=null;
     this.roundAction=null;
+    this.returnVotes=new Set();
+    this.returnRequestedBy=null;
+    this.returnApproved=false;
   }
+  /** Number of seats that must be filled before the room may run. */
+  get seatCount(){return this.members.length;}
+  get filledSeats(){return this.members.reduce((n,m)=>m?n+1:n,0);}
+  get allSeated(){return this.members.every(member=>!!member);}
   seatFor(memberId){
     const i=this.members.findIndex(m=>m?.id===memberId);
     return i<0?null:i;
@@ -35,12 +49,20 @@ export class Html5RoomCore {
     if(slot===null)throw new Error('NOT_JOINED');
     return {slot,member:this.members[slot]};
   }
-  attach(memberId){
+  attach(memberId,preferredSlot=null){
     if(typeof memberId!=='string'||memberId.length<8||memberId.length>128)
       throw new TypeError('Expected opaque server-owned member id');
     if(this.seatFor(memberId)!==null)throw new Error('ALREADY_JOINED');
-    const slot=this.members.findIndex(m=>!m);
-    if(slot<0)throw new Error('ROOM_FULL');
+    let slot;
+    if(preferredSlot!==null){
+      if(!Number.isInteger(preferredSlot)||preferredSlot<0||preferredSlot>=this.members.length)
+        throw new Error('INVALID_SEAT');
+      if(this.members[preferredSlot])throw new Error('ROOM_FULL');
+      slot=preferredSlot;
+    }else{
+      slot=this.members.findIndex(m=>!m);
+      if(slot<0)throw new Error('ROOM_FULL');
+    }
     this.members[slot]={id:memberId,ready:false,input:new InputBuffer(),expired:false,
       lastReceivedAt:0,rateStart:0,rateCount:0};
     return slot;
@@ -53,15 +75,20 @@ export class Html5RoomCore {
     return this.publicState();
   }
   get bothReady(){return this.members.every(m=>m?.ready===true);}
-  get effectivePaused(){return !this.bothReady||this.userPaused||this.suspendedReason!==null;}
-  get running(){return this.bothReady&&!this.userPaused&&this.suspendedReason===null;}
+  get effectivePaused(){return !this.bothReady||this.userPaused||this.suspendedReason!==null||this.returnApproved;}
+  get running(){return this.bothReady&&!this.userPaused&&this.suspendedReason===null&&!this.returnApproved;}
   publicState(){
     return {protocol:HTML5_ROOM_VERSION,roomEpoch:this.roomEpoch,ready:this.members.map(m=>!!m?.ready),
       connected:this.members.map(m=>!!m),bothReady:this.bothReady,
+      capacity:this.members.length,seatCount:this.members.length,
+      seats:this.members.map((m,seat)=>({seat,label:'P'+(seat+1),
+        occupied:!!m,ready:!!m?.ready})),
       userPaused:this.userPaused,effectivePaused:this.effectivePaused,pauseRevision:this.pauseRevision,
       suspendedReason:this.suspendedReason,roundNumber:this.roundNumber,
       restartVotes:this.restartVotes.size,restartPending:this.restartPending,
-      roundAction:this.roundAction};
+      restartRequestedBy:this.restartRequestedBy,
+      roundAction:this.roundAction,returnVotes:this.returnVotes.size,
+      returnRequestedBy:this.returnRequestedBy,returnApproved:this.returnApproved};
   }
   suspend(reason){
     if(typeof reason!=='string'||!/^[-A-Z_]{3,64}$/.test(reason))
@@ -70,6 +97,17 @@ export class Html5RoomCore {
     this.suspendedReason=reason;
     this.resetPending();
     return {changed:true,reason};
+  }
+  prepareAutoRestart(action='restart'){
+    if(!this.suspendedReason)throw new Error('ROUND_NOT_SUSPENDED');
+    if(!['restart','advance'].includes(action))throw new Error('ROUND_ACTION_INVALID');
+    if(action==='advance'&&this.suspendedReason!=='LEVEL_WON')
+      throw new Error('NATIVE_WIN_REQUIRED');
+    this.roundAction=action;
+    this.restartPending=true;
+    this.restartVotes.clear();
+    this.restartRequestedBy=null;
+    return {action,roundNumber:this.roundNumber};
   }
   voteRestart(memberId,command){
     this.memberFor(memberId);
@@ -81,7 +119,7 @@ export class Html5RoomCore {
        typeof command.commandId!=='string'||command.commandId.length<1||command.commandId.length>128)
       return {accepted:false,code:'INVALID_RESTART_COMMAND'};
     if(!this.suspendedReason)return {accepted:false,code:'ROUND_NOT_SUSPENDED'};
-    if(!this.members.every(member=>!!member))return {accepted:false,code:'NEED_TWO_MEMBERS'};
+    if(!this.allSeated)return {accepted:false,code:'NEED_TWO_MEMBERS'};
     const action=command.command==='round.advance.vote'?'advance':'restart';
     if(action==='advance'&&this.suspendedReason!=='LEVEL_WON')
       return {accepted:false,code:'NATIVE_WIN_REQUIRED'};
@@ -89,12 +127,61 @@ export class Html5RoomCore {
       return {accepted:false,code:'ROUND_ACTION_CONFLICT'};
     this.roundAction=action;
     this.restartVotes.add(memberId);
-    if(this.restartVotes.size===2)this.restartPending=true;
+    // First voter is the requester whose nickname the confirmation prompt shows.
+    if(this.restartVotes.size===1)this.restartRequestedBy=memberId;
+    // Unanimous vote across every seat, whatever the room capacity is.
+    if(this.restartVotes.size===this.members.length)this.restartPending=true;
     return {accepted:true,roundNumber:this.roundNumber,
       votes:this.restartVotes.size,execute:this.restartPending,action:this.roundAction};
   }
-  beginNewRound(){
-    if(!this.restartPending||this.restartVotes.size!==2||!this.suspendedReason)
+  /**
+   * Leaving the game for level selection is an all-seat vote. One seat asks,
+   * the others either confirm or cancel; every navigation happens client-side
+   * only after the room latches approval.
+   */
+  voteReturn(memberId,command){
+    this.memberFor(memberId);
+    if(!command||typeof command!=='object'||Array.isArray(command)||
+       Object.keys(command).some(key=>!['type','command','roomEpoch','roundNumber','commandId'].includes(key))||
+       command.type!=='room-command'||
+       !['return.request','return.confirm','return.cancel'].includes(command.command)||
+       command.roomEpoch!==this.roomEpoch||
+       !Number.isSafeInteger(command.roundNumber)||command.roundNumber!==this.roundNumber||
+       typeof command.commandId!=='string'||command.commandId.length<1||command.commandId.length>128)
+      return {accepted:false,code:'INVALID_RETURN_COMMAND'};
+    if(this.restartPending)return {accepted:false,code:'ROOM_SUSPENDED'};
+    if(!this.allSeated)return {accepted:false,code:'NEED_TWO_MEMBERS'};
+    if(this.returnApproved&&command.command!=='return.cancel')
+      return {accepted:false,code:'RETURN_IN_PROGRESS'};
+    if(command.command==='return.request'){
+      if(this.returnRequestedBy===null){
+        this.returnRequestedBy=memberId;
+        this.returnVotes.add(memberId);
+      }else if(this.returnRequestedBy!==memberId){
+        return {accepted:false,code:'RETURN_VOTE_PENDING'};
+      }
+    }else if(command.command==='return.confirm'){
+      if(!this.returnRequestedBy)return {accepted:false,code:'NO_RETURN_VOTE'};
+      if(this.returnRequestedBy===memberId)
+        return {accepted:false,code:'CANNOT_CONFIRM_OWN'};
+      this.returnVotes.add(memberId);
+    }else{
+      if(!this.returnRequestedBy)return {accepted:false,code:'NO_RETURN_VOTE'};
+      this.returnVotes.clear();
+      this.returnRequestedBy=null;
+      this.returnApproved=false;
+      this.resetPending();
+      return {accepted:true,cancelled:true,returnVotes:0,
+        returnRequestedBy:null,execute:false};
+    }
+    if(this.returnVotes.size>=this.members.length)this.returnApproved=true;
+    return {accepted:true,cancelled:false,returnVotes:this.returnVotes.size,
+      returnRequestedBy:this.returnRequestedBy,execute:this.returnApproved};
+  }
+  beginNewRound({force=false}={}){
+    if(!force&&(!this.restartPending||this.restartVotes.size!==this.members.length||!this.suspendedReason))
+      throw new Error('ROUND_RESTART_NOT_APPROVED');
+    if(force&&(!this.restartPending||!this.suspendedReason))
       throw new Error('ROUND_RESTART_NOT_APPROVED');
     const completedAction=this.roundAction;
     if(!['restart','advance'].includes(completedAction))
@@ -106,6 +193,10 @@ export class Html5RoomCore {
     this.restartPending=false;
     this.roundAction=null;
     this.restartVotes.clear();
+    this.restartRequestedBy=null;
+    this.returnVotes.clear();
+    this.returnRequestedBy=null;
+    this.returnApproved=false;
     this.receipts.clear();
     for(const member of this.members){
       if(!member)continue;
@@ -123,7 +214,14 @@ export class Html5RoomCore {
     if(seat===null)return {detached:false};
     this.members[seat].input.resetPending();
     this.restartVotes.delete(memberId);
-    if(!this.restartVotes.size){this.restartPending=false;this.roundAction=null;}
+    if(this.restartRequestedBy===memberId)this.restartRequestedBy=null;
+    if(!this.restartVotes.size){this.restartPending=false;this.roundAction=null;this.restartRequestedBy=null;}
+    if(!this.returnApproved){
+      this.returnVotes.delete(memberId);
+      if(this.returnRequestedBy===memberId||!this.returnVotes.size){
+        this.returnVotes.clear();this.returnRequestedBy=null;
+      }
+    }
     this.members[seat]=null;
     for(const member of this.members)member?.input.resetPending();
     return {detached:true,slot:seat,room:this.publicState()};

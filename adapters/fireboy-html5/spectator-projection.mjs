@@ -19,13 +19,33 @@ const valueAtPath=(root,path)=>{
   return undefined;
 };
 const isNumber=value=>typeof value==='number'&&Number.isFinite(value);
-function applySprite(sprite,display,{applyPosition=true}={}){
+function pausedAccessorOf(object){
+  let proto=Object.getPrototypeOf(object);
+  while(proto){
+    const descriptor=Object.getOwnPropertyDescriptor(proto,'paused');
+    if(descriptor&&typeof descriptor.get==='function'&&typeof descriptor.set==='function')
+      return descriptor;
+    proto=Object.getPrototypeOf(proto);
+  }
+  return null;
+}
+function applySprite(sprite,display,{applyPosition=true,applyRotation=true,smooth=null}={}){
   if(!sprite||!display||typeof display!=='object')return;
   for(const key of ['x','y']){
-    if(applyPosition&&isNumber(display[key]))sprite[key]=display[key];
+    if(!applyPosition||!isNumber(display[key]))continue;
+    // Presentation-only smoothing: the authoritative position is still the
+    // target. Large corrections (respawn/teleport) snap instead of sliding.
+    if(smooth&&isNumber(sprite[key])){
+      const delta=display[key]-sprite[key];
+      sprite[key]=Math.abs(delta)>300?display[key]:sprite[key]+delta*smooth.factor;
+    }else sprite[key]=display[key];
   }
   for(const key of ['rotation','alpha']){
-    if(isNumber(display[key]))sprite[key]=display[key];
+    if(!isNumber(display[key]))continue;
+    if(!applyRotation&&key==='rotation')continue;
+    if(smooth&&isNumber(sprite[key])&&key==='rotation'){
+      sprite[key]+=(display[key]-sprite[key])*smooth.factor;
+    }else sprite[key]=display[key];
   }
   if(typeof display.visible==='boolean')sprite.visible=display.visible;
   if(display.scale&&sprite.scale){
@@ -51,30 +71,31 @@ function spriteOf(kind,obj){
   if(kind==='platform'||kind==='box')return obj.sprite;
   return null;
 }
-function applyEntity(entity,obj){
+function applyEntity(entity,obj,options){
   if(!entity||!obj)return;
   if(entity.kind==='diamond'){
-    applySprite(obj,entity.rootDisplay);
-    applySprite(obj.sprite,entity.display);
+    applySprite(obj,entity.rootDisplay,options);
+    applySprite(obj.sprite,entity.display,options);
   }else{
     const sprite=spriteOf(entity.kind,obj);
-    applySprite(sprite,entity.display);
+    applySprite(sprite,entity.display,options);
   }
   if(entity.kind==='character'&&entity.bodyParts){
-    for(const part of ['head','legs','ice'])applySprite(obj.bodyParts?.[part],entity.bodyParts[part]);
+    for(const part of ['head','legs','ice'])applySprite(obj.bodyParts?.[part],entity.bodyParts[part],options);
   }
   if(mechanismTypes.has(entity.kind)){
-    applySprite(obj.base,entity.baseDisplay);
+    applySprite(obj.base,entity.baseDisplay,options);
     const lights=obj.lights??[];
     if(Array.isArray(entity.lights)){
-      for(let i=0;i<entity.lights.length;i++)applySprite(lights[i],entity.lights[i]);
+      for(let i=0;i<entity.lights.length;i++)applySprite(lights[i],entity.lights[i],options);
     }
   }
 }
 function verifyInitial(snapshot) {
+  const playable = snapshot?.coverage?.playableCore ?? snapshot?.coverage?.requiredPresent;
   if(!snapshot||snapshot.schemaVersion!==1 ||
       !CATEGORIES.every(key=>Array.isArray(snapshot[key])) ||
-      !snapshot.coverage?.requiredPresent || !snapshot.coverage?.allObservedPositionsFinite)
+      playable!==true || !snapshot.coverage?.allObservedPositionsFinite)
     throw new Error('Cannot initialize spectator with an incomplete initial snapshot');
   if(!Number.isSafeInteger(snapshot.snapshotSeq)||snapshot.snapshotSeq<1 ||
     !Number.isSafeInteger(snapshot.levelEpoch)||snapshot.levelEpoch<1 ||
@@ -82,14 +103,22 @@ function verifyInitial(snapshot) {
     throw new Error('Invalid snapshot identity');
 }
 /** Install after spectator loads the *same* level as the authoritative instance. */
-export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
+export function installHtml5Spectator(game,{devices=globalThis.Devices,smooth=false,smoothingMs=45,localSeat=null}={}){
   const level=game?.level;
   if(!level||!level.pers1?.sprite||!level.pers2?.sprite||!game.layers?.underGround)
     throw new TypeError('Ready Forest Temple game/scene required');
+  if(typeof smooth!=='boolean')throw new TypeError('smooth must be boolean');
+  if(!Number.isFinite(smoothingMs)||smoothingMs<5||smoothingMs>500)
+    throw new RangeError('smoothingMs must be between 5 and 500');
+  if(localSeat!==null&&localSeat!==0&&localSeat!==1)
+    throw new RangeError('localSeat must be null, 0 or 1');
   const ownPauseDescriptor=Object.getOwnPropertyDescriptor(level,'pauseUpdate');
   const ownToggleDescriptor=Object.getOwnPropertyDescriptor(level,'togglePause');
   const originalInputEnabled=game.input?.enabled;
   const originalGamePauseDescriptor=Object.getOwnPropertyDescriptor(game,'paused');
+  const nativePauseAccessor=pausedAccessorOf(game);
+  const wasPaused=nativePauseAccessor
+    ?Boolean(nativePauseAccessor.get.call(game)):game.paused===true;
   const world=game.physics?.box2d?.world;
   const oldWorldStepDescriptor=world?Object.getOwnPropertyDescriptor(world,'Step'):null;
   const oldWorldStep=world?.Step;
@@ -109,25 +138,54 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
   const originalActors=[level.pers1,level.pers2];
   const signal=level.pauseKey?.onDown;
   const oldToggle=level.togglePause;
-  let active=true,initialized=false,lastSeq=0,epoch=null,entities=new Map(),blockedUnpauses=0,blockedWorldSteps=0,presentedSnapshot=null,presentationReplays=0;
+  let active=true,initialized=false,lastSeq=0,epoch=null,entities=new Map(),blockedUnpauses=0,blockedWorldSteps=0,presentedSnapshot=null,presentationReplays=0,lastPresentedAt=0,cameraTarget=null;
+  let localInputX=0,localPredictedX=0,lastPredictionAt=0;
+  let localCharacter=localSeat===0?level.pers1:localSeat===1?level.pers2:null;
   if(signal&&typeof signal.remove==='function')signal.remove(oldToggle,null);
   function repaintNativeFrame(){
     if(!active||!presentedSnapshot||game.level!==level)return;
     // Phaser's own body sync can overwrite display-only x/y during its paused
     // draw cycle. Re-apply the most recent validated authority presentation
     // immediately before each native render; never change Box2D bodies.
+    const now=performance.now();
+    let presentOptions;
+    if(smooth){
+      const dt=lastPresentedAt?Math.min(100,Math.max(0,now-lastPresentedAt)):1000;
+      presentOptions={smooth:{factor:1-Math.exp(-dt/smoothingMs)}};
+    }
+    lastPresentedAt=now;
     const present=new Set();
     for(const category of CATEGORIES){
       for(const entity of presentedSnapshot[category]){
         const mapped=entities.get(entity.id);
         if(!mapped||mapped.category!==category)continue;
         present.add(entity.id);
-        applyEntity(entity,mapped.object);
+        applyEntity(entity,mapped.object,presentOptions);
         if(category==='diamonds')mapped.object.visible=true;
       }
     }
     for(const [id,mapped] of entities){
       if(mapped.category==='diamonds'&&!present.has(id))mapped.object.visible=false;
+    }
+    // Presentation-only local prediction: the authority still owns collision
+    // and the final position. Integrate the small visual lead in real time,
+    // clamp it to a few pixels and let it decay after the player stops.
+    if(localCharacter?.sprite){
+      const predictionDt=lastPredictionAt?Math.min(80,Math.max(0,now-lastPredictionAt)):0;
+      localPredictedX += localInputX*140*(predictionDt/1000);
+      localPredictedX *= Math.exp(-predictionDt/90);
+      localPredictedX = Math.max(-8,Math.min(8,localPredictedX));
+      localCharacter.sprite.x += localPredictedX;
+    }
+    lastPredictionAt=now;
+    if(cameraTarget&&game.camera){
+      const factor=smooth?(presentOptions?.smooth?.factor??1):1;
+      for(const key of ['x','y']){
+        const target=cameraTarget[key];
+        if(!isNumber(target))continue;
+        const delta=target-game.camera[key];
+        game.camera[key]=Math.abs(delta)>300?target:game.camera[key]+delta*factor;
+      }
     }
     if(game.stage&&typeof game.stage.updateTransform==='function')
       game.stage.updateTransform();
@@ -150,6 +208,11 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       value:function spectatorNoPhysicsStep(){blockedWorldSteps++;return undefined;}
     });
   }
+  // Phaser exposes Game.paused as a prototype accessor backed by _paused.
+  // Overriding only an own property leaves _paused=false and the whole native
+  // update loop (camera, input polling, character logic) running in the viewer.
+  // Freeze the real backing state first, then install the guard.
+  if(nativePauseAccessor&&!wasPaused)nativePauseAccessor.set.call(game,true);
   // The original level may asynchronously set Game.paused=false AFTER
   // loading (even after levelStarted). Keep the locally rendered spectator
   // permanently paused until uninstall; native physics must never run here.
@@ -159,7 +222,16 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
     get(){return true;},
     set(next){if(next!==true)blockedUnpauses++;}
   });
-  if(game.input)game.input.enabled=false;
+  // A paused Phaser game can still have keyboard devices that were bound before
+  // the spectator installed. Disable every local input device so the viewer
+  // never writes a player velocity/body while snapshots are being projected.
+  const inputManagers=[];
+  if(game.input){
+    for(const [owner,key] of [[game.input,'enabled'],[game.input.keyboard,'enabled'],
+      [game.input.mouse,'enabled'],[game.input.touch,'enabled'],[game.input.gamepad,'enabled']]){
+      if(owner&&key in owner){inputManagers.push({owner,key,value:owner[key]});owner[key]=false;}
+    }
+  }
   level.pauseUpdate=()=>{};
   level.togglePause=()=>{};
   function assertLive(){
@@ -227,9 +299,37 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       }
     }
     initialized=true;entities=mapping;epoch={session:snapshot.sessionEpoch,level:snapshot.levelEpoch};
-    return apply(snapshot);
+    return apply(snapshot,{snap:true});
   }
-  function apply(snapshot){
+  function cameraTargetFor(observed){
+    if(!observed||!isNumber(observed.x)||!isNumber(observed.y))return null;
+    const camera=game.camera;
+    if(!camera)return null;
+    let targetX=observed.x,targetY=observed.y;
+    // Copy the world point at the authority camera's center, then recenter it
+    // for this viewer's own viewport/scale. Window sizes may differ.
+    if(isNumber(observed.width)&&isNumber(observed.height)&&
+       isNumber(observed.scaleX)&&observed.scaleX>0&&
+       isNumber(observed.scaleY)&&observed.scaleY>0&&
+       isNumber(camera.width)&&isNumber(camera.height)&&
+       isNumber(camera.scale?.x)&&camera.scale.x>0&&
+       isNumber(camera.scale?.y)&&camera.scale.y>0){
+      const centerX=observed.x+observed.width/(2*observed.scaleX);
+      const centerY=observed.y+observed.height/(2*observed.scaleY);
+      targetX=centerX-camera.width/(2*camera.scale.x);
+      targetY=centerY-camera.height/(2*camera.scale.y);
+    }
+    return {x:targetX,y:targetY};
+  }
+  function applyCamera(observed,{snap=false}={}){
+    cameraTarget=cameraTargetFor(observed);
+    if(!cameraTarget||(smooth&&!snap))return;
+    if(game.camera){
+      game.camera.x=cameraTarget.x;
+      game.camera.y=cameraTarget.y;
+    }
+  }
+  function apply(snapshot,{snap=false}={}){
     assertLive();
     if(!initialized)throw Error('Spectator requires an initial baseline');
     if(snapshot?.schemaVersion!==1||snapshot.sessionEpoch!==epoch.session||
@@ -244,6 +344,9 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
           throw Error('Authority diamond roster/presence mismatch');
       }
     }
+    // In smooth mode positions/rotation are driven by the render-time
+    // interpolation below; discrete fields still update immediately.
+    const options=smooth&&!snap?{applyPosition:false,applyRotation:false}:undefined;
     const found=new Set();
     let applied=0,hidden=0,unknown=0;
     for(const category of CATEGORIES){
@@ -252,7 +355,7 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
         const mapped=entities.get(entity.id);
         if(!mapped||mapped.category!==category){unknown++;continue;}
         found.add(entity.id);
-        applyEntity(entity,mapped.object);applied++;
+        applyEntity(entity,mapped.object,options);applied++;
         if(category==='diamonds')mapped.object.visible=true;
       }
     }
@@ -260,12 +363,15 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       if(mapped.category==='diamonds'&&!found.has(id)){mapped.object.visible=false;hidden++;}
     }
     lastSeq=snapshot.snapshotSeq;
+    localPredictedX=0;
     presentedSnapshot=snapshot;
+    applyCamera(snapshot.camera,{snap});
+    if(snap)lastPresentedAt=0;
     // The guarded native renderer reapplies the last authority presentation
     // and updates display transforms before painting. Do not transform twice.
-    if(game.renderer?.render&&game.stage)
+    if(!smooth&&game.renderer?.render&&game.stage)
       game.renderer.render(game.stage);
-    else if(game.stage&&typeof game.stage.updateTransform==='function')
+    else if(!smooth&&game.stage&&typeof game.stage.updateTransform==='function')
       game.stage.updateTransform();
     return {accepted:true,snapshotSeq:lastSeq,applied,hiddenDiamonds:hidden,unknownEntities:unknown,
       completeGameState:false};
@@ -276,6 +382,20 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       actorRefsMatch:originalActors[0]===level.pers1&&originalActors[1]===level.pers2,
       blockedUnpauses,blockedWorldSteps,gamePaused:game.paused,
       physicsPaused:game.physics?.box2d?.paused??null};
+  }
+  function setLocalSeat(value){
+    if(value!==null&&value!==0&&value!==1)
+      throw new RangeError('local seat must be null, 0 or 1');
+    localSeat=value;
+    localCharacter=value===0?level.pers1:value===1?level.pers2:null;
+    localPredictedX=0;
+    return localSeat;
+  }
+  function setLocalInput({moveX=0}={}){
+    if(moveX!==-1&&moveX!==0&&moveX!==1)
+      throw new RangeError('moveX must be -1, 0 or 1');
+    localInputX=moveX;
+    return localInputX;
   }
   function uninstall(){
     if(!active)return false;
@@ -294,13 +414,15 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices}={}){
       if(ownRenderDescriptor)Object.defineProperty(renderer,'render',ownRenderDescriptor);
       else delete renderer.render;
     }
-    presentedSnapshot=null;
-    if(game.input)game.input.enabled=originalInputEnabled;
+    presentedSnapshot=null;cameraTarget=null;localInputX=0;localPredictedX=0;lastPredictionAt=0;
+    for(const {owner,key,value} of inputManagers)owner[key]=value;
     if(originalGamePauseDescriptor)
       Object.defineProperty(game,'paused',originalGamePauseDescriptor);
     else delete game.paused;
+    if(nativePauseAccessor&&!originalGamePauseDescriptor)
+      nativePauseAccessor.set.call(game,wasPaused);
     entities.clear();
     return true;
   }
-  return Object.freeze({initialize,apply,inspect,uninstall});
+  return Object.freeze({initialize,apply,inspect,setLocalInput,setLocalSeat,uninstall});
 }

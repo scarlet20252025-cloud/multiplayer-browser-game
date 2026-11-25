@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "forest",
+  "title": "森林神庙",
+  "subtitle": "Fireboy & Watergirl in The Forest Temple",
+  "runtime": "html5-phaser",
+  "adapter": "fireboy-html5",
+  "order": 1,
+  "seats": 2,
+  "online": true,
+  "capabilities": {
+    "authority": true,
+    "spectator": true,
+    "levelVote": true,
+    "restartVote": true,
+    "returnVote": true,
+    "save": true
+  },
+  "package": {
+    "dir": "1-forest-temple",
+    "entry": "index.html",
+    "levels": "data/forest/temple.json",
+    "templeId": "forest",
+    "storagePrefix": "fb-forest"
+  },
+  "evidence": [
+    "docs/HTML5_ROUTE_FINDINGS.md",
+    "docs/INPUT_AND_CLOCK_CONTRACT.md"
+  ],
+  "notes": "Verified in the loopback lobby with authority + frozen spectator clients."
+}

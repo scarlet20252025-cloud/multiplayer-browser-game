@@ -162,11 +162,24 @@ test('nonfinite observations are null plus a reason, never silently JSON-coerced
   assert.deepEqual(JSON.parse(JSON.stringify(snapshot)), snapshot);
 });
 
+test('playable core does not require diamonds or mechanisms', () => {
+  const { game, options } = fixture();
+  game.layers.underGround.children = [];
+  game.level.objects = [];
+  game.MechManager.deviceGroups = {};
+  const snapshot = createSnapshotExporter(game, options).capture();
+  assert.equal(snapshot.diamonds.length, 0);
+  assert.equal(snapshot.mechanisms.length, 0);
+  assert.equal(snapshot.coverage.requiredPresent, false);
+  assert.equal(snapshot.coverage.playableCore, true);
+});
+
 test('missing real Diamond constructor and unreviewed source are explicit gaps', () => {
   const { game, options } = fixture();
   const snapshot = createSnapshotExporter(game, { ...options, devices: {}, sourceGameSha256: 'a'.repeat(64) }).capture();
   assert.equal(snapshot.diamonds.length, 0);
   assert.equal(snapshot.coverage.requiredPresent, false);
+  assert.equal(snapshot.coverage.playableCore, false);
   assert.equal(snapshot.coverage.sourceBuildAudited, false);
   assert.ok(snapshot.unsupported.some(x => x.path === 'Devices.Diamond'));
   assert.ok(snapshot.unsupported.some(x => x.reason === 'source-build-not-audited'));
@@ -176,6 +189,7 @@ test('scan and entity limits yield explicit incomplete observations', () => {
   const { game, options } = fixture();
   const snapshot = createSnapshotExporter(game, { ...options, maxEntities: 3, maxContainerEntries: 2 }).capture();
   assert.equal(snapshot.coverage.requiredPresent, false);
+  assert.equal(snapshot.coverage.playableCore, false);
   assert.ok(snapshot.unsupported.some(x => x.reason === 'entity-limit'));
   assert.ok(snapshot.unsupported.some(x => x.reason === 'container-scan-limit'));
 });

@@ -1,0 +1,69 @@
+{
+  "name": "carnival-lobby",
+  "referenceSize": [
+    1672,
+    941
+  ],
+  "cssVariables": {
+    "ink": "#20215c",
+    "muted": "#68658f",
+    "purple": "#783af0",
+    "purple-dark": "#6330db",
+    "purple-light": "#a772fc",
+    "violet-surface": "#f1edff",
+    "white": "#fff",
+    "yellow": "#ffd126",
+    "yellow-dark": "#e9a000",
+    "green": "#14c357",
+    "pink": "#f6d8e5",
+    "line": "#e1dff1",
+    "blue": "#1389ed",
+    "panel-radius": "32px",
+    "card-radius": "16px",
+    "pill-radius": "999px",
+    "control-radius": "14px",
+    "space-1": "4px",
+    "space-2": "8px",
+    "space-3": "12px",
+    "space-4": "16px",
+    "space-5": "20px",
+    "space-6": "24px",
+    "space-8": "32px",
+    "shadow-panel": "0 8px 26px #27478e26,inset 0 0 0 3px #dfe6ff",
+    "shadow-mode": "0 5px 0 #ffffffa8,0 7px 10px #5059af34",
+    "shadow-button": "0 3px 0 #df9900,0 5px 12px #ecb51f38",
+    "ease-pop": "cubic-bezier(.22,.75,.28,1.2)",
+    "time-fast": "160ms",
+    "time-normal": "240ms",
+    "font-ui": "\"Microsoft YaHei UI\",\"Microsoft YaHei\",\"PingFang SC\",\"Noto Sans CJK SC\",system-ui,sans-serif",
+    "content-width": "1368px",
+    "gap": "12px"
+  },
+  "grid": {
+    "desktop": 4,
+    "tablet": 3,
+    "phone": 2,
+    "desktopColumns": [
+      "7fr",
+      "3fr"
+    ],
+    "breakpoints": [
+      1100,
+      800,
+      480
+    ]
+  },
+  "motion": {
+    "parallaxMaxX": 6,
+    "parallaxMaxY": 5,
+    "spriteFloatPx": [
+      8,
+      14
+    ],
+    "spriteDurationSeconds": [
+      8,
+      13
+    ],
+    "mascotDurationSeconds": 4.5
+  }
+}
