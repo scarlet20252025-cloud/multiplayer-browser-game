@@ -1,5 +1,7 @@
 **加载与席位（2026-11-28）：** 泡泡堂 7、死神 vs 火影、迷宫坦克、云台乱斗、疯狂小人乱斗、闪翼双星、大厅首屏与 BVN 下载页已统一为带百分比动画的加载遮罩（真实字节优先，没有字节按阶段推进），规范见 [网站设计流程第 7 节](docs/WEBSITE_DESIGN_WORKFLOW.md#7-加载与进度条规范)。森林/光明/冰雪/水晶四款神庙游戏仍用原 Phaser 预加载画面，尚未接入。席位续租：冰火人权威房与闪翼镜像房用 `server/seat-presence.mjs` 保留 20 秒，泡泡堂 7 的 20 秒在 `server/room-lobby.mjs`，迷宫坦克与云台乱斗各自保留 45 秒。
 
+**手感修复（2026-11-28）：** 冰火人四部曲去掉了只作用于本地角色的 ±8px 预测位移（回拉的直接原因），权威快照从 9.5–15 Hz 提到约 36 Hz，平滑常数 55ms→30ms；四部逐一实测无可见回退帧。根因、数据和复现命令见 [手感与延迟](docs/HTML5_FEEL_AND_LATENCY.md)。
+
 **本机双浏览器研究入口：** [安装与启动说明](docs/HTML5_LOCAL_TWO_TAB.md) · `scripts/start-html5-local-room.mjs` 能用本地私有 HTML5 资源启动一个权威服务，并让两个普通浏览器标签页自动加入。该入口仅监听 127.0.0.1；不是已授权的公网游戏发行。
 
 **生命周期验证：** [原生 retry() 与死亡双浏览器保护](docs/HTML5_NATIVE_RETRY.md) 已在固定研究版本真实 CI 中通过；目前是旧场景安全停机，尚非死亡后完整双人继续游戏。
@@ -144,6 +146,7 @@ python3 scripts/audit_fireboy.py \
 
 | 路径 | 内容 |
 | --- | --- |
+| [**冰火人手感与延迟**](docs/HTML5_FEEL_AND_LATENCY.md) | 回拉/跳跃黏手的根因、快照频率实测、四部曲验证命令 |
 | [**交接给下一个 Agent**](docs/HANDOFF_TO_NEXT_AGENT.md) | **从这里开始**：当前状态、已验证结论、待做清单、代码位置速查、已踩过的坑 |
 | [HTML5 路线验证](docs/HTML5_ROUTE_FINDINGS.md) | HTML5 版 6 部实机运行、Node 可运行性、输入路径定位、输入桥验证 |
 | [通用游戏适配契约](docs/GAME_ADAPTER_CONTRACT.md) | manifest、运行时分层、准入探测、新游戏接入与闪翼研究注册表 |

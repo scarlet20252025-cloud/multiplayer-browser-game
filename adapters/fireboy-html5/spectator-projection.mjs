@@ -139,7 +139,7 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices,smooth=fa
   const signal=level.pauseKey?.onDown;
   const oldToggle=level.togglePause;
   let active=true,initialized=false,lastSeq=0,epoch=null,entities=new Map(),blockedUnpauses=0,blockedWorldSteps=0,presentedSnapshot=null,presentationReplays=0,lastPresentedAt=0,cameraTarget=null;
-  let localInputX=0,localPredictedX=0,lastPredictionAt=0;
+  // 只记录席位；本地角色不再做任何位移预测（见 repaintNativeFrame 的说明）。
   let localCharacter=localSeat===0?level.pers1:localSeat===1?level.pers2:null;
   if(signal&&typeof signal.remove==='function')signal.remove(oldToggle,null);
   function repaintNativeFrame(){
@@ -167,17 +167,10 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices,smooth=fa
     for(const [id,mapped] of entities){
       if(mapped.category==='diamonds'&&!present.has(id))mapped.object.visible=false;
     }
-    // Presentation-only local prediction: the authority still owns collision
-    // and the final position. Integrate the small visual lead in real time,
-    // clamp it to a few pixels and let it decay after the player stops.
-    if(localCharacter?.sprite){
-      const predictionDt=lastPredictionAt?Math.min(80,Math.max(0,now-lastPredictionAt)):0;
-      localPredictedX += localInputX*140*(predictionDt/1000);
-      localPredictedX *= Math.exp(-predictionDt/90);
-      localPredictedX = Math.max(-8,Math.min(8,localPredictedX));
-      localCharacter.sprite.x += localPredictedX;
-    }
-    lastPredictionAt=now;
+    // 这里曾经给自己角色加过一段「最多 ±8px、随时间衰减」的预测位移。
+    // 衰减意味着这段位移最后要被收回去，表现出来就是自己看自己一直被往回拉；
+    // 队友的角色没有这段偏移，所以只有本人觉得卡。权威已经 30Hz 以上在发快照，
+    // 本地角色和队友角色走同一条投影路径，手感才一致。
     if(cameraTarget&&game.camera){
       const factor=smooth?(presentOptions?.smooth?.factor??1):1;
       for(const key of ['x','y']){
@@ -363,7 +356,6 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices,smooth=fa
       if(mapped.category==='diamonds'&&!found.has(id)){mapped.object.visible=false;hidden++;}
     }
     lastSeq=snapshot.snapshotSeq;
-    localPredictedX=0;
     presentedSnapshot=snapshot;
     applyCamera(snapshot.camera,{snap});
     if(snap)lastPresentedAt=0;
@@ -388,14 +380,17 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices,smooth=fa
       throw new RangeError('local seat must be null, 0 or 1');
     localSeat=value;
     localCharacter=value===0?level.pers1:value===1?level.pers2:null;
-    localPredictedX=0;
     return localSeat;
   }
+  /**
+   * 保留接口给客户端上报本地按键，但不再据此移动精灵。
+   * 之前用它做「预测位移」，衰减时会把角色往回拉；现在本地角色与队友角色
+   * 完全走同一条权威投影路径。
+   */
   function setLocalInput({moveX=0}={}){
     if(moveX!==-1&&moveX!==0&&moveX!==1)
       throw new RangeError('moveX must be -1, 0 or 1');
-    localInputX=moveX;
-    return localInputX;
+    return moveX;
   }
   function uninstall(){
     if(!active)return false;
@@ -414,7 +409,7 @@ export function installHtml5Spectator(game,{devices=globalThis.Devices,smooth=fa
       if(ownRenderDescriptor)Object.defineProperty(renderer,'render',ownRenderDescriptor);
       else delete renderer.render;
     }
-    presentedSnapshot=null;cameraTarget=null;localInputX=0;localPredictedX=0;lastPredictionAt=0;
+    presentedSnapshot=null;cameraTarget=null;
     for(const {owner,key,value} of inputManagers)owner[key]=value;
     if(originalGamePauseDescriptor)
       Object.defineProperty(game,'paused',originalGamePauseDescriptor);

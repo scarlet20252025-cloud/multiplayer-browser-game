@@ -495,18 +495,22 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
       },700);
       autoRestartTimer.unref?.();
     };
-    const TICK_MS=32;
+    const TICK_MS=25;
     let timer=null;
+    // Windows 的定时器粒度约 15.6 ms：setTimeout(32) 实际会落到 ~47 ms。
+    // 用绝对截止时间累加，让周期稳定在 TICK_MS 的整数倍附近，而不是被每次取整放大。
+    let nextDeadline=performance.now();
     const scheduleTick=()=>{
       if(closed)return;
-      timer=setTimeout(runTick,TICK_MS);
+      const now=performance.now();
+      nextDeadline=Math.max(nextDeadline+TICK_MS,now);
+      timer=setTimeout(runTick,Math.max(0,nextDeadline-now));
       timer.unref?.();
     };
     const runTick=()=>{
       timer=null;
       if(closed||failed||!room.running||pendingTick)return scheduleTick();
       pendingTick=true;
-      const startedAt=performance.now();
       void enqueue(async()=>{
         const t0=performance.now();
         const sampled=room.sample(Date.now());
@@ -543,10 +547,9 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
           total:+(performance.now()-t0).toFixed(1)}));
       }).finally(()=>{
         pendingTick=false;
-        const elapsed=performance.now()-startedAt;
         if(closed)return;
-        timer=setTimeout(runTick,Math.max(0,TICK_MS-elapsed));
-        timer.unref?.();
+        // 绝对截止时间：一次慢帧不会把后续节奏整体推后，也不会被定时器取整放大。
+        scheduleTick();
       });
     };
     scheduleTick();

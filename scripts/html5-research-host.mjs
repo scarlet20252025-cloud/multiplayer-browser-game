@@ -471,7 +471,7 @@ dl{margin:0}dl div{display:flex;justify-content:space-between;gap:8px;margin:8px
 /**
  * @param {{root:string,script?:string,port?:number,games?:Array, lobbyWsUrl?:string}} options
  */
-export async function startHtml5ResearchHost({root, script, port = 0, publicPort = null, requireScript = REQUIRE_SCRIPT, entryPath = '/', autoJoinWsUrl=null, autoJoinLevelId=1, games=null, lobbyWsUrl=null, lobbyHttpHandler=null, ruffleDir=null, host='127.0.0.1', publicHost=null, lanViewerOrigin=null, wanViewerOrigin=null, bvnProxy=null, glortonProxy=null, glortonBrowser=null, glortonLocalWebRoot=null, arenaViewerUpgrade=null, bombItSwf=null} = {}) {
+export async function startHtml5ResearchHost({root, script, port = 0, publicPort = null, requireScript = REQUIRE_SCRIPT, entryPath = '/', autoJoinWsUrl=null, autoJoinLevelId=1, games=null, lobbyWsUrl=null, lobbyHttpHandler=null, ruffleDir=null, host='127.0.0.1', publicHost=null, lanViewerOrigin=null, wanViewerOrigin=null, bvnProxy=null, glortonProxy=null, glortonBrowser=null, glortonLocalWebRoot=null, arenaViewerUpgrade=null, bombItSwf=null, templeId='forest', storagePrefix='fb-forest', gameId='forest'} = {}) {
   if (typeof root !== 'string' || !root.trim()) throw failure('HTML5_ROOT_REQUIRED', 'Provide the private first-game directory with --root.');
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw failure('HTML5_INVALID_PORT', 'port must be an integer from 0 to 65535.');
   if (publicPort !== null && (!Number.isInteger(publicPort) || publicPort < 1 || publicPort > 65535))
@@ -644,7 +644,7 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
     }
   } else {
     primary = await ensureGame({
-      id: 'forest', title: 'Forest', templeId: 'forest', storagePrefix: 'fb-forest',
+      id: gameId, title: gameId, templeId, storagePrefix,
       script, requireScript, entryPath,
     });
   }

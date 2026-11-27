@@ -322,7 +322,7 @@ try{
   try{resumeTicket=sessionStorage.getItem(resumeKey);}catch{}
   if(resumeTicket)wsTarget.searchParams.set('resume',resumeTicket);
   player=connectHtml5Spectator({game,wsUrl:wsTarget.href,devices:window.Devices,
-    smooth:config.smooth!==false,smoothingMs:55,resumeKey,
+    smooth:config.smooth!==false,smoothingMs:30,resumeKey,
     expectedSeat,expectedServedSha256:config.servedSha256??null,expectedLevelId:levelId});
   window.__localHtml5Player=player;
   const unsubscribe=player.onStatus(renderStatus);
