@@ -14,7 +14,7 @@
 
 # 双人网页游戏联机实验室
 
-**联机工程总结（2026-11-25）** · [架构、同步方案、故障修复与验收方法](docs/NETPLAY_ENGINEERING_GUIDE.md)。涵盖多游戏大厅、格斗、坦克、合作游戏及公网部署的实际经验。
+**联机工程总结（2026-11-28）** · [架构、同步方案、故障修复与验收方法](docs/NETPLAY_ENGINEERING_GUIDE.md) · [疯狂小人乱斗联机重构](docs/GLORTON_MULTIPLAYER_RESEARCH.md) · [泡泡堂 7 联机与房间设计](docs/BOMB_IT_NETPLAY.md)。新增自动人数、准备恢复、迟到输入与发布验证记录。执行记录中的验收命令需要对应发布版源码、运行器和私有游戏资源。
 
 **网站设计与维护流程** · [页面修改索引、素材原稿、本地预览与发布步骤](docs/WEBSITE_DESIGN_WORKFLOW.md)。
 

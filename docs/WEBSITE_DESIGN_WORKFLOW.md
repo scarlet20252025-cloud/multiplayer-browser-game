@@ -28,7 +28,8 @@ flowchart LR
 | 冰火人、闪翼双星的对局外壳与侧栏 | `scripts/html5-research-host.mjs` 生成页面和内联样式。冰火人控制与投影入口在 `scripts/html5-local-player.mjs`，闪翼输入桥在 `scripts/shanyi-mirror-client.mjs` |
 | 迷宫坦克的对局布局、场景和音效 | `public/tank-arena/index.html`、`arena.css`、`arena-view.mjs`、`arena-audio.mjs`。触屏为 `touch.css` 和 `touch.mjs`。对局规则在 `server/tank-arena-sim.mjs` 与 `tank-arena-match.mjs` |
 | 死神 vs 火影的皮肤、键位、表情、缓存与观战 | `scripts/bvn33-carnival.css`、`bvn33-player-bootstrap.js`、`bvn33-download-cache.js`、`bvn33-watch.html` 和 `bvn33-watch-client.mjs`。改动后由 `scripts/prepare-bvn33-sidecar.mjs` 接入私有构建 |
-| 疯狂小人乱斗的游戏页面 | `public/glorton-online/local-hud.mjs` 包含选角、地图票、结算、键位和响应式侧栏。`local-session.mjs` 管理网页连接，`scripts/build-glorton-local.py` 负责生成 Pygbag 启动壳 |
+| 泡泡堂 7 的备战与对局外壳 | `lobby.mjs` 的 `bombItReadyPanel()`、`bombItWardrobe()`、`bombItRules()`，配合 `lobby.css`。备战状态由 `server/room-lobby.mjs` 管理，对局外壳由 `html5-research-host.mjs` 生成 |
+| 疯狂小人乱斗的建房、备战与游戏页面 | `lobby.mjs` 的 `glortonPanel()`、`submitGlorton()`，以及 `public/glorton-online/local-hud.mjs` 的备战、结算、键位和响应式侧栏。`local-session.mjs` 管理网页连接，`scripts/build-glorton-local.py` 生成 Pygbag 启动壳 |
 
 ## 2. 视觉设计和素材怎么改
 
@@ -41,7 +42,32 @@ flowchart LR
 - 新增图标时编辑 `sprite.svg` 的 `<symbol id="…">`，在 `lobby.mjs` 用 `icon('…')` 引用。新增素材或封面时同时更新 `html5-research-host.mjs` 的公开资源清单。新增游戏封面还要更新 `GAME_STYLE`；启动时 `availableCovers` 会告知页面哪些封面已就绪。缺少可选封面时卡片显示主题色。
 - 第三方游戏截图封面和私有游戏包由部署环境提供。对于可使用的替换封面，将 WebP 放到 `public/lobby/art/covers/<封面名>.webp`，重启本地预览，再核对游戏卡、房间列表缩略图和房间横幅的裁切。封面的出处见 [封面来源](LOBBY_COVER_SOURCES.md)。
 
-## 3. 本地预览和修改顺序
+## 3. 房间备战、预览和对局画布
+
+泡泡堂 7 与疯狂小人乱斗采用同一种备战结构。开局条件和准备按钮放在主栏顶部，选角和规则预览各占一块，侧栏显示房间状态、分席位的玩家和对应键位。备战内容按正常页面流排版，地图预览和准备按钮可以用键盘操作。在移动端主栏先于侧栏，预览阵列随宽度调整。
+
+### 人数、准备与重连
+
+- **分别显示容量、在线和准备人数。** 两款游戏的新房间最多四人，至少两人到齐并全员准备后开始。三个玩家中两人准备时显示 `2/3 已准备`，第四个空席仍可加入。暂离保留席位则显示离线或等待重连，留出恢复原席的时间。玩家返回或席位超时释放后，服务器用此时的成员重新判断开局。对局中的玩家人数以开局名单为准。
+- **选项和准备状态跟随席位。** 同一标签页刷新用已保存的席位令牌恢复服务器状态。昵称用于展示，服务端按令牌定位玩家。调整角色或个人装扮只取消本人准备。测试时先让 P1 准备，再让 P2 改选角色并保持未准备。刷新 P1 后核对两端看到的角色、地图和 P1 的准备状态，再让其余玩家准备开局。加入、刷新、主动退出和席位超时应分别验证。
+- **泡泡堂 7 由房主选择规则。** 角色、服装、帽子和表情可分别预览。角色选择由服务端检查，房主切换地图或模式时增加规则版本并清除全员准备。备战页短暂断开会保留席位 20 秒。刷新恰逢开局时，服务器向恢复的原席位补发同场对局地址。详见 [泡泡堂 7 联机说明](BOMB_IT_NETPLAY.md)。
+- **疯狂小人乱斗按玩家投票选图。** 新房间由大厅提交 `roster: 'auto'`，最多接纳四位玩家。旧固定人数房间继续使用原设定。每人一张地图票，最高票入选，同票由权威服务从并列地图中抽选，无票时沿用房间默认地图。改自己的投票只取消自己的准备。开局冻结参战名单，网页继续显示玩家原来的 P1–P4 标签。对局引擎使用连续的参战索引，通过 `match_slots` 对应回房间席位。详见 [疯狂小人乱斗联机调研](GLORTON_MULTIPLAYER_RESEARCH.md)。
+
+### 预览与封面
+
+泡泡堂 7 的八张角色图集位于 `public/lobby/art/bomb-it-7/wardrobe/`。每张图集包含该角色在原版换装界面的 64 种服装、帽子与表情组合。`bombItPortrait()` 通过服装、帽子和表情编号定位对应单元格。地图和模式预览分别位于同级 `maps/` 与 `modes/`，备战区根据服务端公布的可选项展示九张地图和四种对战模式。
+
+疯狂小人乱斗的六个角色及四种配色预览取自已安装发行包，由 `provider_bootstrap.py` 和 `provider-loader.mjs` 提供给页面。原版菜单的四张选图缩略图位于 `public/lobby/art/glorton/maps/`。大厅封面 `covers/glorton.webp` 使用摩加迪沙实机画面的 640×360 WebP，游戏卡和房间条目共用它。
+
+预览图和可用封面通过 `/__lobby__/art/` 提供。更新图片时同时核对 `html5-research-host.mjs` 的 `LOBBY_ART` 和 `LOBBY_COVERS`，以及页面中的文件名、编号和大小写。验收要在实际入口查看图片的解码尺寸与裁切，再切换角色、配色或地图检查预览是否更新。私有原始包和第三方图像按发布权限单独配置，仓库保留相应代码、相对路径和来源说明。
+
+### 画布和统计的摆放
+
+疯狂小人乱斗在同一网页切换加载、备战、对局和结算。Pygbag 初始化时可能较晚把 `canvas.style.visibility` 设为 `visible`，绝对定位的黑色画布会遮住备战卡片。`local-hud.mjs` 在 `data-mode=select` 时通过 CSS 优先级隐藏画布并关闭指针交互，保留画布尺寸供运行时使用。备战内容有明确的定位和层级，进入对局时画布恢复显示，返回备战时再隐藏。回归要主动在备战期间写入这个内联样式，同时检查实际可见像素和准备按钮能否命中。Firefox 的故障复现中，卡片可被点击时仍可能被绘制层遮挡。
+
+泡泡堂 7 直接使用 SWF 自带的对局计分。迷宫坦克的 `#match-stats` 则放在 `.battle-field` 内紧贴战场下方。`arena.mjs` 的 `prepareRoster()` 按席位创建一排统计卡，显示当前比分、累计得分、击毁、被击毁和胜局。侧栏展开时，统计卡仍按战场高度定位。窄屏先保留战场和操作区，统计卡在自己的区域内横向滚动。验收时检查侧栏展开、六张统计卡横向排列和焦点滚动。
+
+## 4. 本地预览和修改顺序
 
 从已检出的仓库安装 `package-lock.json` 指定的 Node 依赖，Node.js 版本以 `package.json` 为准。以下 PowerShell 命令使用空的私有游戏目录，在独立端口启动实际大厅、房间和原创迷宫坦克。真实的第三方游戏会在相应私有资源与服务就绪后出现。
 
@@ -58,9 +84,24 @@ node scripts/start-game-lobby.mjs --root local/empty-games --viewer-port 8787 --
 3. **走一遍完整状态。** 同时验证加载、空列表、连接失败、正在提交、已满、正在开局、对局中和返回大厅。对有重连的游戏验证刷新后仍保留本席位。对 Glorton 验证胜负弹窗、再战票和回到选角后的状态。
 4. **对照两种屏幕。** 基准可取 1920×1080 桌面和 390px 宽手机，另查触屏横屏。确认房间和对局侧栏可操作，大厅搜索和密码表单保留输入。画面优化要在实际移动、跳跃和镜头跟随时验收。
 
-## 4. 测试、提交和发布
+## 5. 测试、提交和发布
 
 先跑 `npm test`。安装 Playwright 的 Chromium 后，运行 `node scripts/verify-lobby-resume.mjs` 验证两标签页建房、刷新与断线恢复。`node scripts/verify-tank-trouble.mjs` 自建临时夹具，可覆盖真实大厅到原创游戏的入口。Glorton、BVN 和合作游戏的完整浏览器测试需要各自维护的私有运行包。固定研究资源的 GitHub Actions 在 `.github/workflows/`，测试记录应注明使用的候选版本。
+
+调整备战界面后，可用以下命令分别跑泡泡堂 7 四端和疯狂小人乱斗三端。运行前按游戏文档准备对应的私有运行包，将 Glorton 命令中的地址替换成实际候选大厅入口。Glorton 命令末尾的数字是参与验收的浏览器数，房间上限仍为四。
+
+```powershell
+node scripts/verify-bomb-it-room.mjs --players 4 --width 1460 --dpr 1.2 --gpu --test-setup --test-reconnect --map Cake --mode collect
+
+$env:GLORTON_VERIFY_READY_RELOAD='1'
+$env:GLORTON_VERIFY_PREP_CANVAS='1'
+node scripts/verify-glorton-local.mjs http://127.0.0.1:19361 3
+```
+
+- 泡泡堂 7 四端已用蛋糕地图和收集模式验证。验收覆盖角色、装扮和准备状态在刷新后恢复，以及断线恢复后的帧一致性。
+- 疯狂小人乱斗的独立三端验收确认了第四席为空时仍可开局，权威对局恰好收到三位参战玩家。局域网双端验证了房间刷新和强制写入画布可见样式，实战取得 17 个一致检查点，刷新重连后仍可继续。黑块的绘制层回归另用 Firefox 和 Chromium 做了备战、开战、再战切换验证。
+- 迷宫坦克已检查 1440×810 桌面、390 和 320 像素宽的竖屏，以及 932 和 568 像素宽的横屏。侧栏展开时，统计区和战场仍保持 14 像素间距。
+- 疯狂小人乱斗的 640×360 封面已从局域网和公网的 Chromium 游戏卡及真实房间缩略图核对解码。
 
 发布时用独立候选目录与端口预览，把资源、网页与对应协议版本配对。仅替换网页或原图时，以内容哈希或版本参数刷新静态资源缓存。涉及 Node 网关、房间协议或权威服务时，先确认活跃对局，再切到验证通过的候选版本。保留上一个可启动版本和独立的房间数据，切换后从实际局域网和公网入口完成健康检测、建房、进房和对局测试。
 
