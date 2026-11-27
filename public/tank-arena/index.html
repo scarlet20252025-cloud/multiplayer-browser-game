@@ -194,8 +194,12 @@
       async function begin() {
         for (let index = 0;; index++) {
           if (index || attempt) status.textContent = '正在重新载入对战界面…';
-          if (await stylesheet(index)) break;
-          goTo(18 + index * 4);
+          // 样式表最多等 4 秒，这期间数字也要动，不能干停在 6%。
+          const stopWait = creepTo(34);
+          const styled = await stylesheet(index);
+          stopWait();
+          if (styled) break;
+          goTo(26 + index * 6);
           if (index === 2) {
             status.textContent = '暂时无法载入界面，可保留席位重新加载。';
             retry.hidden = false;

@@ -140,6 +140,33 @@ test('a dropped seat resumes with its token inside the grace window', async t=>{
   again.close();
 });
 
+test('taking over a seat does not put the winner into the grace state', async t=>{
+  const room=await startShanyiMirrorRoom({port:0,allowedViewerOrigins:[],wsToken:TOKEN,
+    resumeGraceMs:5000});
+  t.after(()=>room.close());
+  const base=room.url.replace(/^http/,'ws')+'/ws?token='+TOKEN;
+  const first=await open(base+'&seat=0');
+  await next(first,'welcome');
+  const takeover=await open(base+'&seat=0');
+  const winner=await next(takeover,'welcome');
+  assert.equal(winner.seat,0);
+  // 旧 socket 的 close 是异步的；等它跑完再看租约。
+  await new Promise(resolve=>setTimeout(resolve,150));
+  const state=await fetch(room.url+'/health').then(response=>response.json());
+  assert.deepEqual(state.room.reserved,[],'the winner must not be marked as away');
+
+  takeover.close();
+  await new Promise(resolve=>setTimeout(resolve,80));
+  const reserved=await fetch(room.url+'/health').then(response=>response.json());
+  assert.deepEqual(reserved.room.reserved,[0]);
+
+  const back=await open(base+'&resume='+winner.resumeToken);
+  const resumed=await next(back,'welcome');
+  assert.equal(resumed.seat,0);
+  assert.equal(resumed.resumed,true,'the winner keeps a working ticket');
+  back.close();
+});
+
 test('an expired resume token no longer claims the old seat', async t=>{
   const room=await startShanyiMirrorRoom({port:0,allowedViewerOrigins:[],wsToken:TOKEN,
     resumeGraceMs:60});

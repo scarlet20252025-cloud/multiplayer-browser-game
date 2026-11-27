@@ -12,6 +12,7 @@
 | --- | --- | --- | --- |
 | `html5-phaser` | 是（权威/观看） | `authority` `spectator` `levelVote` `restartVote` `returnVote` | 通过探测后可进入大厅 |
 | `html5-external` | 是（外部权威服务） | `authority` `levelVote` `restartVote` `returnVote` | 自带 Colyseus/WebSocket 服务；大厅只分配房间码和按席位入口 |
+| `tank-arena` / `platform-brawl` | 是（服务端权威模拟） | `authority` `levelVote` `returnVote` | 规则由本仓库实现，2–6 人；两者共用同一套策略 |
 | `browser-lockstep` | 是（双人帧同步） | `lockstep` `levelVote` | 私有构建通过确定性步进接口接入大厅 |
 | `flash-ruffle` | 是（仅输入镜像） | `mirrorInput` | 需已审计 wrapper + 本地 Ruffle；实验标签 |
 | `flash-native` | 否 | — | blocker：`NO_BROWSER_RUNTIME` |
@@ -93,7 +94,7 @@ Flash 输入镜像示例（`config/games/shanyi.json`）：
 - HTML5 联机游戏必须声明的五项能力全部为 `true`；`flash-ruffle` 必须声明 `mirrorInput` 且不得声明 `authority`/`spectator`；`save` 可选，只有声明 `save: true` 的游戏才会写入房间存档；未知能力直接拒绝。
 - 联机游戏必须声明已安装的 `adapter`（HTML5 默认 `fireboy-html5`，Flash 强制 `flash-mirror`）；未安装的适配器会被拒绝。离线游戏不得声明 adapter。
 - `flash-ruffle` 的 `package` 必须同时提供 `wrapper` 与 `game` 两个相对路径；两者都必须在 `package.dir` 内。
-- `order` 是可选整数（0..999），决定大厅中的游戏顺序；未声明时排在已声明项之后，再按 id 排序。当前顺序为森林、光明、冰雪、水晶、闪翼双星。
+- `order` 是可选整数（0..999），决定大厅中的游戏顺序；未声明时排在已声明项之后，再按 id 排序。当前顺序为森林、光明、冰雪、水晶、闪翼双星，其后是迷宫坦克（200）与云台乱斗（210，隐藏）。
 - 联机游戏不得声明 blocker；离线游戏必须至少有一个大写下划线 blocker。
 - `package` 内所有路径必须是相对路径，不能包含 `..`，不能以 `/` 或 `\` 开头。
 - `evidence` 只能是安全的相对引用，可带 `#section`。
@@ -158,11 +159,12 @@ node --input-type=module -e "import {loadGameRegistry} from './server/game-adapt
 | `crystal` | html5-phaser | 可联机 | 39 关 |
 | `shanyi` | flash-ruffle | 实验·输入镜像 | wrapper + Ruffle nightly 可进入第一关；键鼠边沿经回环 WS 镜像，无权威/画面 |
 | `shanyi-native-research` | flash-native | 仅研究 | 原生 projector 可玩；浏览器加载链证据保留为研究注册表 |
-| `tank-trouble` | tank-arena | 可联机 | 原创双人迷宫坦克；大厅分配独立席位，服务端处理护甲、反弹、信标占领和得分 |
-| `bleach-vs-naruto` | browser-lockstep | 待兼容构建 | 大厅已支持双人帧同步；私有包接口见 [帧同步接入](BVN_LOCKSTEP.md) |
+| `tank-trouble` | tank-arena | 可联机 | 原创 2–6 人迷宫坦克；大厅分配独立席位，服务端处理护甲、反弹、信标占领和得分 |
+| `platform-brawl` | platform-brawl | 可联机·大厅隐藏 | 云台乱斗；`listed: false`，只做内部候选，不出现在大厅目录 |
+| `bleach-vs-naruto` | browser-lockstep | 可联机（私有 3.3 构建） | BVN Online 3.3 双人对战与观战已验收；3.4 AIR 包仍只作研究，见下一行 |
 | `bleach-vs-naruto-research` | flash-native | 仅研究 | 官方 3.4 发布包需要 AIR，浏览器步进桥待实机验证 |
 
-`shanyi-native-research` 和 `bleach-vs-naruto-research` 属于研究登记。`shanyi` 的实验性输入镜像见 `docs/SHANYI_SOURCE_AUDIT.md` 第 8 节。`tank-trouble` 的双浏览器验收使用 `scripts/verify-tank-trouble.mjs`。
+注册表口径：上表是「可联机 + 研究」全量清单，不是大厅可见列表；`listed: false` 的游戏（如 `platform-brawl`）可联机但不出现在大厅目录。`shanyi-native-research` 和 `bleach-vs-naruto-research` 属于研究登记。`shanyi` 的实验性输入镜像见 `docs/SHANYI_SOURCE_AUDIT.md` 第 8 节。`tank-trouble` 的双浏览器验收使用 `scripts/verify-tank-trouble.mjs`。
 
 ## 7. 不可突破的边界
 
@@ -184,4 +186,4 @@ node scripts/verify-shanyi-sync.mjs     # 双标签页进关：按键归属 + �
 node scripts/verify-auto-restart-stress.mjs # HTML5 权威端 6 轮连续死亡自动重开
 ```
 
-当前全套 162 项 Node 测试通过（含适配器、只读探测器、manifest 目录加载、镜像中继、ready 门禁、房间广场、离线席位替换、“Flash 不写存档”和死亡自动重开回归）；三项 Shanyi E2E 均在 127.0.0.1 上通过，HTML5 自动重开 6 轮压力与双浏览器 E2E 也已通过。
+`npm test` 全套 Node 测试通过（含适配器、只读探测器、manifest 目录加载、镜像中继、席位续租、ready 门禁、房间广场、离线席位替换、“Flash 不写存档”和死亡自动重开回归），具体条数以运行输出为准；三项 Shanyi E2E 均在 127.0.0.1 上通过，HTML5 自动重开 6 轮压力与双浏览器 E2E 也已通过。

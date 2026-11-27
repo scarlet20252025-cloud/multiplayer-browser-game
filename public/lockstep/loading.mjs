@@ -42,7 +42,7 @@ export function mountGameLoader(container, {backUrl, onBack} = {}) {
       </div>
       <div class="game-loader__progress">
         <div class="game-loader__readout">
-          <span class="game-loader__percent" aria-hidden="true">0<span class="game-loader__unit">%</span></span>
+          <span class="game-loader__percent" aria-hidden="true"><span class="game-loader__digits">0</span><span class="game-loader__unit">%</span></span>
           <span class="game-loader__amount" aria-hidden="true" hidden></span>
         </div>
         <div class="game-loader__track" role="progressbar" aria-label="加载进度"
@@ -60,18 +60,18 @@ export function mountGameLoader(container, {backUrl, onBack} = {}) {
   const progress = overlay.querySelector('.game-loader__progress');
   const track = overlay.querySelector('.game-loader__track');
   const fill = overlay.querySelector('.game-loader__fill');
-  const percentText = overlay.querySelector('.game-loader__percent');
   const amount = overlay.querySelector('.game-loader__amount');
   const actions = overlay.querySelector('.game-loader__actions');
   const retryButton = overlay.querySelector('.game-loader__retry');
   const backLink = overlay.querySelector('.game-loader__back');
-  const digits = percentText.firstChild; // 模板里的「0」文本节点，直接改值，别新增节点
+  const digits = overlay.querySelector('.game-loader__digits'); // 单独节点，别依赖 firstChild
   let retryLoad;
   let shown = 0;   // 当前显示的百分比
-  let target = 0;  // 目标百分比
+  let target = 0;  // 目标百分比（只增不减）
   let frameHandle = 0;
   let tweenStart = 0;
   let tweenFrom = 0;
+  let resetPending = false; // 上次以错误收尾：下次非终态展示从 0 重新开始
 
   if (backUrl) backLink.href = backUrl;
   if (onBack) {
@@ -91,15 +91,18 @@ export function mountGameLoader(container, {backUrl, onBack} = {}) {
   function paint(value) {
     shown = value;
     const rounded = Math.round(value);
-    digits.nodeValue = String(rounded);
+    digits.textContent = String(rounded);
     fill.style.width = `${value}%`;
     track.setAttribute('aria-valuenow', String(rounded));
     track.setAttribute('aria-valuetext', `${rounded}%`);
   }
 
   function animateTo(next) {
-    target = Math.min(100, Math.max(shown, next));
-    if (frameHandle) return; // 已经在追，目标会被下一次 paint 取到
+    // 只对「旧 target」取 max：一次补间还没跑完时传入更小的值不能把数字拉回去。
+    const clamped = Math.min(100, Math.max(0, next));
+    if (clamped <= target) return;
+    target = clamped;
+    if (frameHandle) return; // 正在追，step 会读到新的 target
     tweenFrom = shown;
     tweenStart = performance.now();
     const step = (now) => {
@@ -135,11 +138,19 @@ export function mountGameLoader(container, {backUrl, onBack} = {}) {
       retryLoad = typeof retry === 'function' ? retry : undefined;
       overlay.dataset.phase = phase;
       overlay.hidden = false;
+      if (terminal) resetPending = true;
       if (title.textContent !== heading) title.textContent = heading;
       if (detail.textContent !== description) detail.textContent = description;
       detail.hidden = !description;
       progress.hidden = terminal;
       if (!terminal) {
+        // 上次是错误收尾：这次重新加载，从 0 开始重新数，而不是停在 100%。
+        if (resetPending) {
+          if (frameHandle) { cancelAnimationFrame(frameHandle); frameHandle = 0; }
+          shown = target = 0;
+          paint(0);
+          resetPending = false;
+        }
         // 重连不是重新加载：保持当前百分比，只换文案。
         if (phase !== 'recover')
           animateTo(Number.isFinite(percent) ? percent : estimate({phase, loaded, total}));
@@ -159,9 +170,17 @@ export function mountGameLoader(container, {backUrl, onBack} = {}) {
     hide() {
       overlay.hidden = true;
       if (frameHandle) { cancelAnimationFrame(frameHandle); frameHandle = 0; }
-      shown = target = 0;
-      paint(0);
+      // 保留 shown/target：对局中掉线走 recover 时应该显示「100% 正在重连」，
+      // 而不是从 0 重新爬。下一次 show() 会按需继续推进。
       retryLoad = undefined;
+    },
+
+    /** 重新开始一次完整加载（首次进入、再开一局、点重试）：数字归零重新数。 */
+    reset() {
+      if (frameHandle) { cancelAnimationFrame(frameHandle); frameHandle = 0; }
+      shown = target = 0;
+      resetPending = false;
+      paint(0);
     },
   };
 }

@@ -11,7 +11,7 @@
 | 原版 Flash/AS3，逻辑确定性可复现，能读到状态摘要 | 逻辑帧同步（`browser-lockstep` / `lockstep-match.mjs`） | 泡泡堂 7、死神 vs 火影 | 需要可重复初始化的地图、种子和计时；检查点必须能导出 |
 | 原版 Flash，只能控制输入、无法导出状态 | 双端输入镜像（`flash-mirror`） | 闪翼双星 | 两端会分叉，只能算实验功能 |
 | 原版 Phaser/Box2D，物理难以跨浏览器复现 | 单实例权威 + 状态投影（`html5-phaser`） | 森林冰火人 1–4 | 服务器要跑 Chromium；快照要覆盖动态实体 |
-| 规则自己写、可服务端模拟 | 服务端权威模拟（`tank-arena`） | 迷宫坦克、云台乱斗 | 规则和画面都要自己实现 |
+| 规则自己写、可服务端模拟 | 服务端权威模拟（`tank-arena` / `platform-brawl`，两者共用同一套权威策略） | 迷宫坦克、云台乱斗 | 规则和画面都要自己实现 |
 | 自带服务端（Colyseus/WebSocket） | 外部权威（`html5-external`） | — | 大厅只发房间码和席位 |
 
 判断口诀：**能拿到可信状态就用帧同步，拿不到才退回输入镜像；物理复杂就别硬做帧同步。**
@@ -22,7 +22,7 @@
 
 - 记录游戏文件哈希、版本、来源；原包放 `local/`、`private-games/`，永不入库。
 - 用 `scripts/original-game-host.mjs` 起一个只监听 `127.0.0.1` 的宿主，确认首屏、进关、输入。
-- 用 `scripts/verify-original-baseline.mjs` 生成 JSON + 截图。`status` 不是 `passed` 就不能往下写。
+- 用 `scripts/verify-original-baseline.mjs` 生成 JSON + 截图。要求 `load.status === 'loaded'`（否则脚本退出码为 1），并且 `checks[]` 里没有 `failed` / `blocked`，才能往下写。
 - 需要改原包时，只在**内存副本**里打补丁，并且补丁必须校验 SHA-256；磁盘上的原包保持只读。
 
 产物：`docs/<GAME>_ORIGINAL_BASELINE.md` 一份，写清版本、哈希、能做什么、不能做什么。
@@ -42,7 +42,7 @@
 ```bash
 node --input-type=module -e "import {loadGameRegistry} from './server/game-adapter.mjs'; \
   console.log((await loadGameRegistry({gamesDir:'config/games',researchDir:'config/research-games'})).playable.map(g=>g.id))"
-node --test tests/game-adapter.test.mjs tests/game-manifests.test.mjs tests/game-catalog-manifests.test.mjs
+node --test tests/game-adapter.test.mjs tests/game-probe.test.mjs tests/game-catalog-manifests.test.mjs
 ```
 
 ## 3. 房间层：照抄泡泡堂的六条
@@ -51,7 +51,7 @@ node --test tests/game-adapter.test.mjs tests/game-manifests.test.mjs tests/game
 2. **准备是「目标值 + 服务端确认」**：按钮发本席位想要的布尔值，收到广播再改 UI；重复提交同一值结果一致。
 3. **改自己的选项就取消自己的准备**：换角色、换装扮、换地图、换模式都算，避免「已准备但配置已变」。
 4. **规则版本号**：房主改地图/模式时递增，旧版本的准备请求直接拒绝，全员重新确认。
-5. **20 秒重连窗口**：断线保留席位并暂停开局；超时才释放。刷新恰好撞上开局，要把同一场的对局地址补发给恢复的席位。
+5. **20 秒重连窗口**：断线保留席位并暂停开局；超时才释放。刷新恰好撞上开局，要把同一场的对局地址补发给恢复的席位。时长按游戏可调，迷宫坦克与云台乱斗目前是 45 秒。
 6. **房主超时转移**：按在线席位序号最小者接任，接任者继续管地图和模式。
 
 产物：`server/<game>-room.mjs`（或复用 `room-lobby.mjs` 的通用房间）+ `tests/<game>-room.test.mjs`，覆盖上面六条。

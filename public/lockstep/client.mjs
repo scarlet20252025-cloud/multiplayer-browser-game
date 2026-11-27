@@ -143,7 +143,10 @@ function sendReady() {
 
 async function loadGame(retry = false) {
   phase = 'loading';
-  showLoading({phase: 'initialize', title: '正在加载游戏'});
+  loader.reset();
+  // 先进 cache 阶段（10%）：真正的 download/verify/initialize 由桥自己上报，
+  // 否则 initialize 的 80% 会先把进度顶死，下载数字就看不见了。
+  showLoading({phase: 'cache', title: '正在加载游戏', detail: '正在准备游戏脚本。'});
   let retryDownload = false;
   try {
     const {createGame} = await import(bridgeUrl);

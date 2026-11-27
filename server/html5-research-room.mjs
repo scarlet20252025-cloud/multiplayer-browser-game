@@ -103,12 +103,12 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
       if(!__game.paused)throw Error('Waiting room did not pause');
     });
     const room=new Html5RoomCore({roomEpoch,seats}),peers=new Map();
-    /** 断线席位保留：刷新/短暂掉线后带票回到原席位，不用重新选关。 */
-    const presence=new SeatPresence({capacity:seats,graceMs:resumeGraceMs,onExpire:()=>{
+    let closed=false,failed=null,lastError=null,serial=Promise.resolve(),pendingTick=false,broadcastSeq=0;
+    /** 断线席位保留：刷新/短暂掉线后带票回到原席位，不用重新选关。
+     *  容量用 room.capacity（core 会把 seats 归一化到 1..4），不是原始入参。 */
+    const presence=new SeatPresence({capacity:room.capacity,graceMs:resumeGraceMs,onExpire:()=>{
       if(!closed)notify();
     }});
-    const socketsBySlot=new Map();
-    let closed=false,failed=null,lastError=null,serial=Promise.resolve(),pendingTick=false,broadcastSeq=0;
     let lastWinSnapshot=null;
     const send=(ws,obj)=>{if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(obj));};
     const broadcast=obj=>{
@@ -375,13 +375,18 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
         catch{slot=null;}
       }
       if(slot===null){
-        try{slot=room.attach(memberId,requestedSeat);}
+        // 自动分配跳过「保留中」的席位，别抢断线玩家的 20 秒租约。
+        const target=requestedSeat!==null?requestedSeat:
+          [...Array(room.capacity).keys()].find(index=>!room.members[index]&&!presence.isReserved(index));
+        if(target===undefined||target<0){
+          send(ws,{type:'error',code:'ROOM_FULL'});ws.close();return;
+        }
+        try{slot=room.attach(memberId,target);}
         catch{send(ws,{type:'error',code:'ROOM_FULL'});ws.close();return;}
       }
       presence.release(slot);
       const seatToken=presence.issue(slot);
       peers.set(ws,{memberId,slot});
-      socketsBySlot.set(slot,ws);
       send(ws,{type:'welcome',slot,resumed,resumeToken:seatToken,resumeGraceMs,
         room:room.publicState(),level,
         gameId,templeId,gameSha256:host.sourceSha256,servedSha256:host.servedSha256,
@@ -390,7 +395,6 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
       ws.on('close',()=>{
         const owner=peers.get(ws);if(!owner)return;
         peers.delete(ws);
-        if(socketsBySlot.get(owner.slot)===ws)socketsBySlot.delete(owner.slot);
         room.detach(memberId);
         // 主动离开立刻放人，意外断开保留 20 秒。
         if(!closed){

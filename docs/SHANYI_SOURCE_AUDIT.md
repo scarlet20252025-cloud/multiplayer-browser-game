@@ -236,7 +236,7 @@ local/tools/as3-probe/apache-flex-sdk-4.16.1-bin/bin/mxmlc \
 
 - 席位、准备、返回投票改由 `server/html5-room-core.mjs` 管理；`server/shanyi-mirror-room.mjs` 只保留镜像转发（输入边沿、点击、在线页、英雄位置/速度）。
 - 断线席位交给 `server/seat-presence.mjs`：意外断开保留 20 秒，带 `?resume=<token>` 回来坐回原位；主动 `{type:'leave'}` 立即释放。
-- 对外消息形状保持兼容：`welcome` / `peer-connection` / `ready-state` / `return-request` / `return-state` / `return-approved` / `return-cancelled` / `mirror-error` 不变，只新增 `welcome.resumeToken`、`welcome.resumed`、`welcome.resumeGraceMs`、`ready-state.seats[].reserved` 和 `/health` 的 `room.reserved`。
+- 对外消息形状保持兼容：`welcome` / `peer-connection` / `ready-state` / `return-request` / `return-state` / `return-approved` / `return-cancelled` / `mirror-error` 不变，只新增 `welcome.resumeToken`、`welcome.resumed`、`welcome.resumeGraceMs`、`ready-state.seats[].reserved`、`peer-connection.reserved` 和 `/health` 的 `room.reserved`。
 - 客户端 `scripts/shanyi-mirror-client.mjs` 把票存进 `sessionStorage`，断线后按 0.6→3 秒退避重连，20 秒内回到原席位，超时才提示返回大厅。
 
 已由 `tests/shanyi-mirror-room.test.mjs` 覆盖：双席位转发、错误 token/第三席位、断线续租、过期票失效、主动离开立即释放；`tests/seat-presence.test.mjs` 覆盖租约本身。真实双标签页的断线重连仍需在装有 Ruffle 与私有 SWF 的环境跑一次 `scripts/verify-shanyi-sync.mjs`。

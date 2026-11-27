@@ -125,7 +125,15 @@ export async function startShanyiMirrorRoom({
   });
 
   wss.on('connection',(ws,{requestedSeat,resumeToken})=>{
+    ws.alive=true;
+    ws.on('pong',()=>{ws.alive=true;});
     const memberId=randomBytes(16).toString('hex');
+    // 自动分配时跳过「保留中」的席位，否则断线玩家的 20 秒租约形同虚设。
+    const freeSlot=()=>{
+      for(let index=0;index<capacity;index++)
+        if(!core.members[index]&&!presence.isReserved(index))return index;
+      return -1;
+    };
     // 1) 带票回来：优先坐回原席位。
     let slot=null,resumed=false;
     const claimed=presence.claim(resumeToken);
@@ -133,7 +141,11 @@ export async function startShanyiMirrorRoom({
       try{
         slot=core.attach(memberId,claimed);
         resumed=true;
-      }catch{slot=null;}
+      }catch{
+        // 席位在这几毫秒里被占了：把票作废，别留悬空租约。
+        presence.release(claimed);
+        slot=null;
+      }
     }
     if(slot===null&&requestedSeat!==null&&core.members[requestedSeat]){
       // 显式点名同一席位：顶掉旧连接，保持原来的「刷新即接管」行为。
@@ -145,7 +157,13 @@ export async function startShanyiMirrorRoom({
       socketsBySlot.delete(requestedSeat);
     }
     if(slot===null){
-      try{slot=core.attach(memberId,requestedSeat);}
+      const target=requestedSeat!==null?requestedSeat:freeSlot();
+      if(target<0){
+        send(ws,{type:'mirror-error',code:'ROOM_FULL',
+          message:'房间里已有 '+capacity+' 位玩家'});
+        ws.close(4000,'full');return;
+      }
+      try{slot=core.attach(memberId,target);}
       catch{
         send(ws,{type:'mirror-error',code:'ROOM_FULL',
           message:'房间里已有 '+capacity+' 位玩家'});
@@ -156,8 +174,6 @@ export async function startShanyiMirrorRoom({
     const resumeTokenOut=presence.issue(slot);
     peers.set(ws,{memberId,slot});
     socketsBySlot.set(slot,ws);
-    ws.alive=true;
-    ws.on('pong',()=>{ws.alive=true;});
     const state=core.publicState();
     send(ws,{type:'welcome',seat:slot,peerConnected:peerConnectedFor(slot),
       capacity,gameId,levelId,mirrorInput:true,noVideo:true,roomEpoch,
@@ -221,9 +237,12 @@ export async function startShanyiMirrorRoom({
             broadcast({type:'return-cancelled',requestedBy:null,votes:0,cancelledBy:slot});
             return;
           }
-          const payload={requestedBy:result.returnRequestedSeat,votes:result.returnVotes};
+          const payload={requestedBy:result.returnRequestedSeat,votes:result.returnVotes,capacity};
           if(result.execute)broadcast({type:'return-approved',...payload});
-          else broadcast({type:command==='return.request'?'return-request':'return-state',...payload});
+          // 只有第一票才是「新请求」；重复请求只回状态，别再弹一次确认。
+          else if(command==='return.request'&&result.returnVotes===1)
+            broadcast({type:'return-request',...payload});
+          else broadcast({type:'return-state',...payload});
           return;
         }
         if(message.type==='leave'){ws.leaving=true;ws.close(4002,'left');return;}
@@ -238,14 +257,15 @@ export async function startShanyiMirrorRoom({
       const owner=peers.get(ws);
       if(!owner)return;
       peers.delete(ws);
-      if(socketsBySlot.get(owner.slot)===ws)socketsBySlot.delete(owner.slot);
-      const wasRequester=core.returnRequestedBy!==null &&
-        core.returnRequestedBy===core.members[owner.slot]?.id;
+      const stillOwner=socketsBySlot.get(owner.slot)===ws;
+      if(stillOwner)socketsBySlot.delete(owner.slot);
+      const wasRequester=core.returnRequestedBy!==null&&
+        core.returnRequestedBy===owner.memberId;
       core.detach(owner.memberId);
       if(wasRequester&&!closed)
         broadcast({type:'return-cancelled',requestedBy:null,votes:0,cancelledBy:owner.slot});
-      // 主动离开立刻放人；意外断开才保留 20 秒。
-      if(!closed){
+      // 席位已经被新连接接管时，不能再去动它的租约：新连接已经发了新票。
+      if(!closed&&stillOwner){
         if(ws.leaving)presence.release(owner.slot);
         else presence.hold(owner.slot);
       }

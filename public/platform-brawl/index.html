@@ -148,8 +148,11 @@
         for (const attempt of [0, 1, 2]) {
           const search = '?boot=' + attempt;
           if (attempt) status.textContent = '正在重新连接游戏资源…';
-          styled ||= await stylesheet(search);
-          if (!styled) { goTo(18 + attempt * 4); continue; }
+          const stopWait = creepTo(34);
+          const sheetOk = await stylesheet(search);
+          stopWait();
+          styled ||= sheetOk;
+          if (!styled) { goTo(26 + attempt * 6); continue; }
           goTo(52);
           window.brawlBootVersion = search;
           let deadline;
