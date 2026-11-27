@@ -97,6 +97,29 @@ test('mirror room rejects a wrong token and a third seat', async t=>{
   assert.equal(error.code,'ROOM_FULL');
 });
 
+test('return votes carry seat numbers, not internal member ids', async t=>{
+  const room=await startShanyiMirrorRoom({port:0,allowedViewerOrigins:[],wsToken:TOKEN});
+  t.after(()=>room.close());
+  const base=room.url.replace(/^http/,'ws')+'/ws?token='+TOKEN;
+  const a=await open(base+'&seat=0');
+  const b=await open(base+'&seat=1');
+  t.after(()=>{a.close();b.close();});
+  await next(a,'welcome');await next(b,'welcome');
+  a.send(JSON.stringify({type:'ready'}));
+  b.send(JSON.stringify({type:'ready'}));
+  await next(a,'ready-state',4000,message=>message.bothReady===true);
+
+  a.send(JSON.stringify({type:'return.request'}));
+  const request=await next(b,'return-request');
+  assert.equal(request.requestedBy,0);
+  assert.equal(request.votes,1);
+
+  b.send(JSON.stringify({type:'return.confirm'}));
+  const approved=await next(a,'return-approved');
+  assert.equal(approved.requestedBy,0);
+  assert.equal(approved.votes,2);
+});
+
 test('a dropped seat resumes with its token inside the grace window', async t=>{
   const room=await startShanyiMirrorRoom({port:0,allowedViewerOrigins:[],wsToken:TOKEN,
     resumeGraceMs:500});

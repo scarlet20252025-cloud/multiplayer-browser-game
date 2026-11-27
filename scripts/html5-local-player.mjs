@@ -120,11 +120,13 @@ function isDeath(status){
   const reason=status.lifecycle?.reason??status.room?.suspendedReason;
   return reason==='CHARACTER_DEAD'||reason==='CHARACTER_DYING';
 }
+// 服务端把发起人存成 memberId；界面只认席位号，统一在这里取。
+const seatOf=(room,key)=>{const seat=room?.[key];return Number.isInteger(seat)?seat:null;};
 function showVote(kind,status){
   voteKind=kind;
   vote.hidden=false;vote.style.display='flex';
   const reason=status.lifecycle?.reason??status.room?.suspendedReason;
-  const restartBy=status.room?.restartRequestedBy;
+  const restartBy=seatOf(status.room,'restartRequestedSeat');
   if(kind==='advance'){
     voteTitle.textContent='通关！';
     voteText.textContent='所有玩家确认后进入下一关；取消则留在当前关卡。';
@@ -167,7 +169,7 @@ const seatCount=status=>{
 const voteFraction=(status,votes)=>votes+'/'+seatCount(status);
 function renderReturnVote(status){
   if(status.returning||status.room?.returnApproved===true){goToLobby();return;}
-  const requestedBy=status.room?.returnRequestedBy;
+  const requestedBy=seatOf(status.room,'returnRequestedSeat');
   if(requestedBy===null||requestedBy===undefined){
     if(returnMode!==null)closeReturnVote();
     return;
@@ -191,7 +193,7 @@ function updateVote(status){
   if(!voteKind)return;
   const votes=status.room?.restartVotes??0;
   const pending=status.room?.restartPending===true;
-  const restartBy=status.room?.restartRequestedBy;
+  const restartBy=seatOf(status.room,'restartRequestedSeat');
   if(voteKind==='restart'&&restartBy!==null&&restartBy!==undefined&&!pending)
     voteTitle.textContent=restartBy===status.seat?'等待其他玩家确认重开':playerName(restartBy)+' 请求重开';
   if(pending){
@@ -276,7 +278,7 @@ advance.addEventListener('click',()=>{
 returnStart.addEventListener('click',()=>{
   if(!player)return;
   const status=player.status();
-  const requestedBy=status.room?.returnRequestedBy;
+  const requestedBy=seatOf(status.room,'returnRequestedSeat');
   if(requestedBy!==null&&requestedBy!==undefined){renderReturnVote(status);return;}
   const sent=player.requestReturn();
   if(!sent){output.textContent='无法发起返回投票，请确认大厅连接仍然正常。';return;}

@@ -221,7 +221,7 @@ export async function startShanyiMirrorRoom({
             broadcast({type:'return-cancelled',requestedBy:null,votes:0,cancelledBy:slot});
             return;
           }
-          const payload={requestedBy:result.returnRequestedBy,votes:result.returnVotes};
+          const payload={requestedBy:result.returnRequestedSeat,votes:result.returnVotes};
           if(result.execute)broadcast({type:'return-approved',...payload});
           else broadcast({type:command==='return.request'?'return-request':'return-state',...payload});
           return;

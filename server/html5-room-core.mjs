@@ -87,8 +87,11 @@ export class Html5RoomCore {
       suspendedReason:this.suspendedReason,roundNumber:this.roundNumber,
       restartVotes:this.restartVotes.size,restartPending:this.restartPending,
       restartRequestedBy:this.restartRequestedBy,
+      // 发起人是服务端内部 memberId；界面要显示的是席位号，两个都给。
+      restartRequestedSeat:this.seatFor(this.restartRequestedBy),
       roundAction:this.roundAction,returnVotes:this.returnVotes.size,
-      returnRequestedBy:this.returnRequestedBy,returnApproved:this.returnApproved};
+      returnRequestedBy:this.returnRequestedBy,returnApproved:this.returnApproved,
+      returnRequestedSeat:this.seatFor(this.returnRequestedBy)};
   }
   suspend(reason){
     if(typeof reason!=='string'||!/^[-A-Z_]{3,64}$/.test(reason))
@@ -172,11 +175,12 @@ export class Html5RoomCore {
       this.returnApproved=false;
       this.resetPending();
       return {accepted:true,cancelled:true,returnVotes:0,
-        returnRequestedBy:null,execute:false};
+        returnRequestedBy:null,returnRequestedSeat:null,execute:false};
     }
     if(this.returnVotes.size>=this.members.length)this.returnApproved=true;
     return {accepted:true,cancelled:false,returnVotes:this.returnVotes.size,
-      returnRequestedBy:this.returnRequestedBy,execute:this.returnApproved};
+      returnRequestedBy:this.returnRequestedBy,
+      returnRequestedSeat:this.seatFor(this.returnRequestedBy),execute:this.returnApproved};
   }
   beginNewRound({force=false}={}){
     if(!force&&(!this.restartPending||this.restartVotes.size!==this.members.length||!this.suspendedReason))

@@ -175,6 +175,11 @@ test('return-to-selection can be cancelled and tolerates a departing seat',()=>{
   const cmd=(command,id)=>({type:'room-command',command,
     roomEpoch:'fixture-room-1',roundNumber:0,commandId:id});
   assert.equal(core.voteReturn('client-aaaa',cmd('return.request','a1')).returnVotes,1);
+  // 界面要显示「谁请求的」：对外给席位号，内部 memberId 不外泄。
+  const request=core.voteReturn('client-aaaa',cmd('return.request','a1b'));
+  assert.equal(request.returnRequestedBy,'client-aaaa');
+  assert.equal(request.returnRequestedSeat,0);
+  assert.equal(core.publicState().returnRequestedSeat,0);
   core.suspend('CHARACTER_DEAD');
   assert.equal(core.voteReturn('client-bbbb',cmd('return.confirm','b1')).execute,true);
   const cancelled=core.voteReturn('client-aaaa',cmd('return.cancel','a2'));
