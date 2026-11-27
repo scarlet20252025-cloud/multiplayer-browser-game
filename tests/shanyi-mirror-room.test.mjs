@@ -97,6 +97,32 @@ test('mirror room rejects a wrong token and a third seat', async t=>{
   assert.equal(error.code,'ROOM_FULL');
 });
 
+test('batched edges keep their order and stop when the two pages diverge', async t=>{
+  const room=await startShanyiMirrorRoom({port:0,allowedViewerOrigins:[],wsToken:TOKEN});
+  t.after(()=>room.close());
+  const base=room.url.replace(/^http/,'ws')+'/ws?token='+TOKEN;
+  const a=await open(base+'&seat=0');
+  const b=await open(base+'&seat=1');
+  t.after(()=>{a.close();b.close();});
+  await next(a,'welcome');await next(b,'welcome');
+
+  a.send(JSON.stringify({type:'presence',page:'pages::Level1'}));
+  b.send(JSON.stringify({type:'presence',page:'pages::Level1'}));
+  await next(b,'peer-presence');
+  a.send(JSON.stringify({type:'input-batch',edges:[{code:68,down:true},{code:68,down:false}]}));
+  const batch=await next(b,'peer-input-batch');
+  assert.deepEqual(batch.edges,[{code:68,down:true},{code:68,down:false}]);
+
+  // 一端回到菜单：移动键停止转发，并给出明确错误码。
+  b.send(JSON.stringify({type:'presence',page:'pages::MainPage'}));
+  await next(a,'peer-presence');
+  a.send(JSON.stringify({type:'input-batch',edges:[{code:65,down:true}]}));
+  const error=await next(a,'mirror-error');
+  assert.equal(error.code,'PAGE_MISMATCH');
+  assert.equal(error.local,'pages::Level1');
+  assert.equal(error.peer,'pages::MainPage');
+});
+
 test('return votes carry seat numbers, not internal member ids', async t=>{
   const room=await startShanyiMirrorRoom({port:0,allowedViewerOrigins:[],wsToken:TOKEN});
   t.after(()=>room.close());

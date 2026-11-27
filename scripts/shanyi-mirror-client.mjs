@@ -173,17 +173,46 @@ function publishHeroState(){
 function injectKey(code,down){
   inject('shanyiKey',code,down);
 }
+// 输入按 16ms 一帧成批应用：两端都只在帧边界吃边沿，同一帧内的按键顺序固定
+// （P1 先、P2 后），避免「一边已按下、一边还在上一帧」的错位造成机关/跳跃分叉。
+let pendingLocalEdges=[];
+let pendingPeerEdges=[];
 function syncControls(){
   const active=new Set([...keyboardPressed,...touchPressed]);
   for(const code of pressed){
     if(active.has(code))continue;
-    pressed.delete(code);injectKey(code,false);relay({type:'input',code,down:false});
+    pressed.delete(code);pendingLocalEdges.push({code,down:false});
   }
   for(const code of active){
     if(pressed.has(code))continue;
-    pressed.add(code);injectKey(code,true);relay({type:'input',code,down:true});
+    pressed.add(code);pendingLocalEdges.push({code,down:true});
   }
 }
+function applyEdge(edge,fromPeer){
+  if(fromPeer){
+    if(edge.down)peerPressed.add(edge.code);
+    else peerPressed.delete(edge.code);
+  }
+  injectKey(edge.code,edge.down);
+}
+function flushInputTick(){
+  if(!bothReady){
+    pendingLocalEdges.length=0;pendingPeerEdges.length=0;
+    return;
+  }
+  if(!pendingLocalEdges.length&&!pendingPeerEdges.length)return;
+  const own=pendingLocalEdges;pendingLocalEdges=[];
+  const peer=pendingPeerEdges;pendingPeerEdges=[];
+  if((seat??expectedSeat)===0){
+    for(const edge of own)applyEdge(edge,false);
+    for(const edge of peer)applyEdge(edge,true);
+  }else{
+    for(const edge of peer)applyEdge(edge,true);
+    for(const edge of own)applyEdge(edge,false);
+  }
+  if(own.length)relay({type:'input-batch',edges:own});
+}
+setInterval(flushInputTick,16);
 function clearControls(){
   keyboardPressed.clear();touchPressed.clear();touchControls?.clear();
   syncControls();
@@ -295,9 +324,15 @@ function connect(){
     if(message.type==='peer-input'){
       const {code,down}=message;
       if(!bothReady||!CONTROL_KEYS.has(code)||typeof down!=='boolean')return;
-      if(down)peerPressed.add(code);
-      else peerPressed.delete(code);
-      injectKey(code,down);
+      pendingPeerEdges.push({code,down});
+      return;
+    }
+    if(message.type==='peer-input-batch'){
+      if(!bothReady||!Array.isArray(message.edges))return;
+      for(const edge of message.edges.slice(0,16)){
+        if(!edge||!CONTROL_KEYS.has(edge.code)||typeof edge.down!=='boolean')continue;
+        pendingPeerEdges.push({code:edge.code,down:edge.down});
+      }
       return;
     }
     if(message.type==='peer-click'){

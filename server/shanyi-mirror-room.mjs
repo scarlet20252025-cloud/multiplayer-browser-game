@@ -51,6 +51,13 @@ export async function startShanyiMirrorRoom({
   /** 每个 socket 对应一个 memberId；席位由 core 分配。 */
   const peers=new Map();
   const socketsBySlot=new Map();
+  /** 每个席位当前所在的游戏页；两端不在同一页时暂停转发移动键。 */
+  const pages=new Array(capacity).fill(null);
+  const pageMismatchAt=new Map();
+  const pagesAligned=()=>{
+    const known=pages.filter(page=>typeof page==='string'&&page);
+    return known.length<2||known[0]===known[1];
+  };
   let closed=false,closing;
   let commandSeq=0;
 
@@ -192,11 +199,35 @@ export async function startShanyiMirrorRoom({
         return send(ws,{type:'mirror-error',code:'BAD_MESSAGE'});
       const peerWs=peerSeats(slot).map(index=>socketsBySlot.get(index)).filter(Boolean);
       try{
-        if(message.type==='input'){
-          const code=Number(message.code),down=message.down===true;
-          if(!Number.isInteger(code)||code<0||code>255)
-            throw fail('INPUT_INVALID','按键编号无效');
-          for(const target of peerWs)send(target,{type:'peer-input',code,down});
+        if(message.type==='input'||message.type==='input-batch'){
+          // 两端不在同一页（一边在菜单、一边在关卡）时继续转发移动键只会制造分叉。
+          if(!pagesAligned()){
+            const last=pageMismatchAt.get(slot)??0;
+            if(Date.now()-last>1000){
+              pageMismatchAt.set(slot,Date.now());
+              send(ws,{type:'mirror-error',code:'PAGE_MISMATCH',
+                message:'两端不在同一页面，暂时不转发按键',local:pages[slot],
+                peer:peerSeats(slot).map(index=>pages[index]).find(Boolean)??null});
+            }
+            return;
+          }
+          if(message.type==='input'){
+            const code=Number(message.code),down=message.down===true;
+            if(!Number.isInteger(code)||code<0||code>255)
+              throw fail('INPUT_INVALID','按键编号无效');
+            for(const target of peerWs)send(target,{type:'peer-input',code,down});
+            return;
+          }
+          const edges=message.edges;
+          if(!Array.isArray(edges)||edges.length<1||edges.length>16)
+            throw fail('INPUT_BATCH_INVALID','按键批次无效');
+          const clean=edges.map(edge=>{
+            const code=Number(edge?.code),down=edge?.down===true;
+            if(!Number.isInteger(code)||code<0||code>255)
+              throw fail('INPUT_INVALID','按键编号无效');
+            return {code,down};
+          });
+          for(const target of peerWs)send(target,{type:'peer-input-batch',edges:clean});
           return;
         }
         if(message.type==='click'){
@@ -225,6 +256,7 @@ export async function startShanyiMirrorRoom({
         }
         if(message.type==='presence'){
           const page=typeof message.page==='string'?message.page.slice(0,120):'';
+          pages[slot]=page;
           for(const target of peerWs)send(target,{type:'peer-presence',page});
           return;
         }
@@ -264,6 +296,8 @@ export async function startShanyiMirrorRoom({
       core.detach(owner.memberId);
       if(wasRequester&&!closed)
         broadcast({type:'return-cancelled',requestedBy:null,votes:0,cancelledBy:owner.slot});
+      pages[owner.slot]=null;
+      pageMismatchAt.delete(owner.slot);
       // 席位已经被新连接接管时，不能再去动它的租约：新连接已经发了新票。
       if(!closed&&stillOwner){
         if(ws.leaving)presence.release(owner.slot);
