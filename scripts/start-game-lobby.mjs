@@ -19,7 +19,7 @@ const REPO_ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 
 export async function startGameLobby({
   root, viewerPort=8787, lobbyPort=8788, roomsFile=null, expectedForestSha256=null, manifestsDir=null,
-  shanyiRoot=null, ruffleDir=null,
+  shanyiRoot=null, ruffleDir=null, bombItSwf=process.env.BOMB_IT_ORIGINAL_SWF||null,
   host=process.env.MULTIPLAYER_HOST||'127.0.0.1',
   publicHost=process.env.MULTIPLAYER_PUBLIC_HOST||null,
   publicViewerPort=process.env.MULTIPLAYER_PUBLIC_VIEWER_PORT?Number(process.env.MULTIPLAYER_PUBLIC_VIEWER_PORT):null,
@@ -95,6 +95,7 @@ export async function startGameLobby({
       port:viewerPort,publicPort:publicViewerPort,host,publicHost:displayHost,lobbyWsUrl:lobby.lobbyWsUrl,
       lobbyHttpHandler:lobby.handleHttp,lanViewerOrigin,wanViewerOrigin,bvnProxy,glortonProxy,glortonBrowser,
       glortonLocalWebRoot:localWebRoot,
+      bombItSwf:bombItSwf??path.join(flashRoot,'bomb-it-7-original.swf'),
       arenaViewerUpgrade:lobby.handleArenaViewerUpgrade,
       ...(ruffleDir?{ruffleDir}:{})});
     const forest=viewers.games.find(game=>game.id==='forest');
@@ -125,7 +126,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1]
     const {values}=parseArgs({options:{
       root:{type:'string'},'viewer-port':{type:'string'},'lobby-port':{type:'string'},
       'rooms-file':{type:'string'},'expected-forest-sha256':{type:'string'},'manifests':{type:'string'},
-      'shanyi-root':{type:'string'},'ruffle-dir':{type:'string'},host:{type:'string'},'public-host':{type:'string'},
+      'shanyi-root':{type:'string'},'ruffle-dir':{type:'string'},'bomb-it-swf':{type:'string'},host:{type:'string'},'public-host':{type:'string'},
       'public-viewer-port':{type:'string'},'public-lobby-port':{type:'string'},
       'lan-viewer-origin':{type:'string'},'wan-viewer-origin':{type:'string'},
       'authority-port':{type:'string'},'authority-public-port':{type:'string'},
@@ -150,6 +151,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1]
       ...(values['mirror-public-port']?{mirrorPublicPort:Number(values['mirror-public-port'])}:{}),
       ...(values['shanyi-root']?{shanyiRoot:values['shanyi-root']}:{}),
       ...(values['ruffle-dir']?{ruffleDir:values['ruffle-dir']}:{}),
+      ...(values['bomb-it-swf']?{bombItSwf:values['bomb-it-swf']}:{}),
     });
     console.log(JSON.stringify({
       kind:'loopback-multi-game-room-lobby',url:app.url,lobbyWsUrl:app.lobbyWsUrl,

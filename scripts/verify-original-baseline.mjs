@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 原游戏未修改原包的本播放地基准（原创工具）
+ * 未修改原包的本地播放基准（原创工具）
  *
  * 对一份未修改的 SWF，用仓库锁定的 Ruffle 0.7.1 + Playwright Chromium 记录：
  * 实际加载结果、Ruffle 报告的画面尺寸/帧率、控制台与页面错误、请求失败、截图。
@@ -107,6 +107,7 @@ try {
   try {
     await page.waitForFunction(
       () => window.__baseline && window.__baseline.status !== 'booting',
+      undefined,
       { timeout: loadTimeout },
     );
     settled = true;

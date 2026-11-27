@@ -127,34 +127,22 @@ for(const supply of Object.values(SUPPLIES)){
 
 function prepareRoster(count){
   if(roster.length===count)return;
-  for(const id of ['roster-left','roster-right','scores','match-stats'])$(id).replaceChildren();
+  for(const id of ['roster-left','roster-right','match-stats'])$(id).replaceChildren();
   roster=Array.from({length:count},(_,index)=>{
     const card=$('player-card').content.firstElementChild.cloneNode(true);
     const tag='P'+(index+1);
     card.style.setProperty('--seat-color',COLORS[index]);
     card.querySelector('.seat-label').textContent=tag;
     $(index<Math.ceil(count/2)?'roster-left':'roster-right').append(card);
-    const score=document.createElement('li');
-    const label=document.createElement('span'),value=document.createElement('strong');
-    label.textContent=tag;
-    score.style.setProperty('--seat-color',COLORS[index]);
-    score.append(label,value);
-    $('scores').append(score);
-    const row=document.createElement('tr'),statName=document.createElement('th');
-    statName.scope='row';
-    statName.textContent=tag;
-    row.style.setProperty('--seat-color',COLORS[index]);
-    row.append(statName);
-    const columns=['score','kills','deaths','wins'].map(field=>{
-      const cell=document.createElement('td');
-      cell.textContent='0';
-      row.append(cell);
-      return {field,cell};
-    });
-    $('match-stats').append(row);
+    const scores=$('score-card').content.firstElementChild.cloneNode(true);
+    scores.style.setProperty('--seat-color',COLORS[index]);
+    scores.querySelector('.seat-label').textContent=tag;
+    $('match-stats').append(scores);
     return {name:card.querySelector('h2'),you:card.querySelector('.you'),
       connection:card.querySelector('.connection'),condition:card.querySelector('.condition'),
-      armor:card.querySelector('.armor'),supply:card.querySelector('.supply'),score,value,statName,columns};
+      armor:card.querySelector('.armor'),supply:card.querySelector('.supply'),
+      roundScore:scores.querySelector('.round-score strong'),statName:scores.querySelector('h3'),
+      totals:[...scores.querySelectorAll('[data-stat]')]};
   });
 }
 prepareRoster(MIN_PLAYERS);
@@ -246,17 +234,16 @@ function update(next){
   else{blasts=[];effects=[];}
   prepareRoster(next.playerCount);
   const online=next.connected.filter(Boolean).length;
+  changed($('players-online'),online+' / '+next.playerCount);
   for(const [index,tank] of next.tanks.entries()){
     const card=roster[index];
     changed(card.name,next.names[index]);
     card.name.title=next.names[index];
     card.you.hidden=index!==seat;
-    changed(card.value,String(next.scores[index]));
-    card.score.title=next.names[index]+' · '+next.scores[index]+' 分';
-    const playerLabel='P'+(index+1)+' · '+next.names[index];
-    changed(card.statName,playerLabel);
-    card.statName.title=playerLabel;
-    for(const {field,cell} of card.columns)changed(cell,String(next.stats?.[index]?.[field]??0));
+    changed(card.roundScore,String(next.scores[index]));
+    changed(card.statName,next.names[index]);
+    card.statName.title=next.names[index];
+    for(const cell of card.totals)changed(cell,String(next.stats?.[index]?.[cell.dataset.stat]??0));
     const connected=next.connected[index];
     setConnection(index,connected?'在线':next.dropped[index]?'已离场':next.phase==='waiting'?'等待连接':'等待重连',connected);
     const active=tank.armor>0&&!next.dropped[index];
@@ -326,7 +313,7 @@ function input(){
 function clearControls(){keys.clear();if(!touchControls?.clear())input();}
 if(matchMedia('(any-pointer: coarse)').matches){
   import('./touch.mjs').catch(()=>import('./touch.mjs?retry=1')).then(({mountTouchControls})=>{
-    touchControls=mountTouchControls($('field').closest('.board'),'tank',pressed=>{
+    touchControls=mountTouchControls($('field').closest('.battle-field'),'tank',pressed=>{
       touchKeys=pressed;
       if(pressed.size)audio.unlock();
       input();
@@ -335,6 +322,7 @@ if(matchMedia('(any-pointer: coarse)').matches){
 }
 window.addEventListener('keydown',event=>{
   if(!connectionReady||!controlled.has(event.code)||event.ctrlKey||event.altKey||event.metaKey||terminal)return;
+  if(event.target===$('match-stats'))return;
   if(event.code==='Space'&&event.target instanceof Element&&event.target.closest('button, a, summary'))return;
   audio.unlock();
   event.preventDefault();
@@ -362,6 +350,7 @@ function closeConnection(){
   clearTimeout(loadingTimer);
   clearTimeout(stallTimer);
   connectionReady=false;
+  changed($('players-online'),'—');
   clearControls();
   const live=socket;
   socket=null;

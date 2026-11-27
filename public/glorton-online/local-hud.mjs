@@ -6,6 +6,7 @@ const colors = ['红色', '蓝色', '绿色', '黄色'];
 const stages = new Map([
   ['Rooftop', '屋顶'], ['Mogadishu', '摩加迪沙'], ['B52', 'B52 轰炸机'], ['Space', '太空'],
 ]);
+const mapArtRoot = '/__lobby__/art/glorton/maps';
 const colorValues = ['#d73e64', '#3b79e2', '#188657', '#a56b00'];
 
 const styleText = `
@@ -13,6 +14,9 @@ body.glorton-room {
   min-height:100vh; margin:0; color:#20215c; color-scheme:light;
   background:linear-gradient(180deg,#e2ebff 0,#f5f2ff 340px,#f8f9ff 100%) !important;
   font:14px/1.55 "Microsoft YaHei UI","PingFang SC","Noto Sans CJK SC",system-ui,sans-serif;
+}
+body.glorton-room.glorton-setup {
+  background:#69c9f3 url('/__lobby__/art/carnival.webp') center top / cover no-repeat fixed !important;
 }
 .glorton-local-hud {
   --ink:#20215c; --muted:#645f84; --purple:#6b30e0; --line:#e3dcf4;
@@ -32,6 +36,12 @@ body.glorton-room {
   grid-area:head; display:flex; align-items:center; justify-content:space-between;
   flex-wrap:wrap; gap:10px 16px; padding:11px 15px;
 }
+.glorton-setup .glorton-local-hud .local-hud-head {
+  padding:clamp(13px,2.2vw,24px); border-color:#fff; border-width:2px;
+  color:#fff; background:linear-gradient(115deg,#5b38a4,#432c83);
+  box-shadow:0 4px 0 #dcd0ff,0 10px 27px #26115238;
+}
+.glorton-local-hud .local-hud-banner-name { margin-top:2px; font-size:13px; font-weight:650 }
 .glorton-local-hud h1 { font-size:clamp(19px,2vw,25px); line-height:1.2; letter-spacing:.01em }
 .glorton-local-hud h2 { font-size:14px; line-height:1.4 }
 .glorton-local-hud .local-hud-actions { display:flex; gap:7px; flex-wrap:wrap }
@@ -78,6 +88,8 @@ body.glorton-room {
 .glorton-local-hud li b { color:var(--slot-color,#635ba8); font-size:12px; align-self:start }
 .glorton-local-hud li span,.glorton-local-hud li small { overflow-wrap:anywhere }
 .glorton-local-hud li small { grid-column:2; color:var(--muted); font-size:11px }
+.glorton-local-hud li[data-player-ready] small { color:#12714a; font-weight:700 }
+.glorton-local-hud li[data-player-vacant] { opacity:.65 }
 .glorton-local-hud .glorton-stage {
   position:relative; isolation:isolate; grid-area:stage; min-width:0; width:100%;
   aspect-ratio:32 / 19; border:1px solid #d0c1ef; border-radius:18px;
@@ -94,49 +106,67 @@ body.glorton-room {
 .glorton-local-hud .glorton-stage #transfer #status { margin:0 0 8px; color:inherit }
 .glorton-local-hud .glorton-stage #transfer #progress { width:min(220px,60vw) }
 .glorton-local-hud .glorton-stage:not([data-mode=loading]) #transfer { display:none }
-.glorton-local-hud .glorton-stage[data-mode=select] #canvas { opacity:0 }
+.glorton-local-hud .glorton-stage[data-mode=select] #canvas {
+  /* Pygbag sets inline visibility during boot. Keep the backing surface sized for the match. */
+  visibility:hidden !important; opacity:0 !important; pointer-events:none !important;
+}
+.glorton-local-hud .glorton-stage[data-mode=select] {
+  aspect-ratio:auto; border:0; border-radius:0; background:none; box-shadow:none;
+}
 .glorton-local-hud .local-hud-selection {
-  position:absolute; inset:0; display:grid; align-content:center; justify-items:center;
-  padding:clamp(12px,2vw,22px); border-radius:inherit; color:var(--ink); text-align:center;
-  background:radial-gradient(ellipse at 25% 15%,#fff,#f1eaff 54%,#e1eafd);
-  pointer-events:none;
+  position:relative; z-index:1; display:grid; gap:12px; color:var(--ink);
 }
-.glorton-local-hud .glorton-stage[data-mode=select] { min-height:350px }
-.glorton-local-hud .local-hud-selection h2 { font-size:clamp(17px,2.6vw,34px); font-weight:900 }
+.glorton-local-hud .local-hud-selection section { padding:clamp(13px,1.5vw,21px); border-radius:17px }
+.glorton-local-hud .local-hud-selection h2 { font-size:clamp(18px,2.2vw,25px); font-weight:850 }
 .glorton-local-hud .local-hud-selection p { color:var(--muted); margin:3px 0 0 }
-.glorton-local-hud .local-hud-options {
-  display:grid; width:min(680px,100%); gap:12px; margin-top:clamp(9px,2vw,20px);
+.glorton-local-hud .local-hud-ready-head {
+  display:flex; align-items:center; justify-content:space-between; gap:9px;
 }
+.glorton-local-hud .local-hud-ready-head button { min-width:84px; min-height:42px; flex-shrink:0 }
+.glorton-local-hud .local-hud-ready-count { font-weight:700 }
+.glorton-local-hud .local-hud-options {
+  display:grid; min-width:0; gap:12px;
+}
+.glorton-local-hud .local-hud-preview {
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;
+  margin:10px 0; padding:6px 12px; border-radius:14px; background:linear-gradient(120deg,#f8f4ff,#eee6fd);
+}
+.glorton-local-hud .local-hud-preview figure {
+  min-width:0; margin:0; display:flex; align-items:center; gap:10px;
+  color:var(--ink); font-weight:800; font-size:13px;
+}
+.glorton-local-hud .local-hud-preview img { display:block; width:78px; height:78px; object-fit:contain }
+.glorton-local-hud .local-hud-preview label { display:grid; gap:3px; font-size:12px; font-weight:700 }
+.glorton-local-hud .local-hud-preview select { padding:6px 7px }
 .glorton-local-hud .local-hud-fighters {
   display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:clamp(5px,1vw,11px);
 }
 .glorton-local-hud .local-hud-fighter {
-  min-height:0; display:grid; grid-template-rows:clamp(32px,7vw,88px) auto; justify-items:center;
+  min-height:0; display:grid; grid-template-rows:clamp(40px,4.8vw,66px) auto; justify-items:center;
   align-items:center; gap:3px; padding:6px 3px; border-radius:12px; background:#fff;
   border:1px solid #ded3fa; font-size:clamp(11px,1.15vw,15px); white-space:nowrap;
 }
 .glorton-local-hud .local-hud-fighter img { width:88%; height:100%; object-fit:contain; pointer-events:none }
 .glorton-local-hud .local-hud-fighter span { grid-row:2 }
 .glorton-local-hud .local-hud-fighter[aria-pressed=true] {
-  border-color:#7237df; background:#eee6ff; box-shadow:0 0 0 2px #905cf955;
+  border-color:#7237df; background:#eee6ff; box-shadow:inset 0 0 0 1px #7237df;
 }
-.glorton-local-hud .local-hud-pick-actions {
-  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:8px; width:min(380px,100%);
-  align-items:end; justify-self:center; text-align:left;
-}
-.glorton-local-hud .local-hud-pick-actions label { display:grid; min-width:0; gap:4px; font-weight:650 }
-.glorton-local-hud .local-hud-options :is(select,button) { pointer-events:auto }
 .glorton-local-hud .local-hud-ballot {
-  display:grid; gap:6px; padding:8px; border:1px solid #e1d6fa; border-radius:12px; background:#fff9;
-}
-.glorton-local-hud .local-hud-ballot-head {
-  display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:2px 8px;
+  display:grid; min-width:0; gap:8px;
 }
 .glorton-local-hud .local-hud-ballot-head p { font-size:12px; margin:0 }
-.glorton-local-hud .local-hud-ballot-list { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px }
-.glorton-local-hud .local-hud-ballot-list button { display:grid; padding:5px 2px; font-size:clamp(11px,1.2vw,14px) }
-.glorton-local-hud .local-hud-ballot-list button[aria-pressed=true] { border-color:#7237df; background:#eee6ff }
-.glorton-local-hud .local-hud-ballot-list button span { color:var(--muted); font-size:11px; font-weight:600 }
+.glorton-local-hud .local-hud-ballot-list { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px }
+.glorton-local-hud .local-hud-ballot-list button {
+  display:grid; align-content:start; justify-items:center; gap:3px; padding:4px;
+  font-size:clamp(11px,1.2vw,14px); text-align:center;
+}
+.glorton-local-hud .local-hud-ballot-list img {
+  width:100%; height:auto; aspect-ratio:3 / 2; object-fit:contain; border-radius:6px; background:#e9e1f8;
+}
+.glorton-local-hud .local-hud-ballot-list button[aria-pressed=true] {
+  border-color:#7237df; background:#eee6ff; box-shadow:inset 0 0 0 1px #7237df;
+}
+.glorton-local-hud .local-hud-ballot-list button small { color:var(--muted); font-size:11px; font-weight:600 }
 .glorton-local-hud .local-hud-result {
   position:absolute; inset:0; display:grid; place-items:center; padding:12px; border-radius:inherit;
   background:#1d1740a6;
@@ -159,10 +189,9 @@ body.glorton-room {
   .glorton-local-hud { grid-template-columns:minmax(0,1fr); grid-template-areas:"head" "stage" "room" "roster" }
   .glorton-local-hud .local-hud-head,.glorton-local-hud section { border-radius:12px; padding:10px }
   .glorton-local-hud .glorton-stage { border-radius:12px }
-  .glorton-local-hud .glorton-stage[data-mode=select] { min-height:390px }
   .glorton-local-hud .local-hud-fighters { grid-template-columns:repeat(3,minmax(0,1fr)) }
   .glorton-local-hud .local-hud-fighter { grid-template-rows:43px auto }
-  .glorton-local-hud .local-hud-options { margin-top:7px; gap:8px }
+  .glorton-local-hud .local-hud-ballot-list { grid-template-columns:repeat(2,minmax(0,1fr)) }
 }
 @media(max-height:620px) and (orientation:landscape) {
   .glorton-local-hud .glorton-stage:is([data-mode=battle],[data-mode=result]) {
@@ -175,7 +204,7 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
   const view = document.createElement('div');
   view.className = 'glorton-local-hud';
   view.innerHTML = `
-    <header class="local-hud-head"><h1>疯狂小人乱斗</h1><div class="local-hud-actions">
+    <header class="local-hud-head"><div><h1>疯狂小人乱斗</h1><p class="local-hud-banner-name" data-banner-name></p></div><div class="local-hud-actions">
       <button type="button" data-share>复制邀请</button><button type="button" data-leave>返回大厅</button>
     </div></header>
     <aside class="local-hud-rail local-hud-room" aria-label="联机房间">
@@ -195,16 +224,26 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
     </aside>
     <main class="glorton-stage" aria-label="游戏画面" data-mode="loading">
       <div class="local-hud-selection" hidden>
-        <h2 data-pick-title>选择角色</h2><p data-pick-help></p>
+        <section aria-labelledby="glorton-ready-title">
+          <div class="local-hud-ready-head"><div><h2 id="glorton-ready-title" data-pick-title>开局准备</h2>
+            <p class="local-hud-ready-count" data-ready-count hidden></p></div>
+            <button class="local-hud-primary" type="button" data-ready hidden>准备</button>
+          </div>
+          <p data-pick-help></p>
+        </section>
         <div class="local-hud-options" hidden>
-          <div class="local-hud-fighters" data-fighter-list role="group" aria-label="角色"></div>
-          <div class="local-hud-ballot">
-            <div class="local-hud-ballot-head"><b id="glorton-ballot-title">地图投票</b><p>最高票入选，同票时随机抽选</p></div>
+          <section aria-labelledby="glorton-role-title">
+            <h2 id="glorton-role-title">角色与配色</h2>
+            <div class="local-hud-preview">
+              <figure><img data-picked-portrait alt="" width="78" height="78" hidden><figcaption data-picked-role></figcaption></figure>
+              <label for="glorton-color">颜色<select id="glorton-color" data-color></select></label>
+            </div>
+            <div class="local-hud-fighters" data-fighter-list role="group" aria-label="角色"></div>
+          </section>
+          <section class="local-hud-ballot" aria-labelledby="glorton-ballot-title">
+            <div class="local-hud-ballot-head"><h2 id="glorton-ballot-title">地图投票</h2><p>最高票入选，同票时随机抽选。</p></div>
             <div class="local-hud-ballot-list" data-stage-list role="group" aria-labelledby="glorton-ballot-title"></div>
-          </div>
-          <div class="local-hud-pick-actions">
-            <label>颜色<select data-color></select></label><button class="local-hud-primary" type="button" data-ready>准备</button>
-          </div>
+          </section>
         </div>
       </div>
       <div class="local-hud-result" hidden>
@@ -242,9 +281,11 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
   if (transfer) stage.prepend(transfer);
   if (canvas) stage.prepend(canvas);
 
-  const name = find('[data-room-name]'), status = find('[data-status]');
+  const name = find('[data-room-name]'), banner = find('[data-banner-name]'), status = find('[data-status]');
   const selection = find('.local-hud-selection'), options = find('.local-hud-options');
   const fighterList = find('[data-fighter-list]'), color = find('[data-color]'), ready = find('[data-ready]');
+  const activePortrait = find('[data-picked-portrait]'), activeRole = find('[data-picked-role]');
+  const readyCount = find('[data-ready-count]');
   const stageList = find('[data-stage-list]');
   const result = find('.local-hud-result'), resultTitle = find('[data-result-title]');
   const rematch = find('[data-rematch]'), rematchStatus = find('[data-rematch-status]');
@@ -284,10 +325,18 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
     button.type = 'button';
     button.dataset.stageVote = key;
     button.setAttribute('aria-pressed', 'false');
-    const votes = document.createElement('span');
-    button.append(label, votes);
+    const image = document.createElement('img');
+    image.alt = '';
+    image.width = 150;
+    image.height = 100;
+    image.decoding = 'async';
+    image.src = `${mapArtRoot}/${key}.png`;
+    const title = document.createElement('span');
+    title.textContent = label;
+    const votes = document.createElement('small');
+    button.append(image, title, votes);
     button.addEventListener('click', () => {
-      if (canSelect() && !slots[localSlot]?.ready && readyPending === null) {
+      if (canSelect() && readyPending === null && ballot[localSlot] !== key) {
         send({op:'map_vote', stage:key});
       }
     });
@@ -297,6 +346,7 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
 
   let localSlot = null, slots = [], phase = 'connecting', online = false, paused = false;
   let displayName = roomName || room, capacity = 0, settings = null, engineStatus = '', errorMessage = '';
+  let automaticRoster = false, minimumPlayers = 2;
   let started = false, round = 0, ballot = [], matchResult = null, rematchVotes = [];
   let readyPending = null, readyTimer, rematchPending = null, rematchTimer;
 
@@ -314,11 +364,17 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
   }
 
   function renderCards(selected, colorIndex) {
+    const activeSource = portraits[selected]?.[colorIndex];
+    if (activeSource && activePortrait.getAttribute('src') !== activeSource) activePortrait.src = activeSource;
+    activePortrait.hidden = !activeSource;
+    activeRole.textContent = fighters.has(selected)
+      ? `${fighters.get(selected)} · ${colors[colorIndex] ?? colors[0]}` : '选择角色';
     for (const [key, {button, image}] of cards) {
       const source = portraits[key]?.[colorIndex];
       if (source && image.getAttribute('src') !== source) image.src = source;
       image.hidden = !source;
       button.setAttribute('aria-pressed', String(key === selected));
+      button.disabled = readyPending !== null;
     }
   }
 
@@ -326,7 +382,7 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
     for (const [key, {button, votes}] of mapButtons) {
       button.disabled = locked;
       button.setAttribute('aria-pressed', String(ballot[localSlot] === key));
-      votes.textContent = `${ballot.filter(choice => choice === key).length} 票`;
+      votes.textContent = `${ballot.filter((choice, index) => choice === key && slots[index]?.kind === 'human' && slots[index].enabled).length} 票`;
     }
   }
 
@@ -350,6 +406,8 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
       started ? 'battle' : online ? 'select' : 'loading';
     if (stage.dataset.mode !== mode) {
       stage.dataset.mode = mode;
+      document.body.classList.toggle('glorton-setup', mode === 'select');
+      if (mode === 'battle' || mode === 'select') window.scrollTo(0, 0);
       if (mode === 'battle') canvas?.focus({preventScroll:true});
     }
     name.textContent = displayName;
@@ -359,17 +417,31 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
     result.hidden = mode !== 'result';
     if (!result.hidden) renderResult();
     const selectable = canSelect();
+    const humans = slots.filter(slot => slot.kind === 'human' && slot.enabled);
+    const connected = humans.filter(slot => slot.connected).length;
+    const readyPlayers = humans.filter(slot => slot.ready && (!automaticRoster || slot.connected)).length;
+    const requiredPlayers = automaticRoster ? Math.max(minimumPlayers, humans.length) : capacity;
+    const onlineCount = automaticRoster ? `${connected} 人在线 · 最多 ${capacity} 人` : `${connected}/${capacity} 在线`;
+    banner.textContent = capacity ? `${displayName} · ${onlineCount}` : displayName;
     options.hidden = !selectable;
-    pickTitle.textContent = phase === 'ended' ? '房间已关闭' : selectable ? '选择角色' : '等待房间就绪';
-    pickHelp.textContent = phase === 'ended' ? statusText : '所有玩家准备后开始对局';
+    ready.hidden = !selectable;
+    readyCount.hidden = !capacity || !selectable;
+    pickTitle.textContent = phase === 'ended' ? '房间已关闭' : selectable ? '开局准备' : '等待房间就绪';
+    if (phase === 'ended') pickHelp.textContent = statusText;
+    else if (automaticRoster) pickHelp.textContent = connected < humans.length ? '等待暂离玩家重连。'
+      : connected < minimumPlayers ? `至少 ${minimumPlayers} 位玩家在线才能开局。` : '在线玩家全部准备后自动开局。';
+    else pickHelp.textContent = connected < capacity ? '等待所有玩家入座或重连。' : '所有玩家准备后自动开局。';
     if (selectable) {
       const own = slots[localSlot];
       color.value = String(own.color ?? 0);
+      color.disabled = readyPending !== null;
       renderCards(own.fighter, Number(color.value));
+      readyCount.textContent = `${readyPlayers}/${requiredPlayers} 已准备`;
       ready.disabled = readyPending !== null;
       ready.textContent = readyPending !== null ? '正在提交…' : own.ready ? '取消准备' : '准备';
       ready.setAttribute('aria-pressed', String(Boolean(own.ready)));
-      renderBallot(Boolean(own.ready) || readyPending !== null);
+      ready.classList.toggle('local-hud-primary', !own.ready);
+      renderBallot(readyPending !== null);
     }
     for (const row of rules) row.hidden = !settings;
     if (settings) {
@@ -378,19 +450,23 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
       find('[data-stock]').textContent = settings.stock ?? '—';
       find('[data-items]').textContent = settings.items ? '开启' : '关闭';
     }
-    const connected = slots.filter(slot => slot.kind === 'human' && slot.connected).length;
-    count.textContent = capacity ? `房间玩家 ${connected}/${capacity}` : '房间玩家';
+    count.textContent = !capacity ? '房间玩家' : automaticRoster ? `房间玩家 · ${connected} 人在线` : `房间玩家 ${connected}/${capacity}`;
     roster.replaceChildren(...slots.map((slot, index) => {
       if (index >= capacity && !(slot.kind === 'ai' && slot.enabled)) return null;
+      if (automaticRoster && phase !== 'lobby' && !slot.enabled) return null;
       const row = document.createElement('li');
+      row.dataset.playerSlot = index;
       row.toggleAttribute('data-self', index === localSlot);
+      row.toggleAttribute('data-player-ready', phase === 'lobby' && slot.ready && slot.connected);
+      row.toggleAttribute('data-player-vacant', automaticRoster && !slot.enabled);
       if (slot.enabled && colorValues[slot.color]) row.style.setProperty('--slot-color', colorValues[slot.color]);
       const label = document.createElement('b'), nickname = document.createElement('span');
       const detail = document.createElement('small');
       label.textContent = 'P' + (index + 1);
       nickname.textContent = slot.enabled ? (slot.name || (slot.kind === 'ai' ? '电脑' : '玩家 ' + (index + 1))) : '空位';
-      const state = !slot.enabled ? '待加入' : slot.kind === 'ai' ? '电脑' : !slot.connected ? '离线' :
-        phase === 'lobby' ? slot.ready ? '已准备' : '选角中' : '在线';
+      const state = !slot.enabled ? automaticRoster ? '可加入' : '待加入' : slot.kind === 'ai' ? '电脑' : phase === 'lobby'
+        ? [slot.connected ? null : '离线', slot.ready ? '已准备' : '未准备'].filter(Boolean).join(' · ')
+        : slot.connected ? '在线' : '离线';
       const choice = slot.enabled && fighters.has(slot.fighter) ? [fighters.get(slot.fighter), colors[slot.color]].filter(Boolean) : [];
       detail.textContent = [state, ...choice].join(' · ');
       row.append(label, nickname, detail);
@@ -489,6 +565,9 @@ export function mountGlortonHud({room, roomName, send, leave = () => location.as
     receive(packet) {
       if (typeof packet?.roomName === 'string' && packet.roomName) displayName = packet.roomName;
       if (Number.isInteger(packet?.capacity) && packet.capacity >= 2 && packet.capacity <= 4) capacity = packet.capacity;
+      if (typeof packet?.automaticRoster === 'boolean') automaticRoster = packet.automaticRoster;
+      if (Number.isInteger(packet?.minimumPlayers) && packet.minimumPlayers >= 2 && packet.minimumPlayers <= 4)
+        minimumPlayers = packet.minimumPlayers;
       switch (packet?.op) {
         case 'welcome':
           if (!Number.isInteger(packet.slot) || packet.slot < 0 || packet.slot > 3) return;

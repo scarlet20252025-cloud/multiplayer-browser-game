@@ -8,7 +8,7 @@
  */
 import path from 'node:path';
 import {readdir, readFile} from 'node:fs/promises';
-import {LOCKSTEP_RUNTIME} from '../public/lockstep/protocol.mjs';
+import {FRAME_RATE, LOCKSTEP_RUNTIME, isFrameRate, isLockstepPlayerCount} from '../public/lockstep/protocol.mjs';
 import {ARENA_RUNTIME} from '../public/tank-arena/rules.mjs';
 import {BRAWL_RUNTIME} from '../public/platform-brawl/rules.mjs';
 
@@ -167,7 +167,9 @@ function packageOf(value, file, online, runtime) {
     const bridge = relativePath(value.bridge, file, 'package.bridge');
     if (!/^(?:[\w-]+\/)*[\w.-]+\.mjs$/.test(bridge) || entry !== 'index.html')
       fail(file, 'lockstep packages require index.html and a local .mjs bridge');
-    return Object.freeze({dir, entry, levels, templeId, storagePrefix, bridge});
+    const tickRate = value.tickRate ?? FRAME_RATE;
+    if (!isFrameRate(tickRate)) fail(file, 'package.tickRate must be an integer from 1 to 120');
+    return Object.freeze({dir, entry, levels, templeId, storagePrefix, bridge, tickRate});
   }
   if (runtime === 'flash-ruffle' && (!wrapper || !game))
     fail(file, 'flash-ruffle packages require package.wrapper and package.game');
@@ -222,14 +224,14 @@ export function validateGameManifest(manifest, {file = 'manifest'} = {}) {
   if (minSeats > seats) fail(file, 'minSeats must not exceed seats');
   if ((runtime === LOCKSTEP_RUNTIME) !== (manifest.adapter === LOCKSTEP_ADAPTER))
     fail(file, 'browser-lockstep and frame-lockstep must be used together');
-  if (runtime === LOCKSTEP_RUNTIME && seats !== 2)
-    fail(file, 'browser-lockstep requires exactly two seats');
+  if (runtime === LOCKSTEP_RUNTIME && (!isLockstepPlayerCount(seats) || !isLockstepPlayerCount(minSeats)))
+    fail(file, 'browser-lockstep requires two to four players');
   const arena = arenaRuntimes.has(runtime);
   if ((arena || arenaRuntimes.has(manifest.adapter)) && manifest.adapter !== runtime)
     fail(file, runtime + ' runtime requires its matching arena adapter');
   if (arena && minSeats < 2)
     fail(file, runtime + ' requires at least two players');
-  if (!arena && (seats > 4 || minSeats !== seats))
+  if (!arena && runtime !== LOCKSTEP_RUNTIME && (seats > 4 || minSeats !== seats))
     fail(file, 'runtime requires a fixed seat count of four or fewer');
   const normalized = {
     schemaVersion: MANIFEST_SCHEMA_VERSION,
@@ -345,6 +347,7 @@ export function manifestToCatalogDefinition(manifest) {
     levelsPath: pkg.levels,
     entryFile: pkg.entry,
     bridgeFile: pkg.bridge ?? null,
+    ...(manifest.runtime === LOCKSTEP_RUNTIME ? {tickRate: pkg.tickRate ?? FRAME_RATE} : {}),
     wrapperFile: pkg.wrapper ?? null,
     gameFile: pkg.game ?? null,
     runtime: manifest.runtime,

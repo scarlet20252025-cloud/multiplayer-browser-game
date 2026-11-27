@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "bomb-it-7",
+  "title": "Q版泡泡堂7",
+  "subtitle": "原版 2–4 人联机对战",
+  "runtime": "browser-lockstep",
+  "adapter": "frame-lockstep",
+  "online": true,
+  "seats": 4,
+  "minSeats": 2,
+  "capabilities": {
+    "lockstep": true,
+    "levelVote": true
+  },
+  "package": {
+    "dir": "bomb-it-7",
+    "entry": "index.html",
+    "levels": "levels.json",
+    "templeId": "bomb-it-7",
+    "storagePrefix": "bomb-it-7",
+    "bridge": "netplay.mjs",
+    "tickRate": 40
+  },
+  "evidence": ["docs/BOMB_IT_NETPLAY.md"]
+}

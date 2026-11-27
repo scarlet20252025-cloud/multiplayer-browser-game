@@ -35,6 +35,7 @@ MAX_TICK_DEBT = 2 * TICK_MS / 1000
 SNAPSHOT_FIELDS = {"match_start": "initial_snapshot", "snapshot": "snapshot", "match_end": "snapshot"}
 ROUND_PACKETS = frozenset((*SNAPSHOT_FIELDS, "frame"))
 BROWSER_ACTIONS = {"map_vote": "stage", "rematch": "ready"}
+ACTION_EDGE_FIELDS = EDGE_FIELDS - {"shield_pressed", "shield_released"}
 handshake = ContextVar("glorton_handshake")
 SEAT_TOKEN = re.compile(r"[A-Za-z0-9_-]{32}")
 
@@ -65,12 +66,15 @@ def restore_checkpoint(snapshot, runtime):
 
 
 class MultiplayerRoom(Room):
-    def __init__(self, code, host_name, capacity, extended_snapshots):
+    def __init__(self, code, host_name, capacity, extended_snapshots, automatic_roster=False):
         super().__init__(code, host_name)
         self.capacity = capacity
         self.extended_snapshots = extended_snapshots
+        self.automatic_roster = automatic_roster
+        self.match_slots = None
         self.lifecycle = asyncio.Lock()
         self.broadcast_order = asyncio.Lock()
+        self.pending_lobby_resumes = set()
         self.round = 1
         self.map_votes = [None] * capacity
         self.rematch_votes = [False] * capacity
@@ -90,6 +94,14 @@ class MultiplayerRoom(Room):
     @property
     def humans(self):
         return self.slots[:self.capacity]
+
+    @property
+    def participants(self):
+        if not self.automatic_roster:
+            return self.humans
+        if self.match_slots is not None:
+            return [self.slots[index] for index in self.match_slots]
+        return [player for player in self.humans if player.enabled]
 
     def add_connection(self, token, slot, send):
         if not self.extended_snapshots:
@@ -121,6 +133,8 @@ class MultiplayerRoom(Room):
             for fighter in self.simulation.fighters:
                 fighter.lives = stock
             message = {**message, "initial_snapshot": self.simulation.snapshot()}
+            if self.match_slots is not None:
+                message["match_slots"] = list(self.match_slots)
         if message["op"] in ROUND_PACKETS and self.extended_snapshots and "round" not in message:
             message = {**message, "round": self.round}
         async with self.broadcast_order:
@@ -160,16 +174,29 @@ class MultiplayerRoom(Room):
             raise ValueError("seat_connected")
         if slot.disconnected_at is not None and time.monotonic() - slot.disconnected_at > RECONNECT_SECONDS:
             raise ValueError("invalid_resume_token")
+        if self.extended_snapshots and self.phase == "lobby" and handshake.get({}).get("op") == "resume":
+            self.pending_lobby_resumes.add(token)
         self.add_connection(token, slot.index, send)
         return slot.index
+
+    async def complete_lobby_resume(self, token):
+        if token not in self.pending_lobby_resumes:
+            return
+        self.pending_lobby_resumes.remove(token)
+        if self.can_start():
+            await self.start_match()
 
     def disconnect(self, token):
         connection = self.connections.get(token)
         if connection is None:
             return
+        slot = self.slots[connection.slot]
+        was_ready = slot.ready
+        self.pending_lobby_resumes.discard(token)
         super().disconnect(token)
-        self.inputs[connection.slot].clear()
-        self.last_inputs[connection.slot] = self.neutral_input()
+        if self.extended_snapshots and self.phase == "lobby":
+            slot.ready = was_ready
+        self.clear_player_input(connection.slot, self.last_input_seq[connection.slot])
         self.rematch_votes[connection.slot] = False
 
     async def release_guest(self, token):
@@ -186,13 +213,20 @@ class MultiplayerRoom(Room):
             self.disconnect(token)
             self.slots[slot.index] = PlayerSlot(slot.index, "human", "等待玩家", "PeachPlayer", slot.index, enabled=False)
             self.map_votes[slot.index] = None
-            self.reset_ready()
+            if not self.automatic_roster:
+                self.reset_ready()
             self.updated_at = time.monotonic()
             await self.broadcast(self.public_state())
-            return True
+        if self.automatic_roster and self.can_start():
+            await self.start_match()
+        return True
 
     def public_state(self):
         state = {**super().public_state(), "capacity": self.capacity}
+        if self.automatic_roster:
+            state.update(automaticRoster=True, minimumPlayers=2)
+            if self.match_slots is not None:
+                state["match_slots"] = list(self.match_slots)
         if self.extended_snapshots:
             if self.played_stage is not None:
                 state["settings"]["stage"] = self.played_stage
@@ -214,6 +248,7 @@ class MultiplayerRoom(Room):
         self.seed = 0
         self.server_tick = 0
         self.paused_for_reconnect = False
+        self.match_slots = None
         self.map_votes = [None] * self.capacity
         self.rematch_votes = [False] * self.capacity
         for index in range(self.capacity):
@@ -246,15 +281,15 @@ class MultiplayerRoom(Room):
             if type(value) is not bool:
                 raise ValueError("invalid_rematch_vote")
             self.rematch_votes[actor_slot] = value
-            if all(human.connected and self.rematch_votes[human.index] for human in self.humans):
+            if all(human.connected and self.rematch_votes[human.index] for human in self.participants):
                 self.next_round()
 
     async def update_lobby(self, actor_slot, message):
         async with self.lifecycle:
+            if self.extended_snapshots and "round" in message and message["round"] != self.round:
+                raise ValueError("stale_round")
             action = message.get("_browser_action")
             if action in BROWSER_ACTIONS:
-                if "round" in message and message["round"] != self.round:
-                    raise ValueError("stale_round")
                 self.update_ballot(actor_slot, action, message.get(BROWSER_ACTIONS[action]))
             else:
                 self.apply_selection(actor_slot, message)
@@ -269,6 +304,8 @@ class MultiplayerRoom(Room):
             raise ValueError("invalid_slot")
         patch = validate_lobby_patch(message.get("patch"))
         slot = self.slots[target]
+        if self.automatic_roster and slot.kind != "human":
+            raise ValueError("invalid_slot")
         if slot.kind == "human":
             if target != actor_slot:
                 raise ValueError("cannot_edit_other_human")
@@ -292,6 +329,8 @@ class MultiplayerRoom(Room):
                 bot.connected = bot.ready = bot.enabled = slot.enabled
     async def update_settings(self, actor_slot, message):
         async with self.lifecycle:
+            if self.extended_snapshots and "round" in message and message["round"] != self.round:
+                raise ValueError("stale_round")
             if actor_slot != self.host_slot:
                 raise ValueError("host_only")
             if self.phase != "lobby":
@@ -304,9 +343,17 @@ class MultiplayerRoom(Room):
             await self.broadcast(self.public_state())
 
     def can_start(self):
-        return self.phase == "lobby" and all(
-            human.enabled and human.connected and human.ready and human.fighter for human in self.humans
+        participants = self.participants
+        return self.phase == "lobby" and not self.pending_lobby_resumes and len(participants) >= 2 and all(
+            human.enabled and human.connected and human.ready and human.fighter for human in participants
         )
+
+    def match_config(self):
+        config = super().match_config()
+        if self.automatic_roster:
+            for index, player in enumerate(config["players"]):
+                player["team_index"] = player["network_slot"] = index
+        return config
 
     async def start_match(self):
         async with self.lifecycle:
@@ -317,6 +364,8 @@ class MultiplayerRoom(Room):
                 return
             fallback = self.settings["stage"]
             self.played_stage = self.selected_stage()
+            if self.automatic_roster:
+                self.match_slots = tuple(player.index for player in self.participants)
             # The installed authority uses this key both to validate the AI and to build the match config.
             self.settings["stage"] = self.played_stage
             try:
@@ -325,30 +374,68 @@ class MultiplayerRoom(Room):
                 self.settings["stage"] = fallback
                 if self.phase == "lobby":
                     self.played_stage = None
+                    self.match_slots = None
 
     def queue_input(self, slot, message):
         if self.phase != "playing" or slot not in self.inputs or not self.slots[slot].connected:
             return
+        if self.match_slots is not None and slot not in self.match_slots:
+            return
         seq = int(message.get("seq", -1))
         if seq <= self.last_input_seq[slot]:
             return
-        target = int(message.get("tick", self.server_tick + 2))
-        target = min(self.server_tick + MAX_INPUT_LEAD, max(self.server_tick, target))
+        if message.get("clear") is True:
+            self.clear_player_input(slot, seq)
+            self.last_input_seq[slot] = seq
+            return
+        requested_tick = int(message.get("tick", self.server_tick + 2))
+        horizon = self.server_tick + MAX_INPUT_LEAD
+        target = min(horizon, max(self.server_tick, requested_tick))
         controls = normalize_controls(message.get("controls"))
         pending = self.inputs[slot]
+        # Preserve packet ordering if a newer sample requests a tick already passed by an older queued sample.
+        target = max(target, max(pending, default=target))
+        if controls["shield_released"]:
+            controls["shield_pressed"] = False
         previous = pending.get(target)
         if previous:
+            _, prior_controls, prior_tick = previous
+            relative_delay = requested_tick - prior_tick
+            shield_transition = ((controls["shield_pressed"] and prior_controls["shield_released"])
+                                 or (controls["shield_released"] and prior_controls["shield_pressed"]))
+            hold_transition = relative_delay == 0 and any(
+                controls[field] != prior_controls[field] for field in ("left", "right", "down")
+            )
+            # Late samples may share the authority's current tick. Retain their requested spacing
+            # when possible, and give same-tick shield and movement taps distinct frames within the window.
+            if target < horizon and (relative_delay > 0 or shield_transition or hold_transition):
+                target = min(horizon, target + max(1, relative_delay))
+                previous = None
+        if previous:
             # Two packets for one simulation tick may include a short attack press and its release.
-            for edge in EDGE_FIELDS:
+            for edge in ACTION_EDGE_FIELDS:
                 controls[edge] |= previous[1][edge]
-        pending[target] = (seq, controls)
+            # Shield is a latch in the original engine. Keep its most recent transition, not both.
+            if not controls["shield_pressed"] and not controls["shield_released"]:
+                controls["shield_pressed"] = previous[1]["shield_pressed"]
+                controls["shield_released"] = previous[1]["shield_released"]
+        pending[target] = (seq, controls, requested_tick)
         self.last_input_seq[slot] = seq
+
+    def clear_player_input(self, slot, seq):
+        pending = self.inputs[slot]
+        pending.clear()
+        self.last_inputs[slot] = self.neutral_input()
+        if self.phase == "playing":
+            released = self.neutral_input()
+            released["shield_released"] = True
+            pending[self.server_tick] = (seq, released, self.server_tick)
 
     def _controls_for_tick(self, slot, tick):
         entry = self.inputs[slot].pop(tick, None)
         if entry is None:
             return controls_without_edges(self.last_inputs[slot])
-        seq, controls = entry
+        seq, controls, _ = entry
         self.acks[slot] = max(self.acks[slot], seq)
         self.last_inputs[slot] = controls
         return controls
@@ -371,12 +458,13 @@ class MultiplayerRoom(Room):
 
     async def _run_match(self):
         simulation = self.simulation
+        participants = self.participants
         loop = asyncio.get_running_loop()
         deadline = loop.time()
         try:
             while self.phase == "playing":
                 now = loop.time()
-                disconnected = [slot for slot in self.humans if not slot.connected]
+                disconnected = [slot for slot in participants if not slot.connected]
                 if disconnected:
                     if not self.paused_for_reconnect:
                         self.paused_for_reconnect = True
@@ -393,7 +481,7 @@ class MultiplayerRoom(Room):
                     await self.broadcast({"op": "snapshot", "snapshot": simulation.snapshot()})
                     deadline = now
 
-                controls = [self._controls_for_tick(index, self.server_tick) for index in range(self.capacity)]
+                controls = [self._controls_for_tick(player.index, self.server_tick) for player in participants]
                 simulation.step_fast(controls, advance_clock=True)
                 self.server_tick = simulation.tick_index
                 frame = {"op": "frame", "tick": self.server_tick, "controls": simulation._previous_controls,
@@ -406,9 +494,12 @@ class MultiplayerRoom(Room):
                     details = {"reason": "game_set", "winner": winner.name if winner else None,
                                "snapshot": simulation.snapshot()}
                     if self.extended_snapshots:
-                        details["winner_slot"] = winner.team_index if winner is not None else None
+                        winner_slot = winner.team_index if winner is not None else None
+                        if winner_slot is not None and self.match_slots is not None:
+                            winner_slot = self.match_slots[winner_slot]
+                        details["winner_slot"] = winner_slot
                         if winner is not None:
-                            details["winner"] = self.slots[winner.team_index].name
+                            details["winner"] = self.slots[winner_slot].name
                     await self.finish(details)
                     return
                 deadline += TICK_MS / 1000
@@ -430,7 +521,11 @@ class MultiplayerRoomManager(RoomManager):
         if type(capacity) is not int or not 2 <= capacity <= MAX_PLAYERS:
             raise ValueError("invalid_capacity")
         # The browser sync tunnel sets capacity explicitly; the old desktop handshake omits it.
-        room = MultiplayerRoom(self._new_code(), player_name, capacity, extended_snapshots="capacity" in options)
+        automatic = options.get("automatic_roster", False)
+        if type(automatic) is not bool or (automatic and "capacity" not in options):
+            raise ValueError("invalid_roster")
+        room = MultiplayerRoom(self._new_code(), player_name, capacity, extended_snapshots="capacity" in options,
+                               automatic_roster=automatic)
         self.rooms[room.code] = room
         return room, room.host_token, 0
 
@@ -441,20 +536,30 @@ class SeatHandshake:
     def __init__(self, socket):
         self.socket = socket
         self.first = True
+        self.lobby_resume = None
 
     def __getattr__(self, name):
         return getattr(self.socket, name)
 
     async def receive_text(self):
+        if self.lobby_resume is not None:
+            # The reused endpoint has already sent welcome and room state.
+            room, token = self.lobby_resume
+            self.lobby_resume = None
+            await room.complete_lobby_resume(token)
         message = await self.socket.receive_text()
         if self.first:
             self.first = False
             packet = decode_message(message)
             if packet["op"] == "resume" and int(packet.get("protocol", -1)) == PROTOCOL_VERSION:
                 room = upstream.manager.rooms.get(room_code(packet.get("room")))
-                if room is not None and str(packet.get("token", "")) in room.connections:
-                    # Reject before the reused endpoint records the token for its cleanup.
-                    raise ValueError("seat_connected")
+                token = str(packet.get("token", ""))
+                if room is not None:
+                    if token in room.connections:
+                        # Reject before the reused endpoint records the token for its cleanup.
+                        raise ValueError("seat_connected")
+                    if room.extended_snapshots and room.phase == "lobby":
+                        self.lobby_resume = room, token
             handshake.set(packet)
         elif any(f'"{op}"' in message for op in BROWSER_ACTIONS):
             packet = decode_message(message)
@@ -473,7 +578,7 @@ app = FastAPI(title="Glorton Multiplayer Authority", version=str(PROTOCOL_VERSIO
 @app.get("/")
 @app.get("/health")
 async def health():
-    return {**await upstream.health(), "max_players": MAX_PLAYERS, "release_seat": True}
+    return {**await upstream.health(), "max_players": MAX_PLAYERS, "release_seat": True, "automatic_roster": True}
 
 
 @app.post("/release-seat")

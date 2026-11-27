@@ -158,13 +158,22 @@ async function verifySidebars(player){
     const arena=document.querySelector('#field').getBoundingClientRect();
     const left=document.querySelector('#roster-left').getBoundingClientRect();
     const right=document.querySelector('#roster-right').getBoundingClientRect();
+    const scores=[...document.querySelectorAll('#match-stats .scorecard')];
+    const scoreBounds=scores.map(score=>score.getBoundingClientRect());
     return {positioned:left.right<=arena.left&&right.left>=arena.right,
       names:cards.map(card=>card.querySelector('h2').textContent),
-      fields:cards.map(card=>[...card.querySelectorAll('dt')].map(node=>node.textContent))};
+      fields:cards.map(card=>[...card.querySelectorAll('dt')].map(node=>node.textContent)),
+      sideHints:Boolean(document.querySelector('.battle-side.left #latency')&&document.querySelector('.battle-side.right #keys-title')),
+      scoreNames:scores.map(score=>score.querySelector('h3').textContent),
+      scoresInRow:scoreBounds.every((bounds,index)=>bounds.top===scoreBounds[0].top&&
+        (!index||bounds.left>=scoreBounds[index-1].right))};
   });
   assert(view.positioned);
   assert.deepEqual(view.names,player.world.names);
   for(const fields of view.fields)assert.deepEqual(fields,['连接','战况','护甲','武器']);
+  assert(view.sideHints);
+  assert.deepEqual(view.scoreNames,player.world.names);
+  assert(view.scoresInRow);
   const cards=player.page.locator('.player-card');
   assert.equal(await cards.nth(player.seat).locator('.connection').textContent(),'在线');
   assert.equal(await player.page.locator('.player-card .you:visible').count(),1);
@@ -198,7 +207,7 @@ async function verifyRoundFinish(first,second){
   assert.equal(first.world.phase,'settling');
   assert.equal(first.world.remaining,null);
   assert.equal(await first.page.locator('#clock').isVisible(),false);
-  assert.deepEqual(await first.page.locator('#match-stats tr').first().locator('td').allTextContents(),['1','1','0','0']);
+  assert.deepEqual(await first.page.locator('#match-stats .scorecard').first().locator('[data-stat]').allTextContents(),['1','1','0','0']);
   await Promise.all(players.map(player=>player.page.locator('#overlay-note').filter({hasText:'小局结束'}).waitFor()));
   for(const player of players)assert.match(await player.page.locator('#overlay-title').textContent(),/得分/);
 }

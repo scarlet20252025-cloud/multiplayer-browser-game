@@ -32,13 +32,26 @@ function nativeAuthority(){
   const empty=index=>({index,kind:'human',name:'',fighter:'PeachPlayer',color:index,
     enabled:false,ready:false,connected:false,token:null});
   const slots=[empty(0),empty(1)];
+  let phase='lobby',automatic=false,matchSlots;
   function broadcast(){
-    const state={op:'room_state',protocol:1,host_slot:0,phase:'lobby',server_tick:0,slots};
+    const state={op:'room_state',protocol:1,host_slot:0,phase,server_tick:0,slots,
+      ...(automatic?{round:1,automaticRoster:true,minimumPlayers:2,match_slots:matchSlots}:{})};
     for(const peer of peers.keys())if(peer.readyState===WebSocket.OPEN)peer.send(JSON.stringify(state));
+  }
+  function maybeStart(){
+    if(!automatic||phase!=='lobby')return;
+    const occupied=slots.filter(slot=>slot.enabled);
+    if(occupied.length<2||occupied.some(slot=>!slot.connected||!slot.ready))return;
+    matchSlots=occupied.map(slot=>slot.index);
+    phase='playing';
+    const start={op:'match_start',round:1,seed:15,tick_ms:25,input_delay_ticks:2,
+      match_slots:matchSlots,match_config:{players:occupied.map(slot=>({fighter:slot.fighter}))},initial_snapshot:{tick:0}};
+    for(const peer of peers.keys())if(peer.readyState===WebSocket.OPEN)peer.send(JSON.stringify(start));
+    broadcast();
   }
   const http=createServer(async (req,res)=>{
     if(req.url==='/health')return reply(res,200,'application/json',JSON.stringify({ok:true,protocol:1,
-      max_players:4,release_seat:true}));
+      max_players:4,release_seat:true,automatic_roster:true}));
     assert.equal(req.url,'/release-seat');
     assert.equal(req.method,'POST');
     const {room:code,token}=JSON.parse(await Array.fromAsync(req).then(chunks=>Buffer.concat(chunks).toString()));
@@ -46,10 +59,11 @@ function nativeAuthority(){
     const index=slots.findIndex(slot=>slot.token===token);
     if(index>0){
       slots[index]=empty(index);
-      for(const slot of slots)slot.ready=false;
+      if(!automatic)for(const slot of slots)slot.ready=false;
       broadcast();
+      maybeStart();
     }
-    reply(res,200,'application/json',JSON.stringify({released:index>0}));
+    reply(res,200,'application/json',JSON.stringify({released:index>0,playing:phase==='playing'}));
   });
   const hub=new WebSocketServer({server:http,path:'/ws'});
   hub.on('connection',peer=>{
@@ -60,8 +74,13 @@ function nativeAuthority(){
         if(packet.op==='lobby_update'){
           Object.assign(connected,packet.patch);
           broadcast();
+          maybeStart();
         }
         return;
+      }
+      if(packet.op==='create'&&packet.automatic_roster===true){
+        automatic=true;
+        while(slots.length<packet.capacity)slots.push(empty(slots.length));
       }
       const slot=packet.op==='create'?slots[0]:packet.op==='resume'
         ?slots.find(candidate=>candidate.token===packet.token):slots[packet.slot];
@@ -78,6 +97,7 @@ function nativeAuthority(){
       peers.set(peer,slot);
       peer.send(JSON.stringify({op:'welcome',room,protocol:1,slot:slot.index,token:slot.token}));
       broadcast();
+      maybeStart();
     });
     peer.once('close',()=>{
       const slot=peers.get(peer);
@@ -183,4 +203,65 @@ test('Glorton joins by name or legacy code, preserves a refresh, and reclaims fa
   assert.equal(rooms.listRooms()[0].connected,2);
   await post(GLORTON_BROWSER_LEAVE_PATH,{room:'2333',seat:hostTicket.seat},200);
   assert.equal(rooms.listRooms().length,0);
+});
+
+test('Glorton automatic rooms reserve a refresh, start with current seats, and block late joins',async t=>{
+  const native=nativeAuthority();
+  const backend=await listen(native.http);
+  const rooms=createGlortonBrowserRooms({localWebRoot:fileURLToPath(new URL('../public/',import.meta.url)),
+    serviceUrl:backend.replace(/^http/,'ws')+'/ws'});
+  const viewer=createServer(async (req,res)=>{
+    if(!await rooms.handleHttp(req,res,req.url,(...args)=>reply(res,...args)))reply(res,404,'text/plain','Not Found');
+  });
+  viewer.on('upgrade',(req,socket,head)=>rooms.handleUpgrade(req,socket,head));
+  const origin=await listen(viewer);
+  t.after(async()=>{
+    rooms.close();
+    for(const peer of native.hub.clients)peer.terminate();
+    await Promise.all([close(viewer),close(native.http)]);
+  });
+  const endpoint=origin.replace(/^http/,'ws')+GLORTON_BROWSER_SOCKET_PATH;
+  const details={roomName:'弹性乱斗',room:'弹性乱斗',password:'test-room'};
+  async function post(route,body,status){
+    const response=await fetch(origin+route,{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({...details,...body}),signal:AbortSignal.timeout(3500)});
+    const result=await response.json();
+    assert.equal(response.status,status,JSON.stringify(result));
+    return result;
+  }
+  const hostTicket=await post(GLORTON_BROWSER_CREATE_PATH,{name:'房主',roster:'auto'},201);
+  assert.equal(hostTicket.capacity,4);
+  assert.equal(hostTicket.minimumPlayers,2);
+  assert.equal(hostTicket.automaticRoster,true);
+  const host=await browserSocket(endpoint,hostTicket);
+  await host.waitFor(packet=>packet.op==='room_state'&&packet.automaticRoster);
+  host.send({op:'lobby_update',patch:{ready:true},round:1});
+  await host.waitFor(packet=>packet.op==='room_state'&&packet.slots[0].ready);
+  assert.equal(rooms.listRooms()[0].phase,'select');
+
+  const reservedTicket=await post(GLORTON_BROWSER_JOIN_PATH,{name:'断线席位'},200);
+  const guestTicket=await post(GLORTON_BROWSER_JOIN_PATH,{name:'三号玩家'},200);
+  const pending=await post(GLORTON_BROWSER_JOIN_PATH,{name:'迟到玩家'},200);
+  const reserved=await browserSocket(endpoint,reservedTicket);
+  const guest=await browserSocket(endpoint,guestTicket);
+  await guest.waitFor(packet=>packet.op==='welcome'&&packet.slot===2);
+  const beforeDrop=host.history.length;
+  reserved.socket.close();
+  await host.waitFor(packet=>packet.op==='room_state'&&packet.slots[1].enabled&&!packet.slots[1].connected,{after:beforeDrop});
+  guest.send({op:'lobby_update',patch:{fighter:'CoffeePlayer',ready:true},round:1});
+  await host.waitFor(packet=>packet.op==='room_state'&&packet.slots[2].ready);
+  assert.equal(rooms.listRooms()[0].phase,'select');
+
+  await post(GLORTON_BROWSER_LEAVE_PATH,{seat:reservedTicket.seat},200);
+  const [hostStart,guestStart]=await Promise.all([host,guest].map(peer=>peer.waitFor(packet=>packet.op==='match_start')));
+  assert.deepEqual(hostStart.match_slots,[0,2]);
+  assert.equal(hostStart.match_slot,0);
+  assert.equal(guestStart.match_slot,1);
+  assert.equal(rooms.listRooms()[0].participants,2);
+  assert.equal(rooms.listRooms()[0].available,false);
+
+  const denied=await browserSocket(endpoint,pending);
+  assert.equal((await denied.waitFor(packet=>packet.op==='error')).code,'MATCH_STARTED');
+  assert.equal((await post(GLORTON_BROWSER_JOIN_PATH,{name:'后来者'},409)).error,'MATCH_STARTED');
+  assert.equal(rooms.listRooms()[0].phase,'playing');
 });

@@ -1,7 +1,7 @@
 import {PULSE_CHARGE_SECONDS} from './rules.mjs';
 
 const TAU=2*Math.PI;
-const MASTER_GAIN=.86;
+const MASTER_GAIN=0.5;
 const noise=()=>Math.random()*2-1;
 
 function sweep(time,from,to,length){

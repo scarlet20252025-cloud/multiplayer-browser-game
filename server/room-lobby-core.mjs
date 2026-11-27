@@ -20,7 +20,7 @@ export const normalizeSeats=value=>
   Number.isInteger(value)&&value>=1&&value<=MAX_SEATS?value:DEFAULT_SEATS;
 
 export class RoomLobbyCore {
-  constructor({now=()=>Date.now(),catalogIds=[],seats=DEFAULT_SEATS,seatsFor=null,minSeatsFor=null}={}){
+  constructor({now=()=>Date.now(),catalogIds=[],seats=DEFAULT_SEATS,seatsFor=null,minSeatsFor=null,seatGraceMsFor=null}={}){
     if(typeof now!=='function')throw new TypeError('now must be a function');
     this.now=now;
     this.catalogIds=new Set(catalogIds);
@@ -28,6 +28,7 @@ export class RoomLobbyCore {
     /** Optional resolver: gameId -> declared seat capacity from the manifest. */
     this.seatsFor=typeof seatsFor==='function'?seatsFor:null;
     this.minSeatsFor=typeof minSeatsFor==='function'?minSeatsFor:null;
+    this.seatGraceMsFor=typeof seatGraceMsFor==='function'?seatGraceMsFor:null;
     this.rooms=new Map();
   }
   roomFor(key){return this.rooms.get(key)??null;}
@@ -67,8 +68,10 @@ export class RoomLobbyCore {
   nextMemberSeat(room,canReplaceActiveMember){
     const open=room.members.findIndex(member=>!member);
     if(open>=0)return open;
+    const grace=this.seatGraceMsFor?.(room.gameId);
+    const now=this.now();
     const replaceable=room.members.filter(member=>!member.connected&&(room.phase==='select'
-      ?member.everConnected:canReplaceActiveMember?.(member)));
+      ?(grace==null?member.everConnected:now-member.lastSeen>=grace):canReplaceActiveMember?.(member)));
     replaceable.sort((a,b)=>a.lastSeen-b.lastSeen);
     return replaceable[0]?.seat??-1;
   }
@@ -111,7 +114,10 @@ export class RoomLobbyCore {
     for(const room of this.rooms.values()){
       const member=room.members.find(candidate=>candidate?.token===token);
       if(member){
-        if(this.now()-member.createdAt>TOKEN_TTL_MS)
+        const now=this.now();
+        const grace=this.seatGraceMsFor?.(room.gameId);
+        if(now-member.createdAt>TOKEN_TTL_MS||
+           (room.phase==='select'&&!member.connected&&grace!=null&&now-member.lastSeen>=grace))
           throw fail('LOBBY_TOKEN_EXPIRED','房间凭证已过期，请重新加入');
         return {room,member};
       }
@@ -302,11 +308,12 @@ export class RoomLobbyCore {
   sweep(){
     const now=this.now(),changed=new Set();
     for(const [key,room] of this.rooms){
+      const grace=this.seatGraceMsFor?.(room.gameId)??OFFLINE_RELEASE_MS;
       for(let seat=0;seat<room.members.length;seat++){
         const member=room.members[seat];
         if(!member||member.connected)continue;
         if(room.phase==='playing')continue;
-        if(now-member.lastSeen>OFFLINE_RELEASE_MS){
+        if(now-member.lastSeen>=grace){
           room.members[seat]=null;changed.add(room);room.lastActivity=now;
         }
       }

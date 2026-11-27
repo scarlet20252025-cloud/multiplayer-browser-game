@@ -2,7 +2,9 @@ import {COLORS, MIN_PLAYERS, PULSE_CHARGE_SECONDS, SUPPLIES, arenaFor, randomFro
 import {laserPath, shellAimPath} from './laser-path.mjs';
 
 const TAU = Math.PI * 2;
-const TRACK_LIFETIME = 2100;
+const TRACK_LIFETIME = 2400;
+const TRACK_SPACING = 8;
+const TREAD_PITCH = 5;
 const EXHAUST_LIFETIME = 420;
 const BEAM_COLOR = SUPPLIES.beam?.color ?? '#f88fc8';
 const PROJECTILES = Object.freeze({
@@ -257,14 +259,14 @@ function paintTrack(ctx, mark, now) {
   ctx.save();
   ctx.translate(mark.x, mark.y);
   ctx.rotate(mark.hull);
-  ctx.globalAlpha = .42 * life ** 2;
+  ctx.globalAlpha = .64 * life ** 1.5;
   for (const side of [-11, 11]) {
-    ctx.fillStyle = '#825342';
+    ctx.fillStyle = '#674238';
     ctx.beginPath();
-    ctx.roundRect(-2, side - 3.4, 4, 6.8, 1.1);
+    ctx.roundRect(-2.6, side - 3.8, 5.2, 7.6, 1.2);
     ctx.fill();
-    ctx.fillStyle = '#ffd8a6';
-    ctx.fillRect(-1.2, side - 2.3, 1, 4.6);
+    ctx.fillStyle = '#e3aa7c';
+    ctx.fillRect(-1.5, side - 2.7, 1.25, 5.4);
   }
   ctx.restore();
 }
@@ -279,12 +281,14 @@ function paintTread(ctx, y, phase, [, middle, light, frame]) {
   ctx.strokeStyle = '#2a1928';
   ctx.stroke();
   ctx.clip();
-  for (let x = -23 + phase; x < 18; x += 5) {
-    ctx.fillStyle = '#695463';
-    ctx.fillRect(x, y + .8, 1.75, 6.7);
-    ctx.fillStyle = '#8b7080';
-    ctx.fillRect(x, y + 1, 1.75, 1.1);
+  for (let x = -18 - TREAD_PITCH + phase; x < 18; x += TREAD_PITCH) {
+    ctx.fillStyle = '#806675';
+    ctx.fillRect(x, y + .55, 2.15, 7.5);
+    ctx.fillStyle = '#b09097';
+    ctx.fillRect(x, y < 0 ? y + .55 : y + 6.4, 2.15, 1.45);
   }
+  const spoke = phase / TREAD_PITCH * Math.PI / 2;
+  const spokeX = Math.cos(spoke) * 1.65, spokeY = Math.sin(spoke) * 1.65;
   for (const x of [-12, -4, 4, 12]) {
     circle(ctx, x, y + 4.35, 3);
     ctx.fillStyle = frame;
@@ -292,9 +296,15 @@ function paintTread(ctx, y, phase, [, middle, light, frame]) {
     circle(ctx, x, y + 4.15, 2.35);
     ctx.fillStyle = middle;
     ctx.fill();
-    circle(ctx, x, y + 4.15, .9);
-    ctx.fillStyle = light;
-    ctx.fill();
+    const hub = y + 4.15;
+    ctx.beginPath();
+    ctx.moveTo(x - spokeX, hub - spokeY);
+    ctx.lineTo(x + spokeX, hub + spokeY);
+    ctx.moveTo(x + spokeY, hub - spokeX);
+    ctx.lineTo(x - spokeY, hub + spokeX);
+    ctx.lineWidth = .75;
+    ctx.strokeStyle = light;
+    ctx.stroke();
   }
   ctx.fillStyle = '#20182290';
   ctx.fillRect(-18, y + 7.4, 36, 1.3);
@@ -1525,17 +1535,17 @@ export function createArenaView(canvas) {
       motion.set(seat, phase);
       return phase;
     }
-    const dx = x - last.x;
-    const dy = y - last.y;
+    const dx = x - last.x, dy = y - last.y;
+    const distance = Math.hypot(dx, dy);
     const roll = dx * Math.cos(hull) + dy * Math.sin(hull);
-    const turn = turnDelta(last.hull, hull) * 10;
-    last.left = (last.left + roll + turn + 5) % 5;
-    last.right = (last.right + roll - turn + 5) % 5;
-    last.distance += Math.hypot(dx, dy);
-    if (last.distance >= 7.5) {
-      tracks.push({x, y, hull, time: now});
-      last.distance %= 7.5;
+    const turn = turnDelta(last.hull, hull);
+    last.left = ((last.left + roll + turn * 10) % TREAD_PITCH + TREAD_PITCH) % TREAD_PITCH;
+    last.right = ((last.right + roll - turn * 10) % TREAD_PITCH + TREAD_PITCH) % TREAD_PITCH;
+    for (let offset = TRACK_SPACING - last.distance; offset <= distance; offset += TRACK_SPACING) {
+      const at = offset / distance;
+      tracks.push({x: last.x + dx * at, y: last.y + dy * at, hull: last.hull + turn * at, time: now});
     }
+    last.distance = (last.distance + distance) % TRACK_SPACING;
     Object.assign(last, {x, y, hull, roll});
     return last;
   }
@@ -1602,7 +1612,12 @@ export function createArenaView(canvas) {
       paintBeacon(ctx, world.beacon ?? layout.beacon, world.capture, now, relay, world.beaconMoveRemaining);
     }
     tracks = tracks.filter(mark => now - mark.time < TRACK_LIFETIME).slice(-360);
-    for (const mark of tracks) paintTrack(ctx, mark, now);
+    if (tracks.length) {
+      ctx.save();
+      ctx.clip(passages);
+      for (const mark of tracks) paintTrack(ctx, mark, now);
+      ctx.restore();
+    }
     for (const item of world.pickups) paintSupply(ctx, item, now);
     for (const mine of world.mines ?? []) {
       if (!mine.armed) paintMine(ctx, mine, now);

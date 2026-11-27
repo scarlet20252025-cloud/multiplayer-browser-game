@@ -80,10 +80,17 @@ function browserPhase(room){
   return room.ended?'ended':room.syncPhase??'waiting';
 }
 
-const roomPaused=room=>room.syncPaused===true||room.players.some(player=>player?.paused===true);
+const isMatchPlayer=(room,player)=>!room.matchSeats||room.matchSeats.includes(player.role-1);
+const roomPaused=room=>room.syncPaused===true||room.players.some(player=>
+  player?.paused===true&&(browserPhase(room)!=='playing'||isMatchPlayer(room,player)));
+
+function rosterFields(room){
+  return room.automaticRoster?{automaticRoster:true,minimumPlayers:2}:{};
+}
 
 function expirationReason(room,now){
-  const relevant=browserPhase(room)==='playing'?room.players:[room.players[0]];
+  const relevant=browserPhase(room)==='playing'
+    ?room.players.filter(player=>player&&isMatchPlayer(room,player)):[room.players[0]];
   if(relevant.some(player=>player&&player.expiresAt!==null&&player.expiresAt<=now))
     return '玩家离线超过保留时间，房间已关闭。';
   if(browserPhase(room)!=='playing'&&room.activity+idleLobbyWait<=now)
@@ -98,8 +105,8 @@ function publicRoom(room){
   const connected=room.players.filter(player=>player?.socket?.readyState===WebSocket.OPEN).length;
   const paused=roomPaused(room);
   return {key:'glorton:'+room.id,gameId:'glorton',name:room.name,code:room.id,
-    occupied,connected,capacity:room.players.length,participants:phase==='playing'?occupied:0,
-    phase,available:phase==='select'&&occupied<room.players.length&&!room.players[0].paused,paused};
+    occupied,connected,capacity:room.players.length,participants:phase==='playing'?(room.matchSeats?.length??occupied):0,
+    phase,available:phase==='select'&&occupied<room.players.length&&!room.players[0].paused,paused,...rosterFields(room)};
 }
 
 function send(socket,message){
@@ -132,8 +139,8 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
     return [...rooms.values()].filter(room=>!room.ended&&!expirationReason(room,now)).map(publicRoom);
   }
 
-  function authorityCapacity(){
-    if(closing)return Promise.resolve(0);
+  function authorityFeatures(){
+    if(closing)return Promise.resolve(null);
     const now=Date.now();
     if(healthPromise&&now-healthCheckedAt<2500)return healthPromise;
     healthCheckedAt=now;
@@ -141,12 +148,13 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
       try{
         await access(entry);
         const response=await fetch(authorityHealth,{signal:AbortSignal.timeout(1300),redirect:'error'});
-        if(!response.ok){await response.body?.cancel();return 0;}
+        if(!response.ok){await response.body?.cancel();return null;}
         const health=await response.json();
-        if(health.ok!==true||health.protocol!==1)return 0;
+        if(health.ok!==true||health.protocol!==1)return null;
         const capacity=health.max_players;
-        return Number.isInteger(capacity)&&capacity>=2?Math.min(capacity,4):2;
-      }catch{return 0;}
+        return {capacity:Number.isInteger(capacity)&&capacity>=2?Math.min(capacity,4):2,
+          automaticRoster:health.automatic_roster===true};
+      }catch{return null;}
     })();
     return healthPromise;
   }
@@ -156,6 +164,7 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
       capacity:room.players.length,
       connected:room.players.map(item=>item?.socket?.readyState===WebSocket.OPEN),
       ready:room.ready,paused:roomPaused(room),
+      ...rosterFields(room),...(room.matchSeats?{match_slots:room.matchSeats}:{}),
       ...(room.ended?{message:room.endMessage}:{})};
   }
 
@@ -177,7 +186,7 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
     const socket=player.socket;
     player.socket=null;
     room.players[player.role-1]=null;
-    room.ready=room.ready.map(()=>false);
+    room.ready=room.ready.map((ready,index)=>room.automaticRoster&&index!==player.role-1&&ready);
     room.activity=Date.now();
     void room.sync?.release(player.role);
     if(socket?.readyState===WebSocket.OPEN)socket.close(1000,'Seat released');
@@ -196,10 +205,12 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
     room.sync??=createGlortonSyncMatch({
       serviceUrl:authority.href,
       capacity:room.players.length,
+      automaticRoster:room.automaticRoster,
       onState(update){
         if(update.phase==='finished'&&browserPhase(room)!=='finished')room.activity=Date.now();
         if(phases.has(update.phase))room.syncPhase=update.phase;
         if(Array.isArray(update.ready))room.ready=update.ready;
+        room.matchSeats=update.matchSeats;
         room.syncPaused=update.paused===true;
         broadcast(room);
       },
@@ -211,11 +222,16 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
       },
     });
     const canSend=()=>player.socket===socket&&socket.readyState===WebSocket.OPEN&&socket.bufferedAmount<=maxBrowserBuffer;
-    room.sync.attach(player.role,{name:player.name,frameAck,compactFrames,canSend,send(packet){
+    const attached=room.sync.attach(player.role,{name:player.name,frameAck,compactFrames,canSend,send(packet){
       if(!canSend())return false;
       send(socket,packet);
       return true;
     }});
+    if(!attached){
+      send(socket,{op:'error',code:'MATCH_STARTED',message:'对局已经开始，可以等下一局再加入。',fatal:true});
+      releaseGuest(room,player);
+      return;
+    }
     if(frameAck)measureBrowserRoundTrip(room,player,socket,canSend);
   }
 
@@ -292,7 +308,7 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
   function admission(room,player){
     const params=new URLSearchParams({room:room.id,seat:player.token});
     return {ok:true,room:room.id,roomName:room.name,seat:player.token,role:player.role,capacity:room.players.length,renderMode:'local',
-      playUrl:GLORTON_LOCAL_PLAY_PATH+'#'+params};
+      playUrl:GLORTON_LOCAL_PLAY_PATH+'#'+params,...rosterFields(room)};
   }
 
   function normalizeName(value,role){
@@ -300,16 +316,22 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
     return Array.from(name).slice(0,16).join('')||'玩家 '+role;
   }
 
-  async function admit(req,create,maxPlayers){
+  async function admit(req,create,features){
     const body=await readJson(req);
     if(typeof body.password!=='string'||body.password.length<4||body.password.length>64){
       throw problem(400,'INVALID_PASSWORD','房间密码需要 4–64 个字符。');
     }
     if(create){
-      const capacity=body.capacity===undefined?2:body.capacity;
+      const automaticRoster=body.roster==='auto';
+      if(body.roster!==undefined&&(!automaticRoster||body.capacity!==undefined))
+        throw problem(400,'INVALID_ROSTER','房间人数设置无效。');
+      if(automaticRoster&&!features.automaticRoster)
+        throw problem(503,'ROSTER_UNAVAILABLE','等待联机房间服务升级后再试。');
+      const requestedCapacity=body.capacity===undefined?2:body.capacity;
+      const capacity=automaticRoster?features.capacity:requestedCapacity;
       if(!Number.isInteger(capacity)||capacity<2||capacity>4)
         throw problem(400,'INVALID_CAPACITY','房间人数需要在 2 到 4 人之间。');
-      if(capacity>maxPlayers)throw problem(503,'CAPACITY_UNAVAILABLE','联机服务暂时只支持 '+maxPlayers+' 人房间。');
+      if(capacity>features.capacity)throw problem(503,'CAPACITY_UNAVAILABLE','联机服务暂时只支持 '+features.capacity+' 人房间。');
       let name;
       if(body.roomName!==undefined&&!(typeof body.roomName==='string'&&!body.roomName.trim())){
         try{name=normalizeRoomName(body.roomName);}
@@ -327,7 +349,7 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
       name??=normalizeRoomName(id);
       const players=Array(capacity).fill(null);
       players[0]=player;
-      const room={id,name:name.display,nameKey:aliasKey(name.key),salt,password,players,pending:new Map(),
+      const room={id,name:name.display,nameKey:aliasKey(name.key),salt,password,players,automaticRoster,pending:new Map(),
         ready:Array(capacity).fill(false),activity:Date.now()};
       rooms.set(room.id,room);
       names.set(room.nameKey,room);
@@ -361,7 +383,7 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
     if(room.ended||!player)return;
     if(room.pending.delete(player.token))return;
     if(player.role===1){endRoom(room,'房主已退出，房间已关闭。');return;}
-    if(browserPhase(room)==='playing'){endRoom(room,'玩家已退出，对局已结束。');return;}
+    if(browserPhase(room)==='playing'&&isMatchPlayer(room,player)){endRoom(room,'玩家已退出，对局已结束。');return;}
     releaseGuest(room,player);
   }
 
@@ -375,7 +397,7 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
       if(!acceptsOrigin(req))throw problem(403,'FORBIDDEN','请从当前大厅打开游戏。');
       if(health){
         if(!['GET','HEAD'].includes(req.method))throw problem(405,'METHOD_NOT_ALLOWED','不支持此请求。');
-        const ok=Boolean(await authorityCapacity());
+        const ok=Boolean(await authorityFeatures());
         respond(ok?200:503,{ok,browser:true});
       }else{
         if(req.method!=='POST')throw problem(405,'METHOD_NOT_ALLOWED','不支持此请求。');
@@ -389,9 +411,9 @@ export function createGlortonBrowserRooms({localWebRoot,viewerOrigins=[],isRoomN
         if(admissions>=maxAdmissions)throw problem(503,'SERVER_BUSY','请求较多，请稍后再试。');
         admissions++;
         try{
-          const maxPlayers=await authorityCapacity();
-          if(!maxPlayers)throw problem(503,'RUNTIME_UNAVAILABLE','网页联机服务暂不可用。');
-          const {result,allocated}=await admit(req,create,maxPlayers);
+          const features=await authorityFeatures();
+          if(!features)throw problem(503,'RUNTIME_UNAVAILABLE','网页联机服务暂不可用。');
+          const {result,allocated}=await admit(req,create,features);
           if(res.destroyed&&allocated){
             const room=rooms.get(result.room);
             if(room)leave(room,playerByToken(room,result.seat));

@@ -14,7 +14,9 @@ import {startHtml5ResearchRoom} from './html5-research-room.mjs';
 import {startShanyiMirrorRoom} from './shanyi-mirror-room.mjs';
 import {makeRoomCode,probeExternalRoom} from './external-game-server.mjs';
 import {createLockstepMatch} from './lockstep-match.mjs';
-import {LOCKSTEP_RUNTIME} from '../public/lockstep/protocol.mjs';
+import {
+  BOMB_IT_DEFAULT_SETTINGS, BOMB_IT_MAPS, BOMB_IT_MODES, isBombItSettings, LOCKSTEP_RUNTIME,
+} from '../public/lockstep/protocol.mjs';
 import {ARENA_RUNTIME, ARENA_SOCKET} from '../public/tank-arena/rules.mjs';
 import {createTankArenaMatch} from './tank-arena-match.mjs';
 import {BRAWL_RUNTIME, BRAWL_SOCKET} from '../public/platform-brawl/rules.mjs';
@@ -30,6 +32,29 @@ const SESSION_CONNECT_TIMEOUT_MS=150000;
 const SESSION_EMPTY_GRACE_MS=5_000;
 const SESSION_PEER_GRACE_MS=15_000;
 const SPECTATOR_STATUS_TTL_MS=2_500;
+const BOMB_IT_GAME='bomb-it-7';
+const DEFAULT_BOMB_IT_OUTFIT=Object.freeze({clothId:0,hatId:0,expId:0});
+const BOMB_IT_ROBOT_COUNT=8;
+const BOMB_IT_SEAT_GRACE_MS=20_000;
+const DEFAULT_BOMB_IT_SETTINGS=Object.freeze({...BOMB_IT_DEFAULT_SETTINGS,revision:0});
+
+function initializeBombItMember(room,member){
+  if(room.gameId!==BOMB_IT_GAME||Number.isInteger(member.bombItOutfit?.robotId))return;
+  room.bombItHost??=member;
+  const claimed=new Set(room.members.map(candidate=>candidate?.bombItOutfit?.robotId));
+  let robotId=member.seat;
+  if(claimed.has(robotId)){
+    robotId=0;
+    while(claimed.has(robotId))robotId++;
+  }
+  member.bombItOutfit={...DEFAULT_BOMB_IT_OUTFIT,...member.bombItOutfit,robotId};
+}
+
+function bombItHost(room){
+  const host=room.bombItHost;
+  if(host&&room.members[host.seat]===host)return host;
+  return room.bombItHost=room.members.find(member=>member?.connected)??room.members.find(Boolean)??null;
+}
 
 const json=(res,status,body,headers={})=>{
   const text=JSON.stringify(body);
@@ -107,7 +132,8 @@ export async function startRoomLobby({
   const lobby=new RoomLobbyCore({catalogIds,
     seats:DEFAULT_SEATS,
     seatsFor:gameId=>gameFor(catalog,gameId)?.seats??DEFAULT_SEATS,
-    minSeatsFor:gameId=>gameFor(catalog,gameId)?.minSeats});
+    minSeatsFor:gameId=>gameFor(catalog,gameId)?.minSeats,
+    seatGraceMsFor:gameId=>gameId===BOMB_IT_GAME?BOMB_IT_SEAT_GRACE_MS:undefined});
   const clients=new Set();
   const sessions=new Map();
   const reservedPorts=new Set();
@@ -119,7 +145,22 @@ export async function startRoomLobby({
   await expiration.sweep();
   const logMaintenanceError=error=>{lastError=error.message;};
 
-  const roomPayload=(room,viewerSeat=null)=>lobby.publicState(room,{saves:registry.saves(room.key),viewerSeat});
+  const roomPayload=(room,viewerSeat=null)=>{
+    const state=lobby.publicState(room,{saves:registry.saves(room.key),viewerSeat});
+    if(room.gameId===BOMB_IT_GAME){
+      state.bombItSettings={...(room.bombItSettings??DEFAULT_BOMB_IT_SETTINGS),
+        hostSeat:bombItHost(room)?.seat??null,availableMaps:BOMB_IT_MAPS,availableModes:BOMB_IT_MODES};
+      state.canStart=state.canStart&&room.members.every(member=>!member||member.connected);
+      for(const entry of state.seats){
+        const member=room.members[entry.seat];
+        if(member){
+          entry.outfit=member.bombItOutfit;
+          entry.ready=member.bombItReady===true;
+        }
+      }
+    }
+    return state;
+  };
   const unlistedGames=new Set(catalog.filter(game=>game.listed===false).map(game=>game.id));
   const gameAvailableInRoom=(gameId,room)=>!unlistedGames.has(gameId)||room?.boundGameId===gameId;
   const unavailableGame=()=>Object.assign(Error('此游戏暂未在大厅开放'),{code:'GAME_UNLISTED'});
@@ -171,9 +212,9 @@ export async function startRoomLobby({
     const entryPath=session.entryPaths?.[member.seat]??session.entryPath;
     const matchTokens=ticket?.matchTokens;
     return {
-      wsUrl:session.wsUrl,token:matchTokens?.[matchSeat]??session.token,gameId:session.gameId,
+      wsUrl:session.wsUrl,token:matchTokens?matchTokens[matchSeat]:session.token,gameId:session.gameId,
       levelId:session.levelId,entryPath,
-      gameSha256:session.gameSha256,roomName:room.name,seat:member.seat,
+      gameSha256:session.gameSha256,roomName:room.name,seat:matchSeat,
       ...(matchTokens?{lockstep:true}:{}),
       // external 游戏（TankTrouble）需要房间码；其余运行时为 null。
       roomCode:session.roomCode??null,
@@ -292,14 +333,18 @@ export async function startRoomLobby({
       ticket.matchPath=brawl?BRAWL_SOCKET:tankArena?ARENA_SOCKET:'/lockstep';
       const createMatch=brawl?createPlatformBrawlMatch:tankArena?createTankArenaMatch:createLockstepMatch;
       try{
-        ticket.match=createMatch({levelId:proposal.levelId,playerCount:participants.length,
+        ticket.match=createMatch({levelId:proposal.levelId,playerCount:participants.length,tickRate:game.tickRate,
           playerNames:participants.map(member=>member.displayName),onEnd:reason=>endSession(ticket,reason),
+          ...(game.id===BOMB_IT_GAME&&game.runtime===LOCKSTEP_RUNTIME?{
+            playerOutfits:participants.map(member=>member.bombItOutfit),
+            bombItSettings:proposal.bombItSettings,
+          }:{}),
           ...(ticket.matchPlayers?{onSeatDropped:seat=>{
             ticket.matchPlayers[seat]=null;
             if(sessions.get(room.key)===ticket)broadcastState(room);
           }}:{})});
         lobby.startSession(room,{gameId:game.id,levelId:proposal.levelId,
-          wsUrl:brawl||(tankArena&&arenaOnViewer)?viewerSocketOrigin+ticket.matchPath:`ws://${displayHost}:${displayPort}${ticket.matchPath}`,
+          wsUrl:brawl||game.runtime===LOCKSTEP_RUNTIME||(tankArena&&arenaOnViewer)?viewerSocketOrigin+ticket.matchPath:`ws://${displayHost}:${displayPort}${ticket.matchPath}`,
           token,entryPath:game.entryPath});
         for(const member of participants)
           send(member.ws,{type:'session-start',session:sessionPayload(room,member)});
@@ -454,12 +499,34 @@ export async function startRoomLobby({
       send(member?.ws,{type:'session-ended',reason});
     void closeTicket(ticket).catch(()=>{});
   }
+
+  function startConfirmedSession(room,proposal){
+    void startSession(room,proposal).catch(error=>{
+      lastError=error.message;lobby.failStart(room);
+      sendError(room,error.code??'SESSION_START_FAILED',error.message);
+      broadcastState(room);
+    });
+  }
+
+  function tryStartBombIt(room){
+    if(room.gameId!==BOMB_IT_GAME||room.phase!=='select'||!lobby.canStart(room)||
+        room.members.some(member=>member&&(!member.connected||!member.bombItReady)))return;
+    const {mapId,modeId}=room.bombItSettings??DEFAULT_BOMB_IT_SETTINGS;
+    room.phase='starting';
+    for(const member of room.members)if(member)member.bombItReady=false;
+    startConfirmedSession(room,{gameId:BOMB_IT_GAME,levelId:gameFor(catalog,BOMB_IT_GAME).levels[0].id,
+      bombItSettings:{mapId,modeId}});
+  }
+
   const monitor=setInterval(()=>{
     for(const ticket of sessions.values())void checkSession(ticket).catch(error=>{lastError=error.message;});
+    for(const room of lobby.sweep()){
+      broadcastState(room);
+      tryStartBombIt(room);
+    }
   },1000);
   monitor.unref();
   const sweeper=setInterval(()=>{
-    for(const room of lobby.sweep())broadcastState(room);
     void expiration.sweep().catch(logMaintenanceError);
   },5000);
   sweeper.unref();
@@ -614,6 +681,7 @@ export async function startRoomLobby({
         const activeArena=room.phase==='playing'&&isArenaTicket(ticket);
         const member=lobby.addMember(roomInfo.key,{name:roomInfo.name,
           canReplaceActiveMember:activeArena?canReplaceArenaMember(ticket):undefined});
+        initializeBombItMember(room,member);
         let session;
         if(activeArena){
           try{
@@ -626,8 +694,8 @@ export async function startRoomLobby({
             if(seat>=0)ticket.match.leaveSeat(seat);
             throw error;
           }
-          broadcastState(room);
         }
+        if(activeArena||room.gameId===BOMB_IT_GAME)broadcastState(room);
         void expiration.sync(room.key).catch(logMaintenanceError);
         return json(res,created?201:200,{token:member.token,seat:member.seat,
           room:roomPayload(room,member.seat),games:catalogPayload(room),...(session?{session}:{})},cors);
@@ -660,7 +728,7 @@ export async function startRoomLobby({
     if(url.pathname==='/lobby')return upgradeLobby(req,socket,head,url);
     if(url.pathname===ARENA_SOCKET&&!arenaOnViewer)
       return socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
-    if(![ARENA_SOCKET,BRAWL_SOCKET].includes(url.pathname))return socket.end('HTTP/1.1 404 Not Found\r\n\r\n');
+    if(![ARENA_SOCKET,BRAWL_SOCKET,'/lockstep'].includes(url.pathname))return socket.end('HTTP/1.1 404 Not Found\r\n\r\n');
     upgradeMatch(req,socket,head,url.pathname,url.searchParams.get('token'));
   }
 
@@ -713,6 +781,10 @@ export async function startRoomLobby({
     // The game opens its chat socket before the players finish loading.
     if(ticket&&room.phase==='playing'&&!chatOnly)ticket.returned=true;
     sendWelcome(room,member);broadcastState(room);
+    if(!chatOnly&&room.gameId===BOMB_IT_GAME&&ticket?.matchPath==='/lockstep'&&
+        ticket.match.canAttach(ticket.matchSeats.indexOf(member.seat)))
+      send(ws,{type:'session-start',session:sessionPayload(room,member)});
+    else if(!chatOnly)tryStartBombIt(room);
     ws.on('close',()=>{
       clients.delete(ws);
       const result=lobby.detach(ws);
@@ -728,11 +800,15 @@ export async function startRoomLobby({
         if(msg.type==='select-game'){
           if(!gameAvailableInRoom(msg.gameId,room))throw unavailableGame();
           const result=lobby.selectGame(token,msg.gameId,{bind:true});
+          if(room.gameId===BOMB_IT_GAME)
+            for(const seated of room.members)if(seated)initializeBombItMember(room,seated);
           await registry.bindGame(result.room.key,msg.gameId);
           broadcastState(result.room);return;
         }
         if(msg.type==='propose-level'){
           if(!gameAvailableInRoom(msg.gameId,room))throw unavailableGame();
+          if(msg.gameId===BOMB_IT_GAME)
+            return send(ws,{type:'lobby-error',code:'BOMB_IT_USE_READY',message:'请刷新页面后使用准备按钮开局。'});
           const game=gameFor(catalog,msg.gameId);
           if(!game||!game.levels.some(level=>level.id===msg.levelId))
             return send(ws,{type:'lobby-error',code:'LEVEL_INVALID',message:'关卡无效'});
@@ -747,11 +823,7 @@ export async function startRoomLobby({
           const result=lobby.confirm(token,msg.proposalId);
           broadcastState(result.room);
           if(!result.ready)return;
-          void startSession(result.room,result.proposal).catch(error=>{
-            lastError=error.message;lobby.failStart(result.room);
-            sendError(result.room,error.code??'SESSION_START_FAILED',error.message);
-            broadcastState(result.room);
-          });
+          startConfirmedSession(result.room,result.proposal);
           return;
         }
         if(msg.type==='profile'){
@@ -760,6 +832,43 @@ export async function startRoomLobby({
           const matchSeat=isParticipantMatch(active)?participantSeat(active,member):-1;
           if(matchSeat>=0)active.match.setPlayerName?.(matchSeat,member.displayName);
           broadcastState(result.room);return;
+        }
+        if(msg.type==='set-outfit'){
+          if(chatOnly||room.gameId!==BOMB_IT_GAME||room.phase!=='select'||room.proposal)
+            return send(ws,{type:'lobby-error',code:'OUTFIT_UNAVAILABLE',message:'可在开局前更换角色和装扮。'});
+          const {part,value}=msg;
+          const character=part==='robotId';
+          if(typeof part!=='string'||(!character&&!Object.hasOwn(DEFAULT_BOMB_IT_OUTFIT,part))||!Number.isInteger(value)||value<0||
+              value>=(character?BOMB_IT_ROBOT_COUNT:4))
+            return send(ws,{type:'lobby-error',code:'OUTFIT_INVALID',message:'装扮选项无效。'});
+          const outfit=member.bombItOutfit;
+          if(outfit[part]===value)return;
+          if(character&&room.members.some(seated=>seated!==member&&seated?.bombItOutfit?.robotId===value))
+            return send(ws,{type:'lobby-error',code:'BOMB_IT_CHARACTER_TAKEN',message:'这个角色已被选用，请选择其他角色。'});
+          member.bombItOutfit={...outfit,[part]:value};
+          member.bombItReady=false;
+          broadcastState(room);return;
+        }
+        if(msg.type==='set-bomb-it-settings'||msg.type==='set-bomb-it-ready'){
+          if(chatOnly||room.gameId!==BOMB_IT_GAME||room.phase!=='select')return;
+          const settings=room.bombItSettings??DEFAULT_BOMB_IT_SETTINGS;
+          if(msg.revision!==settings.revision)
+            return send(ws,{type:'lobby-error',code:'BOMB_IT_SETTINGS_STALE',message:'房间规则已更新，请确认当前设置。'});
+          if(msg.type==='set-bomb-it-settings'){
+            if(bombItHost(room)!==member)
+              return send(ws,{type:'lobby-error',code:'BOMB_IT_HOST_ONLY',message:'只有房主可以选择地图和模式。'});
+            if(!isBombItSettings(msg))
+              return send(ws,{type:'lobby-error',code:'BOMB_IT_SETTINGS_INVALID',message:'地图或模式不可用。'});
+            if(msg.mapId===settings.mapId&&msg.modeId===settings.modeId)return;
+            room.bombItSettings={mapId:msg.mapId,modeId:msg.modeId,revision:settings.revision+1};
+            for(const seated of room.members)if(seated)seated.bombItReady=false;
+          }else{
+            if(typeof msg.ready!=='boolean')
+              return send(ws,{type:'lobby-error',code:'BOMB_IT_READY_INVALID',message:'准备状态无效。'});
+            member.bombItReady=msg.ready;
+          }
+          broadcastState(room);
+          tryStartBombIt(room);return;
         }
         if(msg.type==='chat'){
           const result=lobby.chat(token,msg);
@@ -785,7 +894,7 @@ export async function startRoomLobby({
             if(matchSeat>=0)ticket.match.leaveSeat(matchSeat);
           }
           void expiration.sync(room.key).catch(logMaintenanceError);
-          ws.close();broadcastState(result.room);return;
+          ws.close();broadcastState(result.room);tryStartBombIt(result.room);return;
         }
         if(msg.type==='ping'){send(ws,{type:'pong',id:msg.id});return;}
         send(ws,{type:'lobby-error',code:'UNKNOWN_MESSAGE'});

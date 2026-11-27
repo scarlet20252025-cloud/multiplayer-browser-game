@@ -1,0 +1,130 @@
+.game-loader-host {
+  position: relative;
+  isolation: isolate;
+}
+
+.game-loader {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: clamp(10px, 3vw, 26px);
+  background: radial-gradient(ellipse at top, #49317b, #20173e 68%);
+  color: #20215c;
+}
+
+.game-loader[hidden], .game-loader [hidden] {
+  display: none;
+}
+
+.game-loader[data-phase="recover"] {
+  background: #20173eb8;
+}
+
+.game-loader__card {
+  width: min(100%, 400px);
+  padding: clamp(14px, 3vw, 25px);
+  border: 2px solid #fff;
+  border-radius: 18px;
+  background: linear-gradient(160deg, #fff, #f6f1ff);
+  box-shadow: 0 5px 0 #c7b4ee, 0 14px 38px #110a32a6;
+  text-align: center;
+}
+
+.game-loader__title {
+  margin: 0;
+  color: inherit;
+  font-size: clamp(18px, 3vw, 25px);
+  font-weight: 850;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.game-loader__detail {
+  margin: 7px 0 0;
+  color: #595578;
+  font-size: .875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.game-loader__progress {
+  margin-top: 15px;
+}
+
+.game-loader__track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6def7;
+}
+
+.game-loader__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6230cf, #9155f5);
+}
+
+.game-loader__track:not([aria-valuenow]) .game-loader__fill {
+  width: 40%;
+  animation: game-loader-sweep 1.35s ease-in-out infinite alternate;
+}
+
+@keyframes game-loader-sweep {
+  from { transform: translateX(0); }
+  to { transform: translateX(150%); }
+}
+
+.game-loader__amount {
+  display: block;
+  margin-top: 6px;
+  color: #595578;
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.game-loader__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.game-loader__retry, .game-loader__back {
+  display: inline-grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 7px 15px;
+  border: 1px solid #d8c7f2;
+  border-radius: 10px;
+  box-shadow: none;
+  font: inherit;
+  font-size: .875rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.game-loader__retry {
+  border-color: #6430c9;
+  background: #6430c9;
+  color: #fff;
+  cursor: pointer;
+}
+
+.game-loader__retry:hover { background: #5126a6; }
+.game-loader__retry:disabled { cursor: wait; opacity: .6; }
+.game-loader__back { background: #fff; color: #4f2e98; }
+.game-loader__back:hover { background: #f0e9ff; }
+.game-loader__actions :focus-visible { outline: 3px solid #2257bc; outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .game-loader__track:not([aria-valuenow]) .game-loader__fill {
+    margin-inline: auto;
+    animation: none;
+  }
+}

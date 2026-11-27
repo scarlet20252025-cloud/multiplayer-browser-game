@@ -41,7 +41,11 @@ const readyToPlay=()=>room?.canStart??room?.bothConnected;
 const typeName=type=>type==='speed'?'限时':type==='puzzle'?'解谜':'普通';
 const levelName=id=>id===0?'教学关':'第 '+id+' 关';
 const versusRuntimes=new Set(['browser-lockstep','bvn33-online','tank-arena','platform-brawl']);
-const versusModeName=level=>level?.type&&level.type!=='general'?level.type:'双人对战';
+function versusModeName(game,level){
+  if(level?.type&&level.type!=='general')return level.type;
+  if(game?.id==='bomb-it-7')return '大乱斗';
+  return gameSeats(game)===2?'双人对战':'多人对战';
+}
 const tokenKey=name=>'fb-lobby-token:'+name;
 const profileKey='fb-guest-profile';
 const catalogKey='fb-lobby-catalog-v2';
@@ -79,9 +83,10 @@ const GAME_STYLE={
   shanyi:{emoji:'⭐',color:'#922461',cover:'shanyi'},
   'tank-trouble':{emoji:'🛡️',color:'#16686f',cover:'tank-trouble'},
   'platform-brawl':{emoji:'☁️',color:'#54359e',cover:'platform-brawl'},
+  'bomb-it-7':{emoji:'💣',color:'#203f88',cover:'bomb-it-7'},
   'bleach-vs-naruto':{emoji:'⚔️',color:'#722f68',cover:'bvn33'},
   bvn33:{emoji:'⚔️',color:'#722f68',cover:'bvn33'},
-  glorton:{emoji:'🎮',color:'#3f246a'},
+  glorton:{emoji:'🎮',color:'#3f246a',cover:'glorton'},
 };
 const styleFor=id=>GAME_STYLE[id]??{emoji:'🎮',color:'#5d36a4'};
 const art='/__lobby__/art/';
@@ -105,7 +110,7 @@ let matchEntry=null,matchNavigation=false;
 let glortonMode=glortonRequest===null?null:legacyGlortonRequest?.toLowerCase()==='host'?'host':'join';
 let glortonRoomQuery=glortonMode==='join'?glortonRoomReference(glortonRequest):'';
 let glortonHealth=null,glortonProbe=null,focusGlorton=Boolean(glortonMode);
-let glortonRoomName='',glortonPassword='',glortonError='',glortonBusy=false,glortonCapacity=2;
+let glortonRoomName='',glortonPassword='',glortonError='',glortonBusy=false;
 
 function toast(text){
   lastError=text;
@@ -256,7 +261,7 @@ function glortonRoomCard(item){
   const status=finished?'结算中':item.paused?'等待重连':playing?'进行中':full?'已满':item.connected?'等候玩家':'等待房主进入';
   const buttonLabel=returning?'返回房间':item.available?'加入':finished?'结算中':playing?'对局中':item.paused?'等待重连':full?'已满':'暂不可加入';
   return `<li class="catalog-room ${playing?'live':''}" style="--game-color:${styleFor(glortonGame.id).color}">
-    <span class="room-thumbnail glorton-room-thumbnail">${icon('gamepad')}</span>
+    <span class="room-thumbnail glorton-room-thumbnail">${coverImage(glortonGame.id)||icon('gamepad')}</span>
     <div class="catalog-room-copy"><b>${esc(item.name)}</b>
     <small>${status} · ${Number(item.connected)||0}/${capacity} 在线</small>
     <small class="glorton-room-meta">${glortonGame.title}</small></div>
@@ -279,7 +284,7 @@ function catalogHtml(){
   </article>`).join('');
   return (cards||'<p class="catalog-empty">正在读取游戏目录…</p>')+`<article class="catalog-game game-card glorton-card" data-game="${glortonGame.id}" style="--game-color:${styleFor(glortonGame.id).color}">
     <button type="button" class="game-select" data-action="filter-game" data-game="${glortonGame.id}" aria-pressed="${selectedGame===glortonGame.id}" aria-label="筛选疯狂小人乱斗房间">
-      <span class="glorton-card-art" aria-hidden="true">${icon('gamepad')}</span>
+      ${coverImage(glortonGame.id,'card-art')||`<span class="glorton-card-art" aria-hidden="true">${icon('gamepad')}</span>`}
       <span class="game-caption"><strong>${glortonGame.title}</strong><small>${icon('users')} 2–4 人 <span>网页对战</span></small></span>
     </button>
     <button type="button" class="game-create" data-action="open-glorton" aria-haspopup="dialog" aria-label="打开疯狂小人乱斗联机" title="创建疯狂小人乱斗房间">${icon('plus')}</button>
@@ -329,11 +334,10 @@ function glortonPanel(){
       <button type="button" data-action="glorton-join" aria-pressed="${!host}" ${glortonBusy?'disabled':''}>${icon('room')}加入房间</button>
     </div>
     <form id="glorton-form" class="create-grid" novalidate>
-      ${host?`<div class="field"><label for="glorton-room-name">房间名（选填）</label><input class="input" id="glorton-room-name" type="text" maxlength="24" autocomplete="off" value="${esc(glortonRoomName)}" placeholder="例如 2333，留空时自动命名" ${glortonBusy?'disabled':''}></div>
-        <div class="field"><label for="glorton-capacity">参赛人数</label><select id="glorton-capacity" ${glortonBusy?'disabled':''}>${[2,3,4].map(count=>`<option value="${count}" ${count===glortonCapacity?'selected':''}>${count} 人</option>`).join('')}</select></div>`
+      ${host?`<div class="field"><label for="glorton-room-name">房间名（选填）</label><input class="input" id="glorton-room-name" type="text" maxlength="24" autocomplete="off" value="${esc(glortonRoomName)}" placeholder="例如 2333，留空时自动命名" ${glortonBusy?'disabled':''}></div>`
         :`<div class="field"><label for="glorton-room-query">房间名或房间码</label><input class="input" id="glorton-room-query" type="text" maxlength="24" autocomplete="off" spellcheck="false" value="${esc(glortonRoomQuery)}" placeholder="输入房主创建的房间名" ${glortonBusy?'disabled':''}></div>`}
       <div class="field"><label for="glorton-password">房间密码</label><input class="input" id="glorton-password" type="password" maxlength="64" autocomplete="${host?'new-password':'off'}" value="${esc(glortonPassword)}" placeholder="${host?'至少 4 位':'输入房主提供的密码'}" ${glortonBusy?'disabled':''}></div>
-      ${host?'<p class="glorton-step">朋友可用房间名和密码加入，也可以直接打开邀请链接。</p>':''}
+      ${host?'<p class="glorton-step">用房间名或邀请链接邀请好友。2–4 位玩家在线并准备后自动开局。</p>':''}
       <p id="glorton-error" class="notice error" role="alert" ${glortonError?'':'hidden'}>${esc(glortonError)}</p>
       <div class="dialog-actions"><button type="submit" class="primary" data-action="enter-glorton" ${glortonHealth&&!glortonBusy?'':'disabled'}>${glortonBusy?'<span class="spinner"></span> ':''}${host?'创建并进入':'进入对局'}</button></div>
     </form>
@@ -400,7 +404,7 @@ async function submitGlorton(){
   const known=host?null:plazaRooms.find(item=>item.gameId===glortonGame.id&&
     [item.name,item.code].some(value=>roomNameKey(value)===roomNameKey(reference)));
   const priorSeat=host?null:readGlortonSeat(known?.code??reference.normalize('NFKC').toUpperCase());
-  const body={name:profile.name,password:glortonPassword,...(host?{roomName:glortonRoomName.trim(),capacity:glortonCapacity}
+  const body={name:profile.name,password:glortonPassword,...(host?{roomName:glortonRoomName.trim(),roster:'auto'}
     :{room:reference,...(priorSeat?{seat:priorSeat}:{})})};
   glortonBusy=true;glortonError='';renderAuth();
   try{
@@ -597,9 +601,9 @@ function chatMessagesHtml(messages){
         <div class="chat-bubble">${esc(message.text)}</div></div></div>`;
   }).join('');
 }
-function chatPanel(){
+function chatPanel(onlineStatus){
   return `<aside class="chat-card" id="room-chat">
-    <div class="chat-head"><div><h3>房间聊天</h3><span id="chat-status">${room?.connected?.filter(Boolean).length??0}/${seatCapacity()} 在线</span></div><span class="live-dot"></span></div>
+    <div class="chat-head"><div><h3>房间聊天</h3><span id="chat-status">${onlineStatus}</span></div><span class="live-dot"></span></div>
     <div class="chat-log" id="chat-log">${chatMessagesHtml(room?.chat)}</div>
     <form class="chat-form" id="chat-form"><input id="chat-input" maxlength="500" autocomplete="off" aria-label="房间聊天消息" placeholder="发送消息…"><button type="submit" class="chat-send">发送</button></form>
   </aside>`;
@@ -607,6 +611,78 @@ function chatPanel(){
 function listedGames(){return games.filter(game=>game.listed!==false);}
 function currentGame(){return games.find(game=>game.id===room?.gameId)??null;}
 function inviteLink(){return (cfg.viewerOrigin||location.origin)+'/?room='+encodeURIComponent(room?.name??'');}
+function bombItOutfitPanel(outfit,locked){
+  const parts=[['clothId','服装'],['hatId','帽子'],['expId','表情']];
+  const options=['默认','款式 1','款式 2','款式 3'];
+  return `<section class="content-card" aria-labelledby="outfit-title">
+    <div class="card-head"><div><h2 id="outfit-title">角色装扮</h2><p>${locked?'本局装扮已锁定。':'选择你在对局中使用的原版装扮。'}</p></div></div>
+    <fieldset class="outfit-fields" aria-labelledby="outfit-title" ${locked?'disabled':''}>
+      ${parts.map(([part,label])=>`<div><label for="outfit-${part}">${label}</label><select id="outfit-${part}" data-outfit-part="${part}">
+        ${options.map((name,value)=>`<option value="${value}" ${outfit[part]===value?'selected':''}>${name}</option>`).join('')}
+      </select></div>`).join('')}
+    </fieldset>
+  </section>`;
+}
+const bombItPreviewRoot='/__lobby__/art/bomb-it-7';
+const bombItMapNames={FashionShop:'时装店',Cake:'蛋糕店',Classroom:'教室',Forest:'森林',Race:'赛道',
+  Ranch:'牧场',ToyShop:'玩具店',Christmas:'圣诞村',Sand:'沙滩'};
+const bombItModeNames={kill:'大乱斗',collect:'抢星星',pacMan:'吃金币',frozen:'冰冻大战'};
+function bombItPortrait({robotId=0,clothId=0,hatId=0,expId=0}){
+  const variant=clothId*16+hatId*4+expId;
+  const offsetX=(variant%8)*100/7;
+  const offsetY=Math.floor(variant/8)*100/7;
+  return `<span class="bomb-it-portrait" aria-hidden="true" style="--portrait:url('${bombItPreviewRoot}/wardrobe/robot-${robotId}.webp');--portrait-x:${offsetX}%;--portrait-y:${offsetY}%"></span>`;
+}
+function bombItWardrobe(outfit,seats,locked){
+  const choice=(part,value,label,portrait,taken)=>`<button type="button" class="bomb-it-choice" id="bombit-${part}-${value}"
+    data-action="bomb-it-outfit" data-outfit-part="${part}" data-outfit-value="${value}"
+    aria-pressed="${outfit[part]===value}" ${locked||taken?'disabled':''} ${taken?`aria-label="${label} · ${esc(taken.label)} 使用中"`:''}>
+    ${bombItPortrait(portrait)}<span>${label}</span></button>`;
+  const characters=Array.from({length:8},(_,robotId)=>choice('robotId',robotId,`角色 ${robotId+1}`,{robotId},
+    seats.find(item=>item.seat!==seat&&item.outfit?.robotId===robotId)));
+  const parts=[['clothId','服装'],['hatId','帽子'],['expId','表情']];
+  return `<section class="content-card" aria-labelledby="bombit-wardrobe-title">
+    <div class="card-head"><h2 id="bombit-wardrobe-title">角色与装扮</h2></div>
+    <div class="bomb-it-wardrobe">
+      <figure class="bomb-it-current">${bombItPortrait(outfit)}<figcaption>角色 ${outfit.robotId+1} · 当前装扮</figcaption></figure>
+      <div class="bomb-it-character-grid" role="group" aria-label="选择角色">${characters.join('')}</div>
+      ${parts.map(([part,label])=>`<section class="bomb-it-part"><h3>${label}</h3><div class="bomb-it-part-grid" role="group" aria-label="选择${label}">
+        ${Array.from({length:4},(_,value)=>choice(part,value,value?'款式 '+value:'默认',{...outfit,[part]:value})).join('')}
+      </div></section>`).join('')}
+    </div>
+  </section>`;
+}
+function bombItRules(settings,locked){
+  const editable=settings.hostSeat===seat&&!locked;
+  const group=(ids,names,directory,part,label)=>{
+    const items=ids.filter(id=>Object.hasOwn(names,id)).map(id=>{
+      const title=names[id];
+      const selected=settings[part]===id;
+      const card=`<img src="${bombItPreviewRoot}/${directory}/${id}.webp" alt="" loading="lazy" width="112" height="70"><span>${title}</span>`;
+      return editable?`<button type="button" class="bomb-it-rule" id="bombit-${part}-${id}" data-action="bomb-it-setting" data-bomb-it-setting="${part}" data-bomb-it-value="${id}" aria-pressed="${selected}">${card}</button>`
+        :`<div class="bomb-it-rule${selected?' active':''}" ${selected?'aria-current="true"':''}>${card}</div>`;
+    });
+    return `<section class="bomb-it-rule-group"><h3>${label}<small>已选 ${esc(names[settings[part]]??'')}</small></h3>
+      <div class="bomb-it-rule-strip" id="bombit-${directory}" data-bomb-it-scroll tabindex="0" role="group" aria-label="${label}预览">${items.join('')}</div></section>`;
+  };
+  return `<section class="content-card" aria-labelledby="bombit-rules-title">
+    <div class="card-head"><div><h2 id="bombit-rules-title">地图与模式</h2><p>${editable?'由房主选择本局规则，变更后所有玩家重新准备。':'房主选择地图和模式后，同步给所有玩家。'}</p></div></div>
+    ${group(settings.availableMaps??[],bombItMapNames,'maps','mapId','地图')}
+    ${group(settings.availableModes??[],bombItModeNames,'modes','modeId','模式')}
+  </section>`;
+}
+function bombItReadyPanel(seats,settings,locked){
+  const me=seats.find(item=>item.seat===seat);
+  const players=seats.filter(item=>item.occupied);
+  const ready=players.filter(item=>item.ready).length;
+  const watching=players.some(item=>!item.connected);
+  const message=players.length<2?'至少 2 位玩家才能开局。':watching?'正在等待玩家重连，席位保留 20 秒。':'所有玩家准备后自动开局。';
+  return `<section class="content-card bomb-it-ready-panel" aria-labelledby="bombit-ready-title">
+    <div class="card-head"><div><h2 id="bombit-ready-title">开局准备</h2><p>${esc(bombItModeNames[settings.modeId]??'')} · ${esc(bombItMapNames[settings.mapId]??'')} · ${ready}/${players.length} 已准备</p></div>
+      <button type="button" class="${me?.ready?'':'primary'}" id="bombit-ready" data-action="bomb-it-ready" ${locked?'disabled':''}>${me?.ready?'取消准备':'准备'}</button></div>
+    ${locked?'':`<p class="bomb-it-ready-note">${message}</p>`}
+  </section>`;
+}
 function renderRoom(){
   view='room';
   const game=currentGame();
@@ -623,11 +699,17 @@ function renderRoom(){
   const arena=game?.runtime==='tank-arena';
   const canResume=game?.id==='bvn33'||game?.runtime==='platform-brawl';
   const proposalLabel=arena?'迷宫对战':versus
-    ? versusModeName(levels.find(level=>level.id===proposal?.levelId))
+    ? versusModeName(game,levels.find(level=>level.id===proposal?.levelId))
     : levelName(proposal?.levelId);
   const saves=room?.saves??{};
   const phaseText=playing?'游戏进行中':starting?'正在启动':'等候开局';
   const seats=seatEntries();
+  const outfit=game?.id==='bomb-it-7'?seats.find(item=>item.seat===seat)?.outfit:null;
+  const outfitLocked=Boolean(starting||playing||proposal);
+  const bombItSettings=outfit?room.bombItSettings:null;
+  const bombItLocked=room.phase!=='select';
+  const onlineLabel=playing?'大厅在线':'在线';
+  const onlineStatus=`${seats.filter(item=>item.connected).length}/${seatCapacity()} ${onlineLabel}`;
   const awaiting=seats.filter(item=>item.connected&&!confirmations.includes(item.seat))
     .map(item=>item.name||item.label).join('、');
   const banner=voted?`<div class="banner"><div>已确认 <b>${esc(proposalLabel)}</b>，等待 ${esc(awaiting)}。</div><button type="button" data-action="cancel-proposal">${proposal.bySeat===seat?'撤回提议':'取消开局'}</button></div>`:'';
@@ -641,13 +723,17 @@ function renderRoom(){
   const chatField=$('#chat-input');
   const chatDraft=chatField?.value??'';
   const restoreChat=chatField&&document.activeElement===chatField;
+  const activeControl=document.activeElement;
+  const focusedBombIt=bombItSettings&&activeControl?.id.startsWith('bombit-')?activeControl.id:null;
+  const bombItScroll=bombItSettings?Array.from(app.querySelectorAll('[data-bomb-it-scroll]'),el=>[el.id,el.scrollLeft]):[];
+  const focusedOutfit=outfit&&!outfitLocked&&!bombItSettings?activeControl?.dataset.outfitPart:null;
   const lastLog=$('#chat-log');
   const previousScroll=lastLog&&lastLog.scrollHeight-lastLog.scrollTop-lastLog.clientHeight>16?lastLog.scrollTop:null;
   app.innerHTML=shell(`
     <header class="room-banner" style="--game-color:${styleFor(game?.id).color}">
       ${coverImage(game?.id,'room-banner-art')}
       <div class="room-title-block"><span class="eyebrow">${icon('room')} ${phaseText}</span><h1>${esc(room?.name??'')}</h1>
-        <p>${esc(game?.title??'等待选择游戏')} · ${seats.filter(item=>item.connected).length}/${seatCapacity()} 在线</p></div>
+        <p>${esc(game?.title??'等待选择游戏')} · ${onlineStatus}</p></div>
       <div class="room-banner-actions"><button type="button" class="danger" data-action="leave">退出房间</button></div>
     </header>
     ${waitingBanner}${playingBanner}${matchEntryBanner}${banner}
@@ -658,7 +744,10 @@ function renderRoom(){
             const isMe=item.seat===seat;
             const avatar=isMe?esc(profile?.avatar??'🐟'):'🎮';
             const name=isMe?(profile?.name??'游客'):(item.name||item.label);
-            const note=item.connected?'已加入':'等待加入';
+            const readyStatus=item.ready?'已准备':'未准备';
+            const note=bombItSettings&&!bombItLocked&&item.occupied
+              ? `${item.connected?'':'重连中 · '}${readyStatus}`
+              : item.connected?onlineLabel:item.occupied?'席位保留':'空席';
             return `<div class="player-row seat-pill seat-${item.seat} ${item.connected?'on':''}"><span class="player-mini-avatar ${isMe?'':'opponent'}" style="--avatar-bg:${isMe?esc(profile?.bg??seatColor(item.seat)):seatColor(item.seat)}">${avatar}<i class="dot" aria-hidden="true"></i></span><div><b>${esc(name)}${isMe?'（你）':''}</b><small>${esc(item.label)} · ${esc(note)}</small></div></div>`;
           }).join('')}
         </section>
@@ -668,7 +757,9 @@ function renderRoom(){
       <section class="room-center">
         ${!room.boundGameId?`<section class="content-card"><div class="card-head"><div><h2>选择此房间的游戏</h2><p>选择后，房间将归入对应的游戏，原有存档继续保留。</p></div></div>
           <div class="room-game-grid legacy-games">${listedGames().map(item=>`<button type="button" data-action="select-game" data-game="${esc(item.id)}" ${starting||playing?'disabled':''}>${styleFor(item.id).emoji} ${esc(item.title)}</button>`).join('')}</div></section>`:''}
-        ${game?`<section class="content-card room-play"><div class="card-head"><div><h2>${icon('play')}${versus?'开始对战':'选择关卡'}</h2><p>${arena?'在线玩家确认后开局，模式在对局内投票。':'发起提议，在线玩家确认后开始。'}</p></div>${Object.keys(saves).length?`<span class="save-state">${esc(saveSummary(saves))}</span>`:''}</div>
+        ${bombItSettings?bombItReadyPanel(seats,bombItSettings,bombItLocked)+bombItWardrobe(outfit,seats,bombItLocked)+bombItRules(bombItSettings,bombItLocked):''}
+        ${outfit&&!bombItSettings?bombItOutfitPanel(outfit,outfitLocked):''}
+        ${game&&!bombItSettings?`<section class="content-card room-play"><div class="card-head"><div><h2>${icon('play')}${versus?'开始对战':'选择关卡'}</h2><p>${arena?'在线玩家确认后开局，模式在对局内投票。':'发起提议，在线玩家确认后开始。'}</p></div>${Object.keys(saves).length?`<span class="save-state">${esc(saveSummary(saves))}</span>`:''}</div>
           <div class="level-grid">${levels.map(level=>{
             const save=saves?.[game.id];
             const flash=game.runtime==='flash-ruffle';
@@ -677,11 +768,11 @@ function renderRoom(){
             const external=game.runtime==='html5-external';
             return `<button type="button" class="level-card ${canSelectLevel?'':'disabled'} ${save?.levelId===level.id?'saved':''}" data-action="level" data-level="${level.id}" data-game="${esc(game.id)}" ${canSelectLevel?'':'disabled'}>
               ${save?.levelId===level.id?'<span class="level-mark">存档</span>':''}
-              <span class="level-n">${arena?'开局':versus?esc(versusModeName(level)):external||flash?'开始':level.id===0?'教学':level.id}</span>
+              <span class="level-n">${arena?'开局':versus?esc(versusModeName(game,level)):external||flash?'开始':level.id===0?'教学':level.id}</span>
               <span class="level-t">${external?'新建 4 位房间码':versus?`${gameSeatRange(game)} 人对战`:flash?'联机':typeName(level.type)}</span></button>`;
           }).join('')}</div></section>`:''}
       </section>
-      ${chatPanel()}
+      ${chatPanel(onlineStatus)}
     </div>
     ${starting?`<div class="modal-mask"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="starting-title" tabindex="-1"><h3 id="starting-title"><span class="spinner"></span>正在启动游戏</h3><p>准备完成后会自动进入对局。</p></div></div>`:''}
     ${needsConfirmation&&!starting?`<div class="modal-mask"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="proposal-title"><div class="dialog-head"><span class="dialog-icon">${icon('gamepad')}</span><div><h3 id="proposal-title">${esc(seatName(proposal.bySeat))} 请求开始</h3><p><b>${esc(game?.title??'')} · ${game?.runtime==='flash-ruffle'?'进入游戏':esc(proposalLabel)}</b></p></div></div>
@@ -698,6 +789,12 @@ function renderRoom(){
   }
   const log=$('#chat-log');
   if(log)log.scrollTop=previousScroll??log.scrollHeight;
+  if(focusedOutfit)app.querySelector(`[data-outfit-part="${CSS.escape(focusedOutfit)}"]`)?.focus({preventScroll:true});
+  for(const [id,offset] of bombItScroll){
+    const strip=document.getElementById(id);
+    if(strip)strip.scrollLeft=offset;
+  }
+  if(focusedBombIt)document.getElementById(focusedBombIt)?.focus({preventScroll:true});
 }
 function render(){
   if(view==='room'&&room)renderRoom();
@@ -1023,7 +1120,10 @@ app.addEventListener('submit',event=>{
   if(event.target.id==='glorton-form'){event.preventDefault();void submitGlorton();}
 });
 app.addEventListener('change',event=>{
-  if(event.target.id==='glorton-capacity')glortonCapacity=Number(event.target.value);
+  const part=event.target.dataset.outfitPart;
+  if(!part||view!=='room'||room?.gameId!=='bomb-it-7'||room.phase!=='select'||room.proposal)return;
+  if(ws?.readyState!==WebSocket.OPEN){renderRoom();toast('房间连接中，请连上后再更换装扮。');return;}
+  ws.send(JSON.stringify({type:'set-outfit',part,value:Number(event.target.value)}));
 });
 document.addEventListener('keydown',event=>{
   const modal=Array.from(app.querySelectorAll('.modal-mask [role="dialog"]')).at(-1);
@@ -1120,6 +1220,24 @@ app.addEventListener('click',event=>{
   if(action==='level'){if(ws?.readyState!==WebSocket.OPEN||!readyToPlay()||room.phase!=='select'||room.proposal)return;ws.send(JSON.stringify({type:'propose-level',gameId:target.dataset.game,levelId:Number(target.dataset.level)}));return;}
   if(action==='cancel-proposal'){if(room?.proposal&&ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'cancel-proposal',proposalId:room.proposal.id}));return;}
   if(action==='confirm-level'){if(room?.proposal&&ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'confirm-level',proposalId:room.proposal.id}));return;}
+  if(action==='bomb-it-ready'||action==='bomb-it-outfit'||action==='bomb-it-setting'){
+    const settings=room?.bombItSettings;
+    if(!settings||room.phase!=='select'||ws?.readyState!==WebSocket.OPEN)return;
+    if(action==='bomb-it-ready'){
+      const ready=!seatEntries().find(item=>item.seat===seat)?.ready;
+      ws.send(JSON.stringify({type:'set-bomb-it-ready',ready,revision:settings.revision}));
+    }
+    if(action==='bomb-it-outfit'){
+      const {outfitPart,outfitValue}=target.dataset;
+      ws.send(JSON.stringify({type:'set-outfit',part:outfitPart,value:Number(outfitValue)}));
+    }
+    if(action==='bomb-it-setting'&&settings.hostSeat===seat){
+      const {bombItSetting,bombItValue}=target.dataset;
+      ws.send(JSON.stringify({type:'set-bomb-it-settings',mapId:settings.mapId,modeId:settings.modeId,
+        [bombItSetting]:bombItValue,revision:settings.revision}));
+    }
+    return;
+  }
   if(action==='join-active'||action==='retry-match-entry'){requestActiveMatch();return;}
   if(action==='copy-invite'){void copyInvite();return;}
   if(action==='leave'){clearMatchEntry();try{ws?.send(JSON.stringify({type:'leave'}));}catch{}if(room)clearToken(room.name);navigating=true;location.href='/';return;}

@@ -9,7 +9,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {constants} from 'node:fs';
-import {lstat, open, realpath} from 'node:fs/promises';
+import {lstat, open, readFile, realpath} from 'node:fs/promises';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {LOCKSTEP_RUNTIME} from '../public/lockstep/protocol.mjs';
@@ -17,6 +17,7 @@ import {ARENA_RUNTIME, ARENA_SOCKET} from '../public/tank-arena/rules.mjs';
 import {BRAWL_RUNTIME, BRAWL_SOCKET} from '../public/platform-brawl/rules.mjs';
 import {GLORTON_HEALTH_PATH, GLORTON_SOCKET_PATH} from '../server/glorton-viewer-proxy.mjs';
 import {GLORTON_BROWSER_HEALTH_PATH, GLORTON_BROWSER_SOCKET_PATH} from '../server/glorton-browser-rooms.mjs';
+import {ORIGINAL_SWF_BYTES, ORIGINAL_SWF_PATH, ORIGINAL_SWF_SHA256} from '../experiments/bomb-it-netplay/original-file.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODULE_NAMES = new Set(['pause-bridge.mjs', 'state-snapshot.mjs', 'jump-observer.mjs', 'jump-analysis.mjs', 'authority-input.mjs', 'spectator-projection.mjs', 'spectator-client.mjs']);
@@ -24,13 +25,18 @@ const MODULE_PREFIX = 'adapters/fireboy-html5/';
 const LOBBY_FILES = new Set(['index.html','lobby.mjs','lobby.css','game-chat.mjs']);
 const GLORTON_LOCAL_PREFIX='/glorton-local/';
 const GLORTON_LOCAL_FILES=new Set(['.html','.js','.mjs','.css','.json','.webmanifest','.wasm','.zip','.apk','.data','.png','.ico','.whl','.txt']);
-const LOBBY_COVERS = ['forest','light','ice','crystal','shanyi','tank-trouble','bvn33','platform-brawl'];
+const LOBBY_COVERS = ['forest','light','ice','crystal','shanyi','tank-trouble','bvn33','platform-brawl','bomb-it-7','glorton'];
 const LOBBY_ART = new Set([
   'art/carnival.webp', 'art/title.webp', 'art/boy.webp', 'art/girl.webp',
   'art/corgi.webp', 'art/sprout.webp', 'art/sprite.svg',
   ...LOBBY_COVERS.map(id => 'art/covers/'+id+'.webp'),
+  ...Array.from({length:8}, (_, id) => 'art/bomb-it-7/wardrobe/robot-'+id+'.webp'),
+  ...['FashionShop','Cake','Classroom','Forest','Race','Ranch','ToyShop','Christmas','Sand']
+    .map(id => 'art/bomb-it-7/maps/'+id+'.webp'),
+  ...['kill','collect','pacMan','frozen'].map(id => 'art/bomb-it-7/modes/'+id+'.webp'),
+  ...['Rooftop','Mogadishu','B52','Space'].map(id => 'art/glorton/maps/'+id+'.png'),
 ]);
-const LOCKSTEP_FILES = new Set(['client.mjs','protocol.mjs']);
+const LOCKSTEP_FILES = new Set(['client.mjs','protocol.mjs','loading.mjs','loading.css']);
 const INSTANCE_ANCHOR = '(o = new h.Game(m)),';
 const INSTANCE_EXPOSURE = '(o = window.__game = new h.Game(m)),';
 const VIEWPORT_WIDTH_READ = 'window.innerWidth || $(window).width()';
@@ -358,27 +364,53 @@ function lobbyNetworkOrigin(value) {
   return url.origin;
 }
 
-function lockstepPage({title, bridgeUrl}, lobbyWsUrl) {
+function lockstepPage({id: gameId, title, bridgeUrl}, lobbyWsUrl) {
   const safeTitle = title.replace(/[<>&]/g, '');
   return `<!doctype html>
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${safeTitle} · 联机对战</title>
+<link rel="stylesheet" href="/__lockstep__/loading.css">
 <style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(155deg,#b9e8ff,#e0f0ff 43%,#eee5ff);color:#20215c;font:16px system-ui,sans-serif}
-main{width:min(1100px,100%);margin:auto;padding:clamp(16px,4vw,40px)}
+main{width:min(1500px,100%);margin:auto;padding:clamp(12px,2.5vw,32px)}
 header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 13px;background:#fff;border:1px solid #dcd8f3;border-radius:16px}
 h1{margin:0;font-size:clamp(18px,4vw,28px)}button{color:#573400;background:#ffda4f;border:1px solid #ffda4f;padding:7px 11px;min-height:42px;border-radius:10px;font:700 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 0 #e5ad19}
-button:focus-visible{outline:2px solid #783af0;outline-offset:2px}#match-status{min-height:1.5em;color:#5d5a83}#match-stage{display:grid;place-items:center;min-height:220px;background:#080518;border:3px solid #fff;border-radius:16px;box-shadow:0 0 0 1px #cabbe6;overflow:hidden}
-#match-stage canvas,#match-stage ruffle-player{display:block;max-width:100%}footer{color:#5d5a83;margin-top:12px}
+button:focus-visible{outline:2px solid #783af0;outline-offset:2px}#match-status{color:#514775}
+.match-layout{margin-top:14px;display:grid;grid-template-columns:clamp(135px,14vw,192px) minmax(0,1fr) clamp(135px,14vw,192px);align-items:start;gap:14px}
+.match-panel{min-width:0;padding:14px;background:#fff;border:1px solid #ded7f0;border-radius:16px}
+.match-panel h2{margin:0 0 10px;font-size:15px}.match-panel p,.match-panel footer{margin:8px 0;color:#514775;font-size:14px;overflow-wrap:anywhere}
+footer kbd{display:inline-block;margin:2px 3px 2px 0;padding:2px 4px;background:#f0e8ff;border:1px solid #dacdf4;border-radius:4px;white-space:nowrap}
+.render-settings{border-top:1px solid #e4dcf8;margin-top:12px;padding-top:12px}.render-settings label{display:block;font-weight:650;font-size:14px}
+.render-settings select{width:100%;min-height:36px;margin-top:7px;border:1px solid #dacdf4;border-radius:7px;background:#f8f5ff;color:#20215c;padding:4px}
+.render-settings small{display:block;margin-top:6px;color:#514775;font-size:12px}
+dl{margin:0}dl div{display:flex;justify-content:space-between;gap:8px;margin:8px 0;font-size:13px}dt{color:#514775}dd{margin:0;min-width:0;text-align:right;overflow-wrap:anywhere;font-weight:650}
+#match-view{background:#080518;border:3px solid #fff;border-radius:16px;box-shadow:0 0 0 1px #cabbe6;overflow:hidden}
+#match-stage{display:grid;place-items:center;min-height:220px}#match-stage canvas,#match-stage ruffle-player{display:block;max-width:100%}
+@media(max-width:760px){.match-layout{grid-template-columns:repeat(2,minmax(0,1fr))}#match-view{grid-row:1;grid-column:1/-1}}
 </style></head>
 <body><main>
 <header><h1>${safeTitle}</h1><button id="match-return" type="button">返回房间</button></header>
-<p id="match-status" role="status">正在连接对战房间…</p>
-<div id="match-stage" aria-label="对战画面"></div>
-<footer>W A S D · J K L U I O</footer>
+<div class="match-layout">
+  <aside class="match-panel" aria-labelledby="match-info-heading">
+    <h2 id="match-info-heading">房间信息</h2>
+    <p id="match-status" role="status">正在连接对战房间…</p>
+    <dl><div><dt>房间</dt><dd id="match-room">—</dd></div><div><dt>玩家</dt><dd id="match-players">—</dd></div><div><dt>逻辑帧率</dt><dd id="match-fps">—</dd></div></dl>
+  </aside>
+  <div id="match-view"><div id="match-stage" aria-label="对战画面"></div></div>
+  <aside class="match-panel" aria-labelledby="match-keys-heading">
+    <h2 id="match-keys-heading">键位</h2><footer hidden></footer>
+    ${gameId === 'bomb-it-7' ? `<div class="render-settings">
+      <label for="match-render-quality">画质</label>
+      <select id="match-render-quality" aria-describedby="match-render-size">
+        <option value="auto">清晰</option><option value="performance">省性能</option>
+      </select>
+      <small id="match-render-size">下次加载时生效</small>
+    </div>` : ''}
+  </aside>
+</div>
 </main>
-<script>window.__LOCKSTEP_CONFIG__=${jsonScript({bridgeUrl,lobbyWsUrl})};</script>
+<script>window.__LOCKSTEP_CONFIG__=${jsonScript({gameId,bridgeUrl,lobbyWsUrl})};</script>
 <script type="module" src="/__lockstep__/client.mjs"></script>
 </body></html>`;
 }
@@ -386,7 +418,7 @@ button:focus-visible{outline:2px solid #783af0;outline-offset:2px}#match-status{
 /**
  * @param {{root:string,script?:string,port?:number,games?:Array, lobbyWsUrl?:string}} options
  */
-export async function startHtml5ResearchHost({root, script, port = 0, publicPort = null, requireScript = REQUIRE_SCRIPT, entryPath = '/', autoJoinWsUrl=null, autoJoinLevelId=1, games=null, lobbyWsUrl=null, lobbyHttpHandler=null, ruffleDir=null, host='127.0.0.1', publicHost=null, lanViewerOrigin=null, wanViewerOrigin=null, bvnProxy=null, glortonProxy=null, glortonBrowser=null, glortonLocalWebRoot=null, arenaViewerUpgrade=null} = {}) {
+export async function startHtml5ResearchHost({root, script, port = 0, publicPort = null, requireScript = REQUIRE_SCRIPT, entryPath = '/', autoJoinWsUrl=null, autoJoinLevelId=1, games=null, lobbyWsUrl=null, lobbyHttpHandler=null, ruffleDir=null, host='127.0.0.1', publicHost=null, lanViewerOrigin=null, wanViewerOrigin=null, bvnProxy=null, glortonProxy=null, glortonBrowser=null, glortonLocalWebRoot=null, arenaViewerUpgrade=null, bombItSwf=null} = {}) {
   if (typeof root !== 'string' || !root.trim()) throw failure('HTML5_ROOT_REQUIRED', 'Provide the private first-game directory with --root.');
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw failure('HTML5_INVALID_PORT', 'port must be an integer from 0 to 65535.');
   if (publicPort !== null && (!Number.isInteger(publicPort) || publicPort < 1 || publicPort > 65535))
@@ -566,6 +598,20 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
   const sourceSha256 = primary.sourceSha256 ?? null;
   const servedSha256 = primary.servedSha256 ?? null;
   const sourceBytes = primary.sourceBytes ?? null;
+  const hasBombIt = externalGames.get('bomb-it-7')?.runtime === LOCKSTEP_RUNTIME;
+  let bombItOriginal;
+  if (hasBombIt && bombItSwf) {
+    try {
+      const file = await lstat(bombItSwf);
+      if (!file.isFile() || file.size !== ORIGINAL_SWF_BYTES) throw new Error('Unexpected SWF size or type');
+      const bytes = await readFile(bombItSwf);
+      if (bytes.length !== ORIGINAL_SWF_BYTES || sha256(bytes) !== ORIGINAL_SWF_SHA256)
+        throw new Error('Unexpected SWF fingerprint');
+      bombItOriginal = bytes;
+    } catch (error) {
+      console.warn('BOMB_IT_ORIGINAL_UNAVAILABLE: ' + (error.code ?? error.message));
+    }
+  }
 
   const manifestGames = [...new Map([
     ...servedGames.values(), ...flashGames.values(), ...externalGames.values(),
@@ -628,6 +674,16 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
         return await lobbyHttpHandler(req,res);
       }
       if (!['GET','HEAD'].includes(req.method)) return reply(405, 'text/plain; charset=utf-8', 'Method Not Allowed');
+      if (hasBombIt && pathname === ORIGINAL_SWF_PATH) {
+        if (!bombItOriginal) return reply(503, 'text/plain; charset=utf-8', 'Original game asset unavailable');
+        const etag = `"${ORIGINAL_SWF_SHA256}"`;
+        const headers = {etag, 'cache-control': 'private, max-age=31536000, immutable'};
+        if (req.headers['if-none-match']?.split(',').some(value => [etag, 'W/' + etag, '*'].includes(value.trim()))) {
+          res.writeHead(304, headers);
+          return res.end();
+        }
+        return reply(200, TYPES['.swf'], bombItOriginal, headers);
+      }
       if (multi) {
         if (pathname===GLORTON_BROWSER_HEALTH_PATH) return reply(503,'application/json; charset=utf-8','{"ok":false}');
         if (['/glorton-online/local-session.mjs','/glorton-online/local-hud.mjs','/glorton-online/frame-wire.mjs'].includes(pathname)) {
@@ -678,7 +734,7 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
         if(pathname.startsWith('/__lockstep__/')){
           const name=pathname.slice('/__lockstep__/'.length);
           if(!LOCKSTEP_FILES.has(name))return reply(404,'text/plain; charset=utf-8','Not Found');
-          return reply(200,'text/javascript; charset=utf-8',
+          return reply(200,name.endsWith('.css')?TYPES['.css']:TYPES['.js'],
             await readContainedFile(REPO_ROOT,'public/lockstep/'+name));
         }
       } else if (pathname === entryPath || (entryPath === '/' && pathname === '/index.html')) {
@@ -706,7 +762,8 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
       // 只做原样转发，不改写 HTML、不注入侧栏；入口目录本身返回 index.html。
       const externalEntry = externalEntries.get(pathname);
       if (externalEntry?.runtime === LOCKSTEP_RUNTIME)
-        return reply(200, 'text/html; charset=utf-8', lockstepPage(externalEntry,lobbyWsUrl));
+        return reply(200, 'text/html; charset=utf-8',
+          lockstepPage(externalEntry,requestClientConfig(req).primaryWsUrl??lobbyWsUrl));
       if (externalEntry) {
         return reply(200, 'text/html; charset=utf-8',
           await readContainedFile(externalEntry.serveRoot, externalEntry.entryRel),
@@ -719,10 +776,14 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
         const file = rest ? relativePath(rest) : 'index.html';
         const ext = path.extname(file).toLowerCase();
         const esModule = ext === '.mjs' && [LOCKSTEP_RUNTIME, ARENA_RUNTIME, BRAWL_RUNTIME].includes(externalInfo.runtime);
-        const type = esModule ? TYPES['.js'] : TYPES[ext];
+        const moviePage = externalInfo.runtime === LOCKSTEP_RUNTIME && file === 'movie.html';
+        const type = moviePage ? 'text/html; charset=utf-8' : esModule ? TYPES['.js'] : TYPES[ext];
         if (!type) return reply(404, 'text/plain; charset=utf-8', 'Not Found');
+        const immutableRuntime = externalInfo.runtime === LOCKSTEP_RUNTIME &&
+          /^runtime\/(?:core\.ruffle\.[a-f0-9]{20}\.js|[a-f0-9]{20}\.wasm)$/.test(file);
         return reply(200, type,
-          await readContainedFile(externalInfo.serveRoot, externalInfo.dir + '/' + file));
+          await readContainedFile(externalInfo.serveRoot, externalInfo.dir + '/' + file),
+          immutableRuntime ? {'cache-control':'public, max-age=31536000, immutable'} : {});
       }
       const flashEntry = flashEntries.get(pathname);
       if (flashEntry)
@@ -794,7 +855,7 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
     const pathname=req.url?.split('?')[0];
     if (pathname===GLORTON_BROWSER_SOCKET_PATH && glortonBrowser) return glortonBrowser.handleUpgrade(req,socket,head);
     if (pathname===GLORTON_SOCKET_PATH && glortonProxy) return glortonProxy.handleUpgrade(req,socket,head);
-    if (arenaViewerUpgrade && [ARENA_SOCKET,BRAWL_SOCKET,'/lobby'].includes(pathname)){
+    if (arenaViewerUpgrade && [ARENA_SOCKET,BRAWL_SOCKET,'/lobby','/lockstep'].includes(pathname)){
       viewerSockets.add(socket);
       socket.once('close',()=>viewerSockets.delete(socket));
       return arenaViewerUpgrade(req,socket,head);

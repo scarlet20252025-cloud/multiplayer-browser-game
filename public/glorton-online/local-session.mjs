@@ -9,6 +9,11 @@ const metricsInterval=250;
 const linkSampleLifetime=5000;
 const seatKey=room=>'glorton-browser-seat:'+room;
 const nameKey=room=>'glorton-browser-name:'+room;
+const gameKeys=new Map([
+  ['KeyA','left'],['KeyD','right'],['KeyW','up'],['KeyS','down'],
+  ['KeyJ','punch'],['KeyK','special'],['ShiftLeft','shield'],['ShiftRight','shield'],
+]);
+const maxInputEvents=32;
 
 function lobbyLink(name){
   const url=new URL('/',location.origin);
@@ -16,7 +21,56 @@ function lobbyLink(name){
   return url;
 }
 
-export function createLocalSession({room,seat,url,Socket=WebSocket,onPacket=()=>{},onDisconnect=()=>{},onMetrics=()=>{}}){
+export function captureGlortonKeyboard(view,isPlaying,onClear){
+  const pressed=new Set(),queue=[];
+  const editing=target=>target?.closest?.('input,select,textarea,[contenteditable]:not([contenteditable="false"])');
+  let reset=false;
+  function clear(notify=false){
+    pressed.clear();
+    queue.length=0;
+    reset=true;
+    if(notify)onClear();
+  }
+  function key(event,down){
+    const action=gameKeys.get(event.code);
+    if(!action)return;
+    if(down){
+      if(!isPlaying()||view.document.hidden||editing(event.target)||event.ctrlKey||event.metaKey||event.altKey||event.isComposing)return;
+      event.preventDefault();
+      if(event.repeat||pressed.has(event.code))return;
+    }else if(!pressed.has(event.code))return;
+    const shared=[...pressed].some(code=>code!==event.code&&gameKeys.get(code)===action);
+    if(down)pressed.add(event.code);
+    else pressed.delete(event.code);
+    if(shared)return;
+    if(queue.length>=maxInputEvents){clear(true);return;}
+    queue.push([action,down]);
+  }
+  view.addEventListener('keydown',event=>key(event,true),true);
+  view.addEventListener('keyup',event=>key(event,false),true);
+  view.addEventListener('blur',()=>clear(true));
+  view.addEventListener('pagehide',()=>clear(true));
+  view.document.addEventListener('visibilitychange',()=>{if(view.document.hidden)clear(true);});
+  view.document.addEventListener('focusin',event=>{if(editing(event.target))clear(true);});
+  return {
+    clear,
+    read(){
+      if(!reset&&!queue.length)return '';
+      const events=[],seen=new Set();
+      // Keep a tap's press and release in separate simulation samples.
+      while(queue.length&&!seen.has(queue[0][0])){
+        const next=queue.shift();
+        seen.add(next[0]);
+        events.push(next);
+      }
+      const packet=JSON.stringify({reset,events});
+      reset=false;
+      return packet;
+    },
+  };
+}
+
+export function createLocalSession({room,seat,url,Socket=WebSocket,keyboard,onPacket=()=>{},onDisconnect=()=>{},onMetrics=()=>{}}){
   let current=null,nextId=0;
   let model={status:'loading',tick:0,corrections:0,rttMs:null,linkRttMs:null,frameBacklog:0,renderMs:null,fps:null};
   let lastMetrics=-Infinity;
@@ -46,9 +100,10 @@ export function createLocalSession({room,seat,url,Socket=WebSocket,onPacket=()=>
 
   function open(){
     current?.socket.close();
+    keyboard?.clear();
     const socket=new Socket(url);
     const link={id:++nextId,socket,events:[],first:0,bytes:0,ping:null,pingTimer:null,linkSampleAt:-Infinity,
-      frameAck:false,lastAck:-1,latestTick:0,round:0};
+      frameAck:false,lastAck:-1,latestTick:0,round:0,welcome:null,engineSlot:null,inputActive:false};
     current=link;
     model.rttMs=null;
     model.linkRttMs=null;
@@ -91,11 +146,32 @@ export function createLocalSession({room,seat,url,Socket=WebSocket,onPacket=()=>
           frameSample=null;
         }
       }
-      if(link.bytes+message.length>inboundLimit){
+      if(packet.op==='welcome'){
+        link.welcome=packet;
+        link.engineSlot=packet.slot;
+      }
+      if(packet.op==='match_start'||packet.op==='room_state'){
+        const active=packet.op==='match_start'||(packet.phase==='playing'&&!packet.paused_for_reconnect);
+        if(packet.op==='match_start'||active!==link.inputActive)keyboard?.clear();
+        link.inputActive=active;
+      }
+      let engineNotice;
+      if(link.welcome){
+        const nextSlot=packet.op==='match_start'?packet.match_slot:
+          packet.op==='room_state'&&packet.phase==='lobby'?link.welcome.slot:undefined;
+        if(Number.isInteger(nextSlot)&&nextSlot>=0&&nextSlot<4&&nextSlot!==link.engineSlot){
+          // The shipped Python renderer uses its welcome slot as a fighter index.
+          // Keep the HUD's lobby slot stable and update only the engine's event queue.
+          link.engineSlot=nextSlot;
+          engineNotice=JSON.stringify({...link.welcome,slot:nextSlot});
+        }
+      }
+      if(link.bytes+message.length+(engineNotice?.length??0)>inboundLimit){
         link.events=[];link.first=0;link.bytes=0;
         socket.close(4002,'Request a fresh game state');
         return;
       }
+      if(engineNotice){link.events.push(engineNotice);link.bytes+=engineNotice.length;}
       link.events.push(message);
       link.bytes+=message.length;
       if(packet.op==='welcome'&&!link.pingTimer){
@@ -116,6 +192,8 @@ export function createLocalSession({room,seat,url,Socket=WebSocket,onPacket=()=>
     socket.addEventListener('close',()=>{
       clearInterval(link.pingTimer);
       if(current!==link)return;
+      link.inputActive=false;
+      keyboard?.clear();
       model.rttMs=null;
       model.linkRttMs=null;
       model.fps=null;
@@ -174,6 +252,8 @@ export function createLocalSession({room,seat,url,Socket=WebSocket,onPacket=()=>
 
   return Object.freeze({
     room,open,read,send,acknowledge,
+    inputActive:()=>current?.inputActive===true&&current.socket.readyState===1,
+    readInput:()=>keyboard?.read()??'',
     state:id=>current?.id===id?current.socket.readyState:3,
     sendControl:packet=>current!==null&&send(current.id,JSON.stringify({...packet,...(current.round?{round:current.round}:{})})),
     close(id){if(current?.id===id)current.socket.close();},
@@ -234,7 +314,11 @@ if(typeof window!=='undefined'){
     }
     const url=new URL('/glorton-online/browser-ws',location.href);
     url.protocol=location.protocol==='https:'?'wss:':'ws:';
-    const transport=createLocalSession({room,seat,url:url.href,onPacket(packet){
+    const keyboard=captureGlortonKeyboard(window,()=>transport.inputActive()&&
+      document.querySelector('.glorton-stage')?.dataset.mode==='battle',()=>{
+        if(transport.inputActive())transport.sendControl({op:'clear'});
+      });
+    const transport=createLocalSession({room,seat,url:url.href,keyboard,onPacket(packet){
       saveRoomName(packet.roomName);
       hud.receive(packet);
     },onDisconnect:()=>{if(!leaving)hud.disconnect();},

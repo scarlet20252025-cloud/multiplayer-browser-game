@@ -27,8 +27,19 @@
       </nav>
     </header>
     <div class="battle-layout">
-      <aside class="battle-side left" aria-label="玩家状态和模式">
-        <div class="roster" id="roster-left"></div>
+      <aside class="battle-side left" aria-label="赛况和左侧玩家">
+        <section class="side-panel match-panel" aria-labelledby="match-info-title">
+          <h2 id="match-info-title">赛况</h2>
+          <div class="match-heading">
+            <strong id="mode-title">迷宫对战</strong>
+            <p id="round"></p>
+          </div>
+          <dl class="match-facts">
+            <div><dt>在线玩家</dt><dd id="players-online">—</dd></div>
+            <div><dt title="浏览器与对局服务器的往返延迟">延迟</dt><dd id="latency">连接中</dd></div>
+          </dl>
+        </section>
+        <div class="roster" id="roster-left" role="group" aria-label="左侧玩家"></div>
         <section class="side-panel mode-panel" aria-labelledby="modes-title">
           <div class="panel-heading"><h2 id="modes-title">模式投票</h2><span id="vote-threshold"></span></div>
           <div class="mode-options" id="mode-options"></div>
@@ -36,41 +47,34 @@
         </section>
       </aside>
       <section class="battle-center" aria-label="对局">
-        <div class="scoreboard" aria-label="实时比分和连接状态">
-          <div class="match-heading">
-            <strong id="mode-title">迷宫对战</strong><span id="round"></span>
-            <span class="latency-indicator" title="浏览器与对局服务器的往返延迟">延迟 <strong id="latency">连接中</strong></span>
+        <div class="battle-field">
+          <div class="board" aria-label="坦克战场">
+            <canvas id="field" width="960" height="600" aria-label="随机迷宫坦克战场"></canvas>
+            <div class="board-top"><span id="map-name">正在载入战场</span><time id="clock" hidden></time></div>
+            <div class="respawn-hint" id="respawn-hint" role="status" hidden></div>
+            <div class="overlay" id="overlay"><div class="overlay-card">
+              <p id="overlay-note">对局连接</p><h2 id="overlay-title" role="status">正在建立连接</h2>
+              <p id="overlay-detail" hidden></p>
+              <div id="overlay-actions" class="overlay-actions" hidden><button id="match-retry" type="button">重试连接</button><a id="match-return" href="/">返回房间</a></div>
+            </div></div>
           </div>
-          <ol class="scores" id="scores"></ol>
+          <details class="stats-panel" open>
+            <summary>得分统计</summary>
+            <div id="match-stats" class="scorecards" role="region" aria-label="玩家得分卡片" tabindex="0"></div>
+          </details>
         </div>
-        <div class="board" aria-label="坦克战场">
-          <canvas id="field" width="960" height="600" aria-label="随机迷宫坦克战场"></canvas>
-          <div class="board-top"><span id="map-name">正在载入战场</span><time id="clock" hidden></time></div>
-          <div class="respawn-hint" id="respawn-hint" role="status" hidden></div>
-          <div class="overlay" id="overlay"><div class="overlay-card">
-            <p id="overlay-note">对局连接</p><h2 id="overlay-title" role="status">正在建立连接</h2>
-            <p id="overlay-detail" hidden></p>
-            <div id="overlay-actions" class="overlay-actions" hidden><button id="match-retry" type="button">重试连接</button><a id="match-return" href="/">返回房间</a></div>
-          </div></div>
-        </div>
-        <footer class="controls" aria-label="按键">
-          <span><kbd>W</kbd> <kbd>S</kbd> 前进 / 后退</span>
-          <span><kbd>A</kbd> <kbd>D</kbd> 左转 / 右转</span>
-          <span><kbd>空格</kbd> 朝车头开火</span>
-          <span id="guide-hint" hidden>遥控导弹飞行中，<kbd>A</kbd> <kbd>D</kbd> 调整方向</span>
-        </footer>
-        <details class="stats-panel" open>
-          <summary>得分统计</summary>
-          <div class="stats-scroll">
-            <table class="stats-table" aria-label="本场房间累计得分统计">
-              <thead><tr><th scope="col">玩家</th><th scope="col">累计得分</th><th scope="col">击毁</th><th scope="col">被击毁</th><th scope="col">胜局</th></tr></thead>
-              <tbody id="match-stats"></tbody>
-            </table>
-          </div>
-        </details>
       </section>
-      <aside class="battle-side right" aria-label="玩家状态和补给">
-        <div class="roster" id="roster-right"></div>
+      <aside class="battle-side right" aria-label="键位和右侧玩家">
+        <section class="side-panel keys-panel" aria-labelledby="keys-title">
+          <h2 id="keys-title">操作键位</h2>
+          <dl class="key-bindings">
+            <div><dt>前进 / 后退</dt><dd><kbd>W</kbd> <kbd>S</kbd> 或 <kbd>↑</kbd> <kbd>↓</kbd></dd></div>
+            <div><dt>左转 / 右转</dt><dd><kbd>A</kbd> <kbd>D</kbd> 或 <kbd>←</kbd> <kbd>→</kbd></dd></div>
+            <div><dt>朝车头开火</dt><dd><kbd>空格</kbd></dd></div>
+          </dl>
+          <p id="guide-hint" hidden>遥控导弹飞行中，按左右转向键调整方向。</p>
+        </section>
+        <div class="roster" id="roster-right" role="group" aria-label="右侧玩家"></div>
         <div id="match-reactions"></div>
         <details class="side-panel supply-help">
           <summary>补给与反弹</summary>
@@ -90,6 +94,18 @@
         <div><dt>武器</dt><dd class="supply">标准炮</dd></div>
       </dl>
     </section>
+  </template>
+  <template id="score-card">
+    <article class="scorecard">
+      <header class="player-heading"><span class="seat-label"></span><h3>等待玩家</h3></header>
+      <p class="round-score"><span>当前比分</span><strong>0</strong></p>
+      <dl class="score-totals">
+        <div><dt>累计得分</dt><dd data-stat="score">0</dd></div>
+        <div><dt>击毁</dt><dd data-stat="kills">0</dd></div>
+        <div><dt>被击毁</dt><dd data-stat="deaths">0</dd></div>
+        <div><dt>胜局</dt><dd data-stat="wins">0</dd></div>
+      </dl>
+    </article>
   </template>
   <script>
     (() => {

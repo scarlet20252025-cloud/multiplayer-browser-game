@@ -2,7 +2,9 @@
 
 审计日期：2026-11-17。输入：用户上传的 `flash-archive-源码版-20261117.zip` 解包目录。
 
-**结论：能定位双人输入与物理循环，但当前材料不是已经恢复的可编译 HTML5 或 Flash 工程。尚未运行原游戏、复编 SWF、修改原游戏字节码或验证原游戏联机。**
+**结论：能定位双人输入与物理循环，但当前材料不是已经恢复的可编译 HTML5 或 Flash 工程。尚未复编 SWF、修改原游戏字节码或验证原游戏联机。**
+
+**2026-11-18 运行补充**：原包已在 Adobe Flash Player 32 projector 中运行到第一关，并确认两名角色可独立操作；Ruffle 0.7.1 与 nightly 2026-11-18 仍无法运行同一包。运行证据与限制见第 7 节。
 
 本文件描述的是读取实际文件得到的结果。下面的接入位置是候选改造点，不是已经应用的补丁。
 
@@ -122,6 +124,111 @@ python3 scripts/audit_archive.py "/path/to/flash-archive-源码版" --output loc
 4. 若不能稳定控制这些依赖，再评估抽取碰撞/关卡数据并迁移规则的工作量。
 
 目前没有足够证据承诺“少量 AS3 修改即可直接成为 Node 权威游戏”。尚待补齐 SWF 和资源，并进行原游戏运行验证。
+
+## 7. 原包运行验证（2026-11-18 补充）
+
+本节只记录本机运行事实；原包保持只读，测试产物在 `local/reports/shanyi-runtime/`（不入库）。
+
+### 7.1 环境
+
+| 项 | 实际值 |
+| --- | --- |
+| 系统 | Windows 10.0.26100 x64 |
+| Flash 运行器 | `02-fireboy-watergirl/tas-src/tools/flashplayer.exe`，Adobe Flash Player 32.0.0.453，PE32 i386 |
+| 浏览器运行器 | Ruffle 0.7.1（仓库锁定）与 nightly 2026-11-18，Playwright Chromium |
+| 4399 平台模块 | `http://cdn.comment.4399pk.com/control/A4399dv_base.swf` 可访问（HTTP 200，1,135 字节） |
+
+项目器不能直接从 Bash 启动（任何参数都立即 exit 1），但用 32 位 `cmd.exe` 启动可正常显示窗口：
+
+```bash
+C:/Windows/SysWOW64/cmd.exe //c "C:\\tmp\\fp32.exe E:\\...\\shanyi-binary.swf"
+```
+
+### 7.2 结果矩阵
+
+| 输入 | 运行器 | 结果 |
+| --- | --- | --- |
+| `shanyi-binary.swf` | Flash Player 32 | **通过**：4399 标志 → 标题菜单 → 剧情 → 操作教学 → 第一关「秘密实验室出口」 |
+| `core-game.swf` | Flash Player 32 | 能显示标题菜单，但画面静止；点击「开始新游戏」不推进，4399 外壳的启动调用缺失 |
+| `core-game.swf` | Ruffle 0.7.1 / nightly | 黑屏；AS3 已执行（800×600@30、无页面异常） |
+| `shanyi-binary.swf` | Ruffle nightly | 停在 4399 标志，未进入标题菜单 |
+| `extracted-C-lightning.swf` | Ruffle 0.7.1 | 标题与「2012」过场可见，45 秒后仍未进入玩法 |
+
+### 7.3 双人操作
+
+进入第一关后：
+
+- 按住 `D` 1.5 秒，蓝色角色向右移动；粉色角色不动。
+- 按住 `Right` 1.5 秒，粉色角色向右移动，镜头跟随；蓝色角色不受该按键驱动。
+
+这说明原包的双人独立输入仍然有效，第 2 节的源码审计（W/S/A/D 与方向键）与运行行为一致。
+
+### 7.4 Ruffle 失败的定位
+
+对 `core-game.swf` 的 `fw` 类按方法体注入 `throw` 作为追踪通道：
+
+- `checkAndPlay()`（body 24）会执行，异常文本出现在 Ruffle 控制台。
+- 加载下一段的 `Event.COMPLETE` 回调（body 29）从未执行。
+- 换成 nightly 2026-11-18 后结果相同。
+
+因此黑屏不是「AS3 完全没跑」，而是 `Loader.loadBytes` 的链式分段加载没有走完；4399 外壳版本还停在平台标志。该行为属于 Ruffle 兼容性边界，补资源或调播放器参数都未改变结果。
+
+### 7.5 对加入网页大厅的含义
+
+当前大厅的权威端与观看端都是 Chromium + Ruffle。原包在 projector 中可玩，证明游戏本身与双人输入完整，但这不能直接用于浏览器联机：
+
+- Ruffle 无法执行该包的加载链，加入大厅后仍是黑屏。
+- Flash projector 是 Windows GUI 进程，不能被浏览器标签页承载；用它做权威端需要额外的桌面采集、输入注入与进程管理，现有服务未实现。
+- 若要联机，需要另做 AS3→JS 重写或改造加载链，属于独立工程，不是补一段适配器即可完成。
+
+结论：**本次测试支持「原包可本机运行、双人输入有效」，不支持「闪翼双星可以接入当前浏览器联机大厅」。**（该结论随后被第 8 节的有壳路线部分修正：仅限实验性输入镜像，原包仍不能独立在浏览器中运行。）
+
+## 8. 浏览器输入镜像准入（2026-11-18）
+
+第 7 节失败的是「直接把原包丢给 Ruffle」。在不改写原 SWF 的前提下，新增一个自写 AS3 外壳 `adapters/shanyi-flash/src/ShanyiHost.as`，编译为 `shanyi-host.swf`，由它用 `Loader.load(new URLRequest(game), new LoaderContext(false, ApplicationDomain.currentDomain))` 载入只读的 `core_4_abc.swf`。外壳只做三件事：转发键鼠事件、修正过场着色、通过 `ExternalInterface` 暴露 `shanyiPage`/`shanyiButtons`/`shanyiClickAt`/`shanyiKey` 等自动化桥。游戏逻辑、素材和存档格式都没有改动。
+
+外壳源码进入仓库；编译产物与原始 SWF 一样只放在 `local/private-games/shanyi/`，不进入公开仓库。重新构建需要 AS3 工具链（本地忽略目录中的 Flex SDK）：
+
+```bash
+local/tools/as3-probe/apache-flex-sdk-4.16.1-bin/bin/mxmlc \
+  -compiler.library-path=local/tools/as3-probe/playerglobal32_0.swc \
+  -compiler.external-library-path=local/tools/as3-probe/playerglobal32_0.swc \
+  -target-player=11.1 -swf-version=14 -static-link-runtime-shared-libraries=true \
+  -output local/private-games/shanyi/shanyi-host.swf adapters/shanyi-flash/src/ShanyiHost.as
+```
+
+### 8.1 运行条件（缺一不可）
+
+| 项 | 值 | 失败表现 |
+| --- | --- | --- |
+| Ruffle | nightly 0.8.0-nightly.2026.11.18，本地忽略目录 | 稳定版 0.7.1 黑屏 |
+| 渲染器 | 默认 wgpu | canvas 渲染器无法完成关卡构建的 `BitmapData.draw` |
+| `maxExecutionDuration` | 600 秒 | 默认 15 秒会把 `drawBigBMD` 当死循环终止，关卡停在 loading |
+| 缩放 | `scale=showAll`，`letterbox=on` | 坐标映射错误会导致点击落空 |
+
+### 8.2 已实测
+
+- 生产宿主 `scripts/html5-research-host.mjs` 提供 `/shanyi/index.html`、`/__ruffle__/` 允许列表和只读 `/game/<gameId>/`；原始 SWF 只从 `local/private-games` 读取。
+- 舞台按 4:3 自适应填满视口并居中；Ruffle 宿主与 canvas 都设为 100%。1100×800 视口中实测 canvas 为 1066×800（此前固定为左上角 550×400）。
+- Playwright + Chromium（启用 SwiftShader）中，页面从 4399 标志进入标题菜单（`pages::MainPage`），按舞台坐标缩放点击后进入剧情页（`pages::IntroPage`）。
+- 基准宿主 `maxexec=600` 下继续走到操作教学和第一关，第一关完整渲染；原生键盘与 `ExternalInterface` 注入都能分别驱动火娃（WASD）与水娃（方向键），镜头跟随。
+- `server/shanyi-mirror-room.mjs` 的双席位回环中继已由单元测试和真实双 token 会话验证：转发 `input`/`click`/`presence`/`hero-state`/`ready`，拒绝错误 token 和第三席位。
+- 双方就位门禁：游戏页在 Ruffle 启动并可用后发送 `ready`，服务器广播 `ready-state`；两端都 ready 前显示“等待双方就位”遮罩，按键、画面点击和转发输入都不生效。大厅层同时要求两位玩家都在房间内才允许提议/确认关卡。
+- `scripts/verify-shanyi-dual.mjs` 已验证两个 Ruffle 标签页同时启动：两端都到达标题菜单（`pages::MainPage`），在座位 0 点击开始后，座位 1 也注入同一点击并进入 `pages::IntroPage`，两端无页面错误。
+- 新增英雄状态纠偏：每端约 30Hz 发送自己角色的显示坐标与速度，对端通过 wrapper 的 `shanyiApplyHero` 调用 `SetTransform`/`SetLinearVelocity` 追上。`scripts/verify-shanyi-sync.mjs` 实测按住 D 时两端火男坐标完全一致；按住方向键时水女移动中最大差约 5px，松开停下后两端完全一致。
+- 控制键按席位隔离：页面在捕获阶段拦截 W/A/S/D 与方向键，只把自己席位的按键注入本机游戏并中继；另一席位的按键既不注入也不传给 Ruffle。验收脚本在座位 0 按方向键、座位 1 按 D，确认两端 `keysDown` 都保持为空，因此不会出现“同一角色被两人同时控制”。
+- 暂停/继续双边同步：游戏暂停由 `Main.onFocusOut` 触发，恢复依赖舞台点击 `onFocusIn`。中继点击在坐标处没有按钮时会补发舞台点击，因此对方暂停后点击空白处也能恢复。验收脚本实测点击暂停按钮后两端均为 `paused=true overlay=true`，再点击画面后两端均为 `paused=false overlay=false`。
+
+### 8.3 联机声明边界
+
+`config/games/shanyi.json` 只声明 `mirrorInput`，不声明 `authority`、`spectator`、投票或存档；大厅卡片标注「实验·输入镜像」。两名玩家各自运行一份本地 SWF：服务器转发输入边沿，并以约 30Hz 转发各自英雄的位置/速度供对端纠偏；不传画面，也没有服务器端权威状态或确定性锁步。返回选关已接入双方请求/确认/取消投票；跨区域坐标差超过 180px 时客户端会跳过对端英雄纠偏，避免镜头追到空白区域。`levels.json` 当前只登记第一关；更多关卡需要逐关验收后才能加入。
+
+### 8.4 尚未验证
+
+- 长时间运行、复杂机关和两人同时移动时的物理漂移；当前只验证了单键移动与停下后的收敛，没有逐帧状态比对。
+- 低性能机器上两个 Ruffle 实例的帧率；当前误差范围来自本机 headless 测试。
+- 断线重连后的输入重放边界。
+- 第一关之后的关卡和存档等 HTML5 已有能力在镜像层未实现；返回选关投票已实现，但未做长局和断线重连后的完整验收。
 
 ## 编码记录
 

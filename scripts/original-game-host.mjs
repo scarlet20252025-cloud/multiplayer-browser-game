@@ -20,11 +20,18 @@
  */
 import http from 'node:http';
 import path from 'node:path';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUFFLE_DIR = path.join(REPO_ROOT, 'node_modules/@ruffle-rs/ruffle');
+const GAME_EXTENSIONS = new Set(['.swf', '.json', '.xml', '.png', '.jpg', '.jpeg', '.gif', '.mp3', '.ogg', '.wav', '.flv', '.bin', '.txt']);
+const HOST_CSP = [
+  "default-src 'none'", "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
+  "connect-src 'self'", "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:", "font-src 'self' data: blob:", "media-src 'self' data: blob:",
+  "base-uri 'none'", "frame-ancestors 'none'",
+].join('; ');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -49,7 +56,7 @@ function safeJoin(dir, relative) {
 }
 
 function pageHtml(entry) {
-  const safeEntry = JSON.stringify(entry);
+  const safeEntry = JSON.stringify(entry).replace(/</g, '\\u003c');
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -60,12 +67,15 @@ function pageHtml(entry) {
   :root { color-scheme: dark; }
   body { margin:0; background:#15181c; color:#e7ecf3; font:13px/1.5 ui-sans-serif,system-ui,"Segoe UI",sans-serif; }
   #frame { display:flex; justify-content:center; align-items:center; min-height:100vh; padding:16px; box-sizing:border-box; }
-  #stage { background:#000; box-shadow:0 8px 32px rgba(0,0,0,.5); line-height:0; min-width:320px; min-height:240px; }
+  #stage { background:#000; box-shadow:0 8px 32px rgba(0,0,0,.5); line-height:0;
+           --native-width:550px; --stage-ratio:1.375;
+           width:min(var(--native-width), calc(100vw - 32px), calc((100dvh - 32px) * var(--stage-ratio)));
+           aspect-ratio:var(--stage-ratio); }
   #stage ruffle-player { display:block; }
   #hud { position:fixed; left:12px; bottom:12px; background:rgba(0,0,0,.72); border:1px solid #2c333c;
          border-radius:6px; padding:6px 10px; font:12px/1.4 ui-monospace,Consolas,monospace; max-width:60vw; }
-  #hud b { color:#8fbe95; }
-  #hud .err { color:#e08a82; }
+  #hud { color:#8fbe95; }
+  #hud.err { color:#e08a82; }
 </style>
 </head>
 <body>
@@ -90,9 +100,10 @@ window.__baseline = {
     const meta = b.metadata
       ? \` \${b.metadata.width}×\${b.metadata.height} @ \${b.metadata.frameRate ?? '?'}fps\`
       : '';
-    hud.innerHTML = b.status === 'error'
-      ? '<span class="err">载入失败：' + String(b.error).slice(0, 240) + '</span>'
-      : '<b>' + b.status + '</b>' + meta + ' · ' + b.entry;
+    hud.classList.toggle('err', b.status === 'error');
+    hud.textContent = b.status === 'error'
+      ? '载入失败：' + String(b.error).slice(0, 240)
+      : b.status + meta + ' · ' + b.entry;
   };
 
   function boot() {
@@ -113,7 +124,8 @@ window.__baseline = {
       player.config = {
         autoplay: 'on',
         unmuteOverlay: 'hidden',
-        allowScriptAccess: true,
+        allowScriptAccess: false,
+        allowNetworking: 'internal',
         letterbox: 'on',
         logLevel: (new URLSearchParams(location.search).get('loglevel') || 'warn'),
         scale: 'showAll',
@@ -130,8 +142,8 @@ window.__baseline = {
           // 舞台跟随 SWF 原生尺寸；父容器为 0 会让 player 一起塌缩成黑屏。
           const stage = document.getElementById('stage');
           if (m.width && m.height) {
-            stage.style.width = m.width + 'px';
-            stage.style.height = m.height + 'px';
+            stage.style.setProperty('--native-width', m.width + 'px');
+            stage.style.setProperty('--stage-ratio', m.width / m.height);
             player.style.width = '100%';
             player.style.height = '100%';
           }
@@ -142,7 +154,8 @@ window.__baseline = {
         render();
       });
       window.__baseline.player = player;
-      player.load({ url: '/game/' + encodeURIComponent(${safeEntry}) })
+      const swfUrl = new URL('/game/' + ${safeEntry}.split('/').map(encodeURIComponent).join('/'), location.origin);
+      player.load({ url: swfUrl.href, base: new URL('.', swfUrl).href })
         .then(() => {
           window.__baseline.status = 'loaded';
           window.__baseline.events.push('load-resolved');
@@ -176,27 +189,31 @@ window.__baseline = {
 
 /**
  * 启动基准宿主。
- * @param {{root:string, entry:string, port?:number, host?:string}} options
+ * @param {{root:string, entry:string, port?:number}} options
  * @returns {Promise<{url:string, port:number, close:()=>Promise<void>}>}
  */
 export async function startOriginalGameHost(options) {
-  const host = options.host ?? '127.0.0.1';
-  const gameRoot = path.resolve(options.root);
+  const host = '127.0.0.1';
+  const gameRoot = await realpath(options.root);
+  const runtimeRoot = await realpath(RUFFLE_DIR);
   const entry = String(options.entry || '').replace(/\\/g, '/');
 
-  if (!entry || entry.startsWith('/') || entry.split('/').includes('..')) {
-    throw new Error('entry 必须是游戏根目录下的相对路径，且不能包含 ..');
+  if (!entry || entry.startsWith('/') || entry.split('/').includes('..') || path.extname(entry).toLowerCase() !== '.swf') {
+    throw new Error('entry 必须是游戏根目录下的 SWF 相对路径，且不能包含 ..');
   }
-  const entryPath = safeJoin(gameRoot, entry);
-  if (!entryPath) throw new Error('entry 解析后越出游戏根目录');
+  const candidate = safeJoin(gameRoot, entry);
+  if (!candidate) throw new Error('entry 解析后越出游戏根目录');
+  const entryPath = await realpath(candidate);
+  if (!safeJoin(gameRoot, path.relative(gameRoot, entryPath))) throw new Error('入口链接越出游戏根目录');
   const entryInfo = await stat(entryPath).catch(() => null);
   if (!entryInfo || !entryInfo.isFile()) throw new Error(`找不到入口文件：${entryPath}`);
 
   const server = http.createServer(async (req, res) => {
-    const send = (status, type, body) => {
-      res.writeHead(status, { 'content-type': type, 'cache-control': 'no-cache',
-        'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' });
-      res.end(req.method === 'HEAD' ? undefined : body);
+    const send = (status, type, body, headers = {}) => {
+      res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store',
+        'content-security-policy': HOST_CSP, 'x-content-type-options': 'nosniff',
+        'referrer-policy': 'no-referrer', ...headers });
+      res.end(req.method === 'HEAD' || status === 304 ? undefined : body);
     };
     try {
       if (!['GET', 'HEAD'].includes(req.method)) return send(405, 'text/plain', 'Method Not Allowed');
@@ -212,7 +229,7 @@ export async function startOriginalGameHost(options) {
       let dir;
       let relative;
       if (pathname.startsWith('/runtime/')) {
-        dir = RUFFLE_DIR;
+        dir = runtimeRoot;
         relative = pathname.slice('/runtime/'.length);
       } else if (pathname.startsWith('/game/')) {
         dir = gameRoot;
@@ -223,10 +240,21 @@ export async function startOriginalGameHost(options) {
 
       const target = safeJoin(dir, relative);
       if (!target) return send(403, 'text/plain', 'Forbidden');
-      const info = await stat(target).catch(() => null);
+      const extension = path.extname(target).toLowerCase();
+      if (dir === gameRoot && !GAME_EXTENSIONS.has(extension)) return send(404, 'text/plain', 'Not Found');
+      if (dir === runtimeRoot && !/^[\w.-]+\.(?:js|wasm)$/i.test(relative)) return send(404, 'text/plain', 'Not Found');
+      const resolved = await realpath(target).catch(() => null);
+      if (!resolved) return send(404, 'text/plain', 'Not Found');
+      if (!safeJoin(dir, path.relative(dir, resolved))) return send(403, 'text/plain', 'Forbidden');
+      const info = await stat(resolved).catch(() => null);
       if (!info || !info.isFile()) return send(404, 'text/plain', 'Not Found');
-      return send(200, MIME[path.extname(target).toLowerCase()] || 'application/octet-stream',
-        await readFile(target));
+      const etag = `W/"${info.size.toString(16)}-${info.mtimeMs.toString(16)}"`;
+      const cache = { etag, 'cache-control': 'private, no-cache' };
+      const type = MIME[extension] || 'application/octet-stream';
+      if (req.headers['if-none-match']?.split(',').some(tag => tag.trim() === etag || tag.trim() === '*'))
+        return send(304, type, undefined, cache);
+      const body = req.method === 'HEAD' ? undefined : await readFile(resolved);
+      return send(200, type, body, { ...cache, 'content-length': body?.length ?? info.size });
     } catch (error) {
       return send(400, 'text/plain', String(error && error.message ? error.message : error));
     }

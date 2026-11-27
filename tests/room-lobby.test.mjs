@@ -166,6 +166,161 @@ test('persistent room name + password matching runs one authoritative session',a
   assert.equal(health.activeSession.levelId,2);
 });
 
+test('lockstep compacts connected lobby seats and authenticates each match token',async t=>{
+  const lockstep={...catalog[0],id:'lockstep-test',runtime:'browser-lockstep',seats:4,minSeats:2,tickRate:40};
+  const {app}=await fixture(t,{games:[lockstep]});
+  const name='不连续席位',password='pass1234';
+  const members=[(await post(app.url+'/api/rooms',{name,password,gameId:lockstep.id})).body];
+  for(let seat=1;seat<4;seat++)members.push((await post(app.url+'/api/rooms/join',{name,password})).body);
+  assert.deepEqual(members.map(member=>member.seat),[0,1,2,3]);
+
+  const peers=[0,2,3].map(seat=>client(t,app,members[seat].token));
+  const names=['Ada','Cam','Dee'];
+  await peers[0].waitFor(message=>message.type==='state'&&message.room.connectedCount===3);
+  for(const [seat,peer] of peers.entries())peer.ws.send(JSON.stringify({type:'profile',name:names[seat]}));
+  await peers[0].waitFor(message=>message.type==='state'&&
+    [0,2,3].every((seat,index)=>message.room.seats[seat].name===names[index]));
+  peers[0].ws.send(JSON.stringify({type:'propose-level',gameId:lockstep.id,levelId:1}));
+  const {room:{proposal}}=await peers[1].waitFor(message=>message.type==='state'&&message.room.proposal);
+  for(const peer of peers.slice(1))peer.ws.send(JSON.stringify({type:'confirm-level',proposalId:proposal.id}));
+  const sessions=await Promise.all(peers.map(peer=>peer.waitFor(message=>message.type==='session-start')
+    .then(message=>message.session)));
+  assert.deepEqual(sessions.map(session=>session.seat),[0,1,2]);
+  assert.equal(new Set(sessions.map(session=>session.token)).size,3);
+
+  const url=app.lobbyWsUrl.replace('/lobby','/lockstep');
+  const origin='http://127.0.0.1:8787';
+  const matches=sessions.map(session=>client(t,app,session.token,{url,origin}));
+  for(const [seat,match] of matches.entries()){
+    const welcome=await match.waitFor(message=>message.type==='welcome');
+    assert.equal(welcome.seat,seat);
+    assert.equal(welcome.playerCount,3);
+    assert.deepEqual(welcome.playerNames,names);
+  }
+  async function rejected(token){
+    return new Promise((resolve,reject)=>{
+      const ws=new WebSocket(`${url}?token=${token}`,{origin,handshakeTimeout:2000});
+      t.after(()=>ws.terminate());
+      ws.once('open',()=>reject(Error('Unexpected lockstep admission')));
+      ws.once('error',reject);
+      ws.once('unexpected-response',(_request,response)=>{
+        response.resume();
+        resolve(response.statusCode);
+      });
+    });
+  }
+  assert.equal(await rejected(members[1].token),403);
+  assert.equal(await rejected(sessions[2].token),403);
+});
+
+test('Bomb It owns character claims, preserves readiness on refresh, and starts with the confirmed rules',async t=>{
+  const bombIt={...catalog[0],id:'bomb-it-7',runtime:'browser-lockstep',seats:4,minSeats:2,tickRate:40};
+  const {app}=await fixture(t,{games:[bombIt]});
+  const roomOptions={name:'泡泡堂选人',password:'pass1234',gameId:bombIt.id};
+  const first=(await post(app.url+'/api/rooms',roomOptions)).body;
+  const second=(await post(app.url+'/api/rooms/join',roomOptions)).body;
+  const a=client(t,app,first.token),b=client(t,app,second.token);
+  const emit=(peer,type,fields)=>peer.ws.send(JSON.stringify({type,...fields}));
+  const state=(peer,check)=>peer.waitFor(message=>message.type==='state'&&check(message.room)).then(message=>message.room);
+  const initial=await state(a,room=>room.connectedCount===2);
+  assert.deepEqual(initial.seats.slice(0,2).map(seat=>seat.outfit.robotId),[0,1]);
+  assert.equal(initial.bombItSettings.hostSeat,0);
+  assert.equal(initial.bombItSettings.mapId,'FashionShop');
+  assert.equal(initial.bombItSettings.modeId,'kill');
+
+  for(const peer of [a,b])emit(peer,'set-outfit',{part:'robotId',value:6});
+  const claimed=await state(a,room=>room.seats.some(seat=>seat.outfit?.robotId===6));
+  const claimant=claimed.seats.find(seat=>seat.outfit?.robotId===6).seat;
+  await [b,a][claimant].waitFor(message=>message.code==='BOMB_IT_CHARACTER_TAKEN');
+
+  emit(a,'set-bomb-it-ready',{ready:true,revision:0});
+  await state(b,room=>room.seats[0].ready===true);
+  emit(b,'set-bomb-it-settings',{mapId:'Forest',modeId:'collect',revision:0});
+  await b.waitFor(message=>message.code==='BOMB_IT_HOST_ONLY');
+  emit(a,'set-bomb-it-settings',{mapId:'Forest',modeId:'collect',revision:0});
+  const newRules=await state(b,room=>room.bombItSettings.revision===1);
+  assert.equal(newRules.seats[0].ready,false);
+  emit(a,'set-bomb-it-ready',{ready:true,revision:0});
+  await a.waitFor(message=>message.code==='BOMB_IT_SETTINGS_STALE');
+  emit(a,'set-bomb-it-ready',{ready:true,revision:1});
+  emit(a,'set-bomb-it-ready',{ready:true,revision:1});
+  await state(b,room=>room.bombItSettings.revision===1&&room.seats[0].ready===true);
+
+  a.ws.close();
+  await state(b,room=>room.seats[0].ready&&!room.seats[0].connected);
+  emit(b,'set-bomb-it-ready',{ready:true,revision:1});
+  await state(b,room=>room.seats[0].ready&&room.seats[1].ready&&!room.seats[0].connected);
+  assert.equal(app.activeSession,null);
+
+  const refreshed=client(t,app,first.token);
+  const preLaunch=await refreshed.waitFor(message=>message.type==='welcome');
+  assert.equal(preLaunch.room.bombItSettings.hostSeat,0);
+  assert.deepEqual(preLaunch.room.seats.slice(0,2).map(seat=>seat.ready),[true,true]);
+  const sessionA=(await refreshed.waitFor(message=>message.type==='session-start')).session;
+  const sessionB=(await b.waitFor(message=>message.type==='session-start')).session;
+  assert.equal((await fetch(app.url+'/health').then(response=>response.json())).activeSessions.length,1);
+  assert.notEqual(sessionA.token,sessionB.token);
+
+  refreshed.ws.close();
+  await state(b,room=>room.phase==='playing'&&!room.seats[0].connected);
+  const launchRefresh=client(t,app,first.token);
+  const resumedSession=(await launchRefresh.waitFor(message=>message.type==='session-start')).session;
+  assert.deepEqual(resumedSession,sessionA);
+
+  const url=app.lobbyWsUrl.replace('/lobby','/lockstep');
+  const match=client(t,app,resumedSession.token,{url,origin:'http://127.0.0.1:8787'});
+  const welcome=await match.waitFor(message=>message.type==='welcome');
+  assert.deepEqual(welcome.bombItSettings,{mapId:'Forest',modeId:'collect'});
+  assert.deepEqual(welcome.playerOutfits,claimed.seats.slice(0,2).map(player=>player.outfit));
+});
+
+test('a full Bomb It room holds a disconnected player’s character and seat through a refresh',async t=>{
+  const bombIt={...catalog[0],id:'bomb-it-7',runtime:'browser-lockstep',seats:4,minSeats:2};
+  const {app}=await fixture(t,{games:[bombIt]});
+  const roomOptions={name:'泡泡堂满员',password:'pass1234',gameId:bombIt.id};
+  const owner=(await post(app.url+'/api/rooms',roomOptions)).body;
+  const a=client(t,app,owner.token);
+  await a.waitFor(message=>message.type==='welcome');
+  a.ws.send(JSON.stringify({type:'set-outfit',part:'robotId',value:3}));
+  await a.waitFor(message=>message.room?.seats[0].outfit?.robotId===3);
+  const members=[];
+  for(let seat=1;seat<4;seat++)members.push((await post(app.url+'/api/rooms/join',roomOptions)).body);
+  const entrants=members.map(member=>client(t,app,member.token));
+  const full=(await a.waitFor(message=>message.room?.connectedCount===4)).room;
+  assert.deepEqual(full.seats.map(seat=>seat.outfit.robotId),[3,1,2,0]);
+  a.ws.close();
+  await entrants[0].waitFor(message=>message.room?.connectedCount===3&&message.room?.seats[0].connected===false);
+  assert.equal((await post(app.url+'/api/rooms/join',roomOptions)).body.error,'ROOM_FULL');
+  const restored=client(t,app,owner.token);
+  const rejoined=(await restored.waitFor(message=>message.type==='welcome')).room;
+  assert.equal(rejoined.seats[0].outfit.robotId,3);
+  assert.equal(rejoined.connectedCount,4);
+});
+
+test('Bomb It releases a closed lobby seat at its grace deadline and keeps the new host',async t=>{
+  const bombIt={...catalog[0],id:'bomb-it-7',runtime:'browser-lockstep',seats:4,minSeats:2};
+  const {app}=await fixture(t,{games:[bombIt]});
+  const roomOptions={name:'泡泡堂超时换房主',password:'pass1234',gameId:bombIt.id};
+  const owner=(await post(app.url+'/api/rooms',roomOptions)).body;
+  const a=client(t,app,owner.token);
+  await a.waitFor(message=>message.type==='welcome');
+  const guest=(await post(app.url+'/api/rooms/join',roomOptions)).body;
+  const b=client(t,app,guest.token);
+  await b.waitFor(message=>message.type==='welcome');
+  const room=app.lobby.roomFor(owner.room.key);
+  a.ws.close();
+  await b.waitFor(m=>m.room?.seats[0].occupied&&!m.room.seats[0].connected&&m.room.bombItSettings.hostSeat===0);
+  assert.doesNotThrow(()=>app.lobby.memberForToken(owner.token));
+  room.members[0].lastSeen=Date.now()-20_000;
+  assert.throws(()=>app.lobby.memberForToken(owner.token),{code:'LOBBY_TOKEN_EXPIRED'});
+  await b.waitFor(m=>m.room?.seats[0].occupied===false&&m.room.bombItSettings.hostSeat===1);
+  const replacement=(await post(app.url+'/api/rooms/join',roomOptions)).body;
+  assert.equal(replacement.seat,0);
+  assert.equal(replacement.room.bombItSettings.hostSeat,1);
+  b.ws.send(JSON.stringify({type:'set-bomb-it-settings',mapId:'Forest',modeId:'collect',revision:0}));
+  await b.waitFor(m=>m.room?.bombItSettings.mapId==='Forest');
+});
+
 test('two rooms play concurrently and only the empty game session is reclaimed',async t=>{
   const {app,calls}=await fixture(t);
   const created=await post(app.url+'/api/rooms',{name:'第一间',password:'pass1234'});

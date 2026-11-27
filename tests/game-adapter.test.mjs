@@ -47,6 +47,22 @@ test('valid html5 manifest normalizes and maps to a catalog definition', () => {
   assert.equal(definition.runtime, 'html5-phaser');
 });
 
+test('lockstep manifests allow a two-to-four player range', () => {
+  const manifest = html5Manifest({
+    runtime: 'browser-lockstep', adapter: 'frame-lockstep', seats: 4, minSeats: 2,
+    capabilities: {lockstep: true, levelVote: true},
+    package: {...html5Manifest().package, bridge: 'netplay.mjs'},
+  });
+  const definition = manifestToCatalogDefinition(validateGameManifest(manifest));
+  assert.equal(definition.seats, 4);
+  assert.equal(definition.minSeats, 2);
+  const defaultGame = validateGameManifest({...manifest, seats: undefined, minSeats: undefined});
+  assert.equal(defaultGame.seats, 2);
+  assert.equal(defaultGame.minSeats, 2);
+  assert.throws(() => validateGameManifest({...manifest, seats: 5}), /requires two to four players/);
+  assert.throws(() => validateGameManifest({...manifest, minSeats: 1}), /requires two to four players/);
+});
+
 const flashManifest = (overrides = {}) => ({
   schemaVersion: 1,
   id: 'shanyi',

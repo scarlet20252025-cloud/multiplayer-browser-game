@@ -56,6 +56,33 @@ test('Glorton decodes compact frames before the engine reads them and passes sna
   transport.close(handle);
 });
 
+test('Glorton maps a gapped room slot only in the engine queue and restores it for rematch',()=>{
+  let socket;
+  class TestSocket extends EventTarget{
+    constructor(){super();socket=this;this.readyState=1;this.bufferedAmount=0;}
+    send(){}
+    receive(data){this.dispatchEvent(new MessageEvent('message',{data}));}
+    close(){this.readyState=3;this.dispatchEvent(new Event('close'));}
+  }
+  const hud=[];
+  const transport=createLocalSession({room:'MNP234',seat:'0'.repeat(32),url:'ws://example.test',Socket:TestSocket,
+    onPacket:packet=>hud.push(packet)});
+  const handle=transport.open();
+  socket.receive('{"op":"welcome","slot":2,"capacity":4,"automaticRoster":true}');
+  const start='{"op":"match_start","round":1,"match_slots":[0,2],"match_slot":1,"initial_snapshot":{"tick":0,"offset":-0.0}}';
+  socket.receive(start);
+  socket.receive('{"op":"room_state","round":2,"phase":"lobby","server_tick":0}');
+  assert.equal(JSON.parse(transport.read(handle)).slot,2);
+  assert.equal(JSON.parse(transport.read(handle)).slot,1);
+  assert.equal(transport.read(handle),start);
+  assert.equal(JSON.parse(transport.read(handle)).slot,2);
+  assert.equal(JSON.parse(transport.read(handle)).round,2);
+  assert.equal(transport.read(handle),'');
+  assert.deepEqual(hud.map(packet=>packet.op),['welcome','match_start','room_state']);
+  assert.equal(hud[0].slot,2);
+  transport.close(handle);
+});
+
 async function waitFor(check){
   for(let attempt=0;attempt<300;attempt++){
     if(check())return;
@@ -70,6 +97,7 @@ test('Glorton bounds a slow browser and retains the seats for a new round after 
   const peers=new Map();
   const recovery=[];
   const forwarded=[];
+  const inputs=[];
   authority.on('connection',socket=>socket.on('message',message=>{
     const packet=JSON.parse(message);
     if(packet.op==='create'||packet.op==='join'){
@@ -78,7 +106,8 @@ test('Glorton bounds a slow browser and retains the seats for a new round after 
       socket.send(JSON.stringify({op:'welcome',slot,room:'MNP234',protocol:1,token:String(slot).repeat(32)}));
     }
     if(packet.op==='desync')recovery.push(socket);
-    if(['map_vote','rematch'].includes(packet.op))forwarded.push(packet);
+    if(packet.op==='input')inputs.push(packet);
+    if(['map_vote','rematch','lobby_update','settings_update'].includes(packet.op))forwarded.push(packet);
   }));
   server.listen(0,'127.0.0.1');
   await once(server,'listening');
@@ -131,6 +160,14 @@ test('Glorton bounds a slow browser and retains the seats for a new round after 
   assert.deepEqual(decodeGlortonFrame(host.at(-1)).controls,[seatControls('shield_released'),seatControls()]);
   assert.deepEqual(host.at(-1).acks,{'0':3,'1':4});
 
+  assert.equal(tunnel.receive(1,{op:'input',seq:7,tick:20,controls:{right:true,shield_pressed:true}}),true);
+  assert.equal(tunnel.receive(1,{op:'input',seq:8,tick:21,controls:{shield_released:true}}),true);
+  assert.equal(tunnel.receive(1,{op:'clear',round:1}),true);
+  await waitFor(()=>inputs.length===3);
+  assert.deepEqual(inputs[0],{op:'input',seq:1,tick:20,controls:seatControls('right','shield_pressed')});
+  assert.deepEqual(inputs[1],{op:'input',seq:2,tick:21,controls:seatControls('shield_released')});
+  assert.deepEqual(inputs[2],{op:'input',seq:3,tick:25,clear:true,controls:{shield_released:true}});
+
   const result={reason:'game_set',winner:'host',winner_slot:0};
   broadcast({op:'match_end',round:1,...result,snapshot:{tick:25}});
   await waitFor(()=>host.at(-1).op==='match_end'&&guest.at(-1).op==='match_end');
@@ -144,6 +181,14 @@ test('Glorton bounds a slow browser and retains the seats for a new round after 
   await waitFor(()=>host.at(-1).round===2&&guest.at(-1).round===2);
   assert.equal(phase,'lobby');
   assert.equal(tunnel.receive(1,{op:'frame_ack',tick:25,round:1}),false);
+  assert.equal(tunnel.receive(2,{op:'lobby_update',round:1,patch:{ready:true}}),false);
+  assert.equal(tunnel.receive(2,{op:'lobby_update',round:2,patch:{ready:true}}),true);
+  assert.equal(tunnel.receive(1,{op:'settings_update',round:2,patch:{stock:3}}),true);
+  await waitFor(()=>forwarded.length===4);
+  assert.deepEqual(forwarded.slice(2),[
+    {op:'lobby_update',slot:1,patch:{ready:true},round:2},
+    {op:'settings_update',patch:{stock:3},round:2},
+  ]);
   send(1,{op:'match_end',round:1,...result,snapshot:{tick:25}});
   broadcast({op:'match_start',round:2,seed:5,tick_ms:25,initial_snapshot:{tick:0},match_config:{}});
   broadcast({op:'frame',round:2,tick:1,controls:[seatControls(),seatControls()],acks:{}});

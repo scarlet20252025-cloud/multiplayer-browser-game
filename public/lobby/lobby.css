@@ -283,6 +283,7 @@ button.danger:hover:not(:disabled) { background: #fdd7e5 }
 .game-select[aria-pressed="true"] { outline: 3px solid #8756f2; outline-offset: 2px }
 .card-art { width: 100%; height: 73%; position: absolute; inset: 0; object-fit: cover }
 .game-card[data-game="bvn33"] .card-art, .game-card[data-game="bleach-vs-naruto"] .card-art { object-position: center bottom }
+.game-card[data-game="bomb-it-7"] .card-art { object-position: center top }
 .game-caption {
   position: relative;
   width: 100%; padding: 19px 9px 7px;
@@ -452,6 +453,58 @@ button.danger:hover:not(:disabled) { background: #fdd7e5 }
 .invite-box button { width: 100% }
 .card-head { align-items: flex-start }
 .card-head p { color: var(--muted); font-size: 13px; margin-top: 3px }
+.outfit-fields {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); gap: 10px;
+  min-width: 0; margin: 0; padding: 0; border: 0;
+}
+.outfit-fields > div { display: grid; gap: 5px }
+.outfit-fields label { color: var(--ink); font-size: 13px; font-weight: 750 }
+.outfit-fields select:disabled { opacity: .65 }
+.bomb-it-ready-panel .card-head { align-items: center; margin-bottom: 0 }
+.bomb-it-ready-panel .card-head > button { min-width: 82px; min-height: 42px; flex-shrink: 0 }
+.bomb-it-ready-note { margin-top: 8px; color: var(--muted); font-size: 12px }
+.bomb-it-wardrobe { display: grid; gap: 10px }
+.bomb-it-current {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  min-width: 0; margin: 0; padding: 3px 8px; border-radius: 14px;
+  background: radial-gradient(ellipse at 38% 72%, #fff 0%, #f1eaff 65%); color: var(--purple-dark);
+  font-size: 13px; font-weight: 750;
+}
+.bomb-it-portrait {
+  display: block; aspect-ratio: 1; width: min(100%, 64px);
+  background-image: var(--portrait); background-size: 800% 800%;
+  background-position: var(--portrait-x) var(--portrait-y); background-repeat: no-repeat;
+}
+.bomb-it-current .bomb-it-portrait { width: min(50%, 104px); flex-shrink: 0 }
+.bomb-it-character-grid, .bomb-it-part-grid { display: grid; gap: 6px }
+.bomb-it-character-grid { grid-template-columns: repeat(8, minmax(0, 1fr)) }
+.bomb-it-part-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) }
+.bomb-it-part h3, .bomb-it-rule-group h3 { margin-bottom: 5px; font-size: 13px }
+.bomb-it-choice, .bomb-it-rule {
+  display: grid; justify-items: center; min-width: 0; gap: 0; padding: 4px;
+  border: 1px solid var(--line); border-radius: 10px; background: #f8f6ff;
+  text-align: center; font-size: 12px; font-weight: 750;
+}
+.bomb-it-choice[aria-pressed="true"], .bomb-it-rule[aria-pressed="true"], .bomb-it-rule.active {
+  border-color: var(--purple); color: var(--purple-dark); background: #ede5ff;
+  box-shadow: inset 0 0 0 1px var(--purple);
+}
+.bomb-it-choice:focus-visible, .bomb-it-rule:focus-visible { outline-offset: -3px }
+.bomb-it-rule-group + .bomb-it-rule-group { margin-top: 10px }
+.bomb-it-rule-group h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 6px }
+.bomb-it-rule-group h3 small { font-weight: 650 }
+.bomb-it-rule-strip {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(94px, 20%); gap: 6px;
+  max-width: 100%; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin;
+}
+.bomb-it-rule img {
+  width: 100%; height: auto; aspect-ratio: 8/5; object-fit: cover;
+  border-radius: 6px; background: #eae4f8;
+}
+.bomb-it-rule span { padding: 2px 0 1px }
+@media (max-width: 1220px) {
+  .bomb-it-character-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) }
+}
 .save-state { color: var(--purple-dark); background: var(--purple-pale); flex: none; border-radius: 999px; padding: 4px 8px; font-size: 11px }
 .level-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 108px), 1fr)); gap: 8px }
 .level-card {
@@ -606,7 +659,7 @@ button.danger:hover:not(:disabled) { background: #fdd7e5 }
   .room-layout > * { width: 100% }
   .room-left { grid-template-columns: repeat(2, minmax(0, 1fr)) }
   .chat-log { height: 225px }
-  .chat-form input, .create-grid input, .create-grid select, .join-dialog input, .welcome-body input, .room-search input { font-size: 16px }
+  .chat-form input, .create-grid input, .create-grid select, .join-dialog input, .welcome-body input, .room-search input, .outfit-fields select { font-size: 16px }
 }
 @media (max-width: 475px) {
   .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px }

@@ -6,7 +6,6 @@ import {encodeGlortonFrame,glortonControlFields} from '../public/glorton-online/
 const roomCode=/^[A-HJ-NP-Z2-9]{6}$/;
 const seatToken=/^[A-Za-z0-9_-]{32}$/;
 const maxAuthorityPacket=2_000_000;
-const maxInputLead=8;
 const snapshotInterval=400;
 const handshakeTimeout=6000;
 const disconnectTimeout=900;
@@ -29,17 +28,24 @@ function losslessFields(data){
 
 function makeSeat(role){
   return {role,send:null,link:null,token:null,guestToken:null,releasing:false,sequence:0,lastBrowserSequence:-1,
-    lastTargetTick:0,bootstrap:false,catchingUp:false,snapshotRequestedAt:0,detachedAt:null,
+    bootstrap:false,catchingUp:false,snapshotRequestedAt:0,detachedAt:null,
     pacing:null,canSend:null,compactFrames:false};
 }
 
-function safeLobbyState(packet,capacity){
+function validMatchSlots(slots,capacity){
+  return Array.isArray(slots)&&slots.length>=2&&slots.length<=capacity&&slots[0]===0&&
+    slots.every((slot,index)=>Number.isInteger(slot)&&slot<capacity&&(index===0||slot>slots[index-1]));
+}
+
+function safeLobbyState(packet,capacity,automaticRoster){
   const slots=Array.isArray(packet.slots)?packet.slots.map(slot=>({
     index:slot.index,kind:slot.kind,name:slot.name,fighter:slot.fighter,color:slot.color,
     level:slot.level,enabled:slot.enabled,ready:slot.ready,connected:slot.connected,
   })):[];
   return {op:'room_state',protocol:1,capacity,phase:packet.phase,host_slot:packet.host_slot,
     settings:packet.settings,slots,server_tick:packet.server_tick,paused_for_reconnect:packet.paused_for_reconnect===true,
+    ...(automaticRoster?{automaticRoster:true,minimumPlayers:2}:{}),
+    ...(automaticRoster&&validMatchSlots(packet.match_slots,capacity)?{match_slots:packet.match_slots}:{}),
     ...(Number.isSafeInteger(packet.round)?{round:packet.round}:{}),
     map_votes:Array.from({length:capacity},(_,index)=>stages.has(packet.map_votes?.[index])?packet.map_votes[index]:null),
     rematch_votes:Array.from({length:capacity},(_,index)=>packet.rematch_votes?.[index]===true),
@@ -49,7 +55,8 @@ function safeLobbyState(packet,capacity){
     }:null};
 }
 
-export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onEnd=()=>{},onError=()=>{},onSeatError=()=>{}}={}){
+export function createGlortonSyncMatch({serviceUrl,capacity=2,automaticRoster=false,
+  onState=()=>{},onEnd=()=>{},onError=()=>{},onSeatError=()=>{}}={}){
   const authority=new URL(serviceUrl);
   if(authority.protocol!=='ws:'||authority.hostname!=='127.0.0.1'||authority.pathname!=='/ws'||
     authority.username||authority.password||authority.search||authority.hash)throw Error('Expected a loopback Glorton authority');
@@ -60,6 +67,9 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
   const find=role=>Number.isInteger(role)?players[role-1]:null;
   let nativeRoom=null,lobby=null,matchStart=null,serverTick=0,round=0,finished=false,closed=false;
 
+  const matchSlot=player=>matchStart?.match_slots?.indexOf(player.role-1)??-1;
+  const isParticipant=player=>!automaticRoster||matchSlot(player)>=0;
+
   function deliver(player,packet){
     return player.send!==null&&player.send(packet)!==false;
   }
@@ -67,12 +77,15 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
   function emitState(){
     if(closed)return;
     const connected=players.map(player=>player.send!==null&&openLink(player)!==null);
-    const allSeatsFilled=connected.every(Boolean)&&players.every((_,index)=>lobby?.slots[index]?.enabled===true);
+    const occupied=players.flatMap((_,index)=>lobby?.slots[index]?.enabled===true?[index]:[]);
+    const enoughSeats=automaticRoster?occupied.length>=2:occupied.length===capacity;
+    const allSeatsConnected=enoughSeats&&occupied.every(index=>connected[index]);
     const playing=matchStart!==null&&!finished;
-    onState({phase:finished?'finished':playing?'playing':allSeatsFilled?'lobby':'waiting',
+    onState({phase:finished?'finished':playing?'playing':allSeatsConnected?'lobby':'waiting',
       ready:players.map((player,index)=>!player.releasing&&lobby?.slots[index]?.ready===true),
       connected,
-      paused:lobby?.paused_for_reconnect===true||(playing&&players.some(player=>player.detachedAt!==null))});
+      matchSeats:matchStart?.match_slots,
+      paused:lobby?.paused_for_reconnect===true||(playing&&players.some(player=>isParticipant(player)&&player.detachedAt!==null))});
   }
 
   function advanceRound(next){
@@ -82,7 +95,6 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
     finished=false;
     serverTick=0;
     for(const player of players){
-      player.lastTargetTick=0;
       player.bootstrap=false;
       player.catchingUp=false;
       player.snapshotRequestedAt=0;
@@ -144,14 +156,14 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
     const link=openLink(player);
     if(!link)return false;
     const input=Object.fromEntries(glortonControlFields.map(key=>[key,held[key]===true]));
-    player.lastTargetTick=Math.max(player.lastTargetTick,tick);
     return sendUpstream(link,{op:'input',seq:++player.sequence,tick,controls:input});
   }
 
   function neutralize(player){
     if(!matchStart||finished)return;
-    const end=Math.min(serverTick+maxInputLead,Math.max(serverTick,player.lastTargetTick));
-    for(let tick=serverTick;tick<=end;tick++)if(!sendInput(player,tick,{}))break;
+    const link=openLink(player);
+    if(!link)return;
+    sendUpstream(link,{op:'input',seq:++player.sequence,tick:serverTick,clear:true,controls:{shield_released:true}});
   }
 
   function closeLink(link,force=false){
@@ -183,22 +195,23 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
     onEnd(message);
   }
 
-  function failSeat(player){
-    if(player.role===1||matchStart)return fail();
-    const error={op:'error',code:'AUTHORITY_UNAVAILABLE',message:'游戏连接失败，席位已释放。请返回大厅重试。',fatal:true};
+  function failSeat(player,code='AUTHORITY_UNAVAILABLE',message='游戏连接失败，席位已释放。请返回大厅重试。'){
+    if(player.role===1||(matchStart&&isParticipant(player)))return fail();
+    const error={op:'error',code,message,fatal:true};
     deliver(player,error);
     onSeatError(player.role);
   }
 
   function welcome(player){
     deliver(player,{op:'welcome',protocol:1,slot:player.role-1,capacity,reconnect_seconds:22,
+      ...(automaticRoster?{automaticRoster:true,minimumPlayers:2}:{}),
       ...(player.pacing?{frame_ack:true}:{}),...(player.compactFrames?{compact_frames:true}:{})});
   }
 
   function forwardState(player,packet){
     if(!Number.isSafeInteger(packet.server_tick)||packet.server_tick<0)return;
     serverTick=Math.max(serverTick,packet.server_tick);
-    const state=safeLobbyState(packet,capacity);
+    const state=safeLobbyState(packet,capacity,automaticRoster);
     if(player.role===1||!lobby||!openLink(players[0]))lobby=state;
     if(state.phase==='finished'&&state.result)finished=true;
     deliver(player,state);
@@ -217,7 +230,8 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
     }
     if(player.bootstrap){
       if(!matchStart)return fail('对局配置丢失，请重新建房。');
-      if(!deliver(player,{...matchStart,initial_snapshot:exactSnapshot}))return;
+      if(!deliver(player,{...matchStart,initial_snapshot:exactSnapshot,
+        ...(automaticRoster?{match_slot:matchSlot(player)}:{})}))return;
       player.bootstrap=false;
     }else if(!deliver(player,{...packet,snapshot:exactSnapshot}))return;
     resetPacing(player,tick);
@@ -233,6 +247,8 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
     try{packet=JSON.parse(message);}catch{return fail();}
     if(!isObject(packet))return fail();
     if(!link.welcomed){
+      if(automaticRoster&&packet.op==='error'&&packet.code==='match_already_started')
+        return failSeat(player,'MATCH_STARTED','对局已经开始，可以等下一局再加入。');
       if(packet.op!=='welcome'||packet.protocol!==1||packet.slot!==player.role-1||
         !roomCode.test(packet.room)||!seatToken.test(packet.token)||(nativeRoom&&nativeRoom!==packet.room))return failSeat(player);
       nativeRoom=packet.room;
@@ -254,11 +270,14 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
       const exact=losslessFields(message);
       const startPacket={op:'match_start',seed:packet.seed,tick_ms:packet.tick_ms,input_delay_ticks:packet.input_delay_ticks,
         match_config:exact.match_config,initial_snapshot:exact.initial_snapshot,
-        ...(Number.isSafeInteger(packet.round)?{round:packet.round}:{})};
+        ...(Number.isSafeInteger(packet.round)?{round:packet.round}:{}),
+        ...(automaticRoster?{match_slots:packet.match_slots}:{})};
       if(!Number.isSafeInteger(startPacket.seed)||startPacket.tick_ms!==25||!isObject(startPacket.match_config)||
-        !isObject(startPacket.initial_snapshot)||!Number.isSafeInteger(packet.initial_snapshot.tick))return fail();
+        !isObject(startPacket.initial_snapshot)||!Number.isSafeInteger(packet.initial_snapshot.tick)||
+        (automaticRoster&&!validMatchSlots(packet.match_slots,capacity)))return fail();
       matchStart=startPacket;
-      player.bootstrap=!deliver(player,startPacket);
+      if(!isParticipant(player))return failSeat(player,'MATCH_STARTED','对局已经开始，可以等下一局再加入。');
+      player.bootstrap=!deliver(player,{...startPacket,...(automaticRoster?{match_slot:matchSlot(player)}:{})});
       if(!player.bootstrap)resetPacing(player,packet.initial_snapshot.tick);
       emitState();
       return;
@@ -318,7 +337,7 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
       if(closed||link.intentional)return;
       if(player.role!==1)player.guestToken??=randomBytes(24).toString('base64url');
       const hello=player.token?{op:'resume',room:nativeRoom,token:player.token}
-        :player.role===1?{op:'create',name:player.name,capacity}
+        :player.role===1?{op:'create',name:player.name,capacity,...(automaticRoster?{automatic_roster:true}:{})}
           :{op:'join',room:nativeRoom,name:player.name,slot:player.role-1,seat_token:player.guestToken};
       sendUpstream(link,{...hello,protocol:1});
     });
@@ -338,6 +357,7 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
   function attach(role,{name,send,canSend,frameAck=false,compactFrames=false}){
     const player=find(role);
     if(closed||!player||typeof send!=='function')return false;
+    if(matchStart&&!finished&&!isParticipant(player))return false;
     player.name=name;
     player.send=send;
     player.canSend=canSend;
@@ -378,8 +398,7 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
       if(!matchStart||finished||player.bootstrap||!Number.isSafeInteger(packet.seq)||packet.seq<=player.lastBrowserSequence||
         !Number.isSafeInteger(packet.tick)||!isObject(packet.controls))return false;
       player.lastBrowserSequence=packet.seq;
-      const tick=Math.min(serverTick+maxInputLead,Math.max(serverTick,packet.tick));
-      return sendInput(player,tick,packet.controls);
+      return sendInput(player,packet.tick,packet.controls);
     }
     if(packet.op==='clear'){neutralize(player);return true;}
     if(packet.op==='ping'&&Number.isSafeInteger(packet.id)&&Number.isSafeInteger(packet.client_time_ms))
@@ -391,14 +410,14 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
       return sendUpstream(link,{op:'rematch',ready:packet.ready,...(packet.round?{round}: {})});
     if(packet.op==='lobby_update'&&!matchStart&&isObject(packet.patch)){
       const slot=packet.slot??role-1;
-      const computerSlot=role===1&&Number.isInteger(slot)&&slot>=capacity&&slot<4;
+      const computerSlot=!automaticRoster&&role===1&&Number.isInteger(slot)&&slot>=capacity&&slot<4;
       if(slot!==role-1&&!computerSlot)return false;
       const patch={};
       if(typeof packet.patch.fighter==='string'&&packet.patch.fighter.length<=32)patch.fighter=packet.patch.fighter;
       for(const key of ['color','level'])if(Number.isSafeInteger(packet.patch[key]))patch[key]=packet.patch[key];
       for(const key of ['ready','enabled'])if(typeof packet.patch[key]==='boolean')patch[key]=packet.patch[key];
       if(!Object.keys(patch).length)return false;
-      return sendUpstream(link,{op:'lobby_update',slot,patch});
+      return sendUpstream(link,{op:'lobby_update',slot,patch,...(packet.round?{round}:{})});
     }
     if(packet.op==='settings_update'&&role===1&&!matchStart&&isObject(packet.patch)){
       const patch={};
@@ -406,7 +425,7 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
       if(Number.isSafeInteger(packet.patch.stock))patch.stock=packet.patch.stock;
       if(typeof packet.patch.items==='boolean')patch.items=packet.patch.items;
       if(!Object.keys(patch).length)return false;
-      return sendUpstream(link,{op:'settings_update',patch});
+      return sendUpstream(link,{op:'settings_update',patch,...(packet.round?{round}:{})});
     }
     return false;
   }
@@ -426,7 +445,7 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
 
   async function release(role){
     const player=find(role);
-    if(closed||!player||player.role===1||(matchStart&&!finished))return;
+    if(closed||!player||player.role===1||(matchStart&&!finished&&isParticipant(player)))return;
     player.send=null;
     player.canSend=null;
     player.pacing=null;
@@ -438,19 +457,18 @@ export function createGlortonSyncMatch({serviceUrl,capacity=2,onState=()=>{},onE
     player.token=null;
     player.guestToken=null;
     player.sequence=0;
-    player.lastTargetTick=0;
     closeLink(link);
     emitState();
     try{
       if(link)await link.closed;
-      if(token&&nativeRoom&&!closed){
+      if(token&&nativeRoom&&!closed&&(!matchStart||finished||isParticipant(player))){
         for(let attempt=0;attempt<2;attempt++){
           const response=await fetch(releaseUrl,{method:'POST',headers:{'content-type':'application/json'},
             body:JSON.stringify({room:nativeRoom,token}),signal:AbortSignal.timeout(1300)});
           if(!response.ok)throw Error('Authority rejected seat release');
           const result=await response.json();
-          if(result.playing)return fail('玩家已退出，对局已结束。');
           if(result.released)break;
+          if(result.playing&&isParticipant(player))return fail('玩家已退出，对局已结束。');
           if(attempt===0)await sleep(100);
         }
       }

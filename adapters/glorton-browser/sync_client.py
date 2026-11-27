@@ -141,6 +141,9 @@ async def main():
         def _start_runtime(self, message):
             super()._start_runtime(message)
             self.last_sent_holds = None
+            self.last_input_tick = -1
+            self.browser_pressed.clear()
+            self.last_local_controls = {}
             self.runtime._quality_scale = scale_display_asset
             install_stage_renderer(self.runtime)
             self.runtime._stage_scene = StageRenderBudget(self.runtime._stage_scene)
@@ -225,18 +228,47 @@ async def main():
             # The browser owns selection, Ready and rematch controls.
             if self.mode in ("lobby", "finished") and event.type in (pygame.KEYDOWN, pygame.KEYUP):
                 return
+            if self.mode == "battle" and event.type in (pygame.KEYDOWN, pygame.KEYUP) and event.key in self.control_keys:
+                return
             await super()._handle_event(event)
 
-        async def _send_controls(self, immediate=False):
-            if self.mode != "battle" or self.local_input is None or self.websocket is None:
+        def _apply_keyboard(self, payload):
+            if payload["reset"]:
+                self.local_input = self.runtime._create_inputs()[0]
+                self.browser_pressed.clear()
+                self.last_sent_holds = None
+                self.last_input_tick = -1
+            local = self.local_input
+            for action, pressed in payload["events"]:
+                key = next(iter(getattr(local, f"{action}_keys")), None)
+                if key is None:
+                    continue
+                if pressed:
+                    self.browser_pressed.add(key)
+                    local.keydown(key)
+                else:
+                    self.browser_pressed.discard(key)
+                    local.keyup(key)
+                    # Keep the other held direction when the current direction is released.
+                    if action in ("left", "right") and local.horizontal_direction == action:
+                        local.horizontal_direction = "left" if local.held_left else "right" if local.held_right else "stop"
+
+        async def _send_controls(self):
+            if (self.mode != "battle" or self.local_input is None or self.websocket is None
+                    or self.room_state.get("paused_for_reconnect")):
                 return
             now = time.monotonic()
             due = now >= self.next_input_at
-            if not due and (not immediate or self.local_input.held_up):
+            if not due and self.local_input.held_up:
                 # Sampling the upstream diagonal/jump input advances its held timer.
                 # Keep hold-to-jump on the normal game-tick cadence.
                 return
-            controls = self.local_input.controls(pygame.key.get_pressed())
+            payload = str(bridge.readInput())
+            if payload:
+                self._apply_keyboard(json.loads(payload))
+            elif not due:
+                return
+            controls = self.local_input.controls({key: key in self.browser_pressed for key in self.local_input.down_keys})
             self.last_local_controls = controls
             if due:
                 self.next_input_at = max(self.next_input_at + TICK_MS / 1000, now + TICK_MS / 2000)
@@ -245,9 +277,11 @@ async def main():
                 return
             self.last_sent_holds = holds
             self.input_seq += 1
-            # The authority schedules inputs on its next applicable tick. The browser
-            # does not need the desktop client's additional fixed two-tick lead.
-            await self.send({"op": "input", "seq": self.input_seq, "tick": self.server_tick, "controls": controls})
+            # Keep the two edges of a short tap on separate ticks when the latest
+            # server frame has not arrived yet. The first edge has no extra delay.
+            tick = max(self.server_tick, min(self.server_tick + 2, self.last_input_tick + 1))
+            self.last_input_tick = tick
+            await self.send({"op": "input", "seq": self.input_seq, "tick": tick, "controls": controls})
 
         async def run(self):
             pygame.init()
@@ -262,6 +296,7 @@ async def main():
             render_ms = 0.0
             presented_frames = 0
             self.control_keys = set()
+            self.browser_pressed = set()
             self.round_number = 0
             self.room_ended = False
             try:
@@ -269,14 +304,10 @@ async def main():
                     now = time.monotonic()
                     elapsed = (now - last_iteration) * 1000
                     last_iteration = now
-                    immediate_input = False
                     for event in pygame.event.get():
-                        if (self.mode == "battle" and event.type in (pygame.KEYDOWN, pygame.KEYUP)
-                                and event.key in self.control_keys):
-                            immediate_input = True
                         await self._handle_event(event)
                     await self._process_messages()
-                    await self._send_controls(immediate_input)
+                    await self._send_controls()
                     await self._advance_confirmed_frames()
                     self.latency_ms = float(bridge.rtt())
                     if self.websocket is not None and not self.room_state.get("paused_for_reconnect"):

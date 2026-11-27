@@ -58,8 +58,9 @@
 | # | 结论 | 证据 | 怎么验证的 |
 | --- | --- | --- | --- |
 | 1 | 冰火人 **Flash** 原版在本地**跑不起来** | `LOCAL_AGENT_FINDINGS.md` §2 | 三个发行版本都卡在预加载；`AGdom.initDomain()` 只在 loaderURL 含 `addictinggames.com`/`shockwave.com` 时才调 `getServer()` |
-| 2 | 闪翼正传 Flash 版**跑不起来** | `LOCAL_AGENT_FINDINGS.md` §3 | 外壳请求 `cdn.comment.4399pk.com` 被 CORS 拦 |
+| 2 | 闪翼正传原包直接放浏览器**跑不起来**（结论仍有效） | `LOCAL_AGENT_FINDINGS.md` §3、`SHANYI_SOURCE_AUDIT.md` §7 | 外壳请求 `cdn.comment.4399pk.com` 被 CORS 拦 |
 | 3 | 闪翼 `core_3`+`core_4` **静态合并不可行** | 同上 §3.3 | 三种合并方案都试过，纯白；根因是四段式链式加载，缺 `fw` 调度器 |
+| 3a | 不改原包的自写 AS3 外壳可在 Ruffle nightly 中载入 `core_4_abc.swf` 并进入第一关 | `SHANYI_SOURCE_AUDIT.md` §8 | 外壳 `adapters/shanyi-flash/src/ShanyiHost.as`；wgpu + `maxExecutionDuration:600`；实验性输入镜像已接入大厅 |
 | 4 | 冰火人 **HTML5 版 6 部全部可运行** | `HTML5_ROUTE_FINDINGS.md` | 2/3/4/5/6 均出 canvas 且标题正确；1–4 仅缺 `h5api`（不影响玩法） |
 | 5 | HTML5 第一代**能进关卡**，32 关选关可用 | 同上 | 主菜单 → 选关 → 解锁 → 进关卡，截图可查 |
 | 6 | **输入桥成立**：只写 `cursors.left/right.isDown` 就能驱动角色 | 同上「输入桥实机验证」 | 不按任何键，水娃 1184→894→1156，火娃全程 `x=64` 不动 |
