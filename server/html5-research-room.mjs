@@ -5,6 +5,7 @@ import {chromium} from 'playwright';
 import {WebSocket,WebSocketServer} from 'ws';
 import {startHtml5ResearchHost} from '../scripts/html5-research-host.mjs';
 import {Html5RoomCore} from './html5-room-core.mjs';
+import {DEFAULT_RESUME_GRACE_MS,SeatPresence} from './seat-presence.mjs';
 import {Html5SceneGuard} from './html5-scene-guard.mjs';
 import {inspectNativeWin,nextForestLevel,nextTempleLevel} from './html5-level-progression.mjs';
 const id=()=>randomBytes(16).toString('hex');
@@ -13,7 +14,7 @@ const isLocalOrPrivateHost=name=>name==='127.0.0.1'||name==='localhost'||
   /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(name)||
   /^192\.168\.\d{1,3}\.\d{1,3}$/.test(name)||
   /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(name);
-export async function startHtml5ResearchRoom({root,script,requireScript,entryPath,levelId=1,port=0,publicPort=null,allowedViewerOrigins=[],templeId='forest',storagePrefix='fb-forest',gameId='forest',wsToken=null,bindHost='127.0.0.1',publicHost=null,seats=2}={}){
+export async function startHtml5ResearchRoom({root,script,requireScript,entryPath,levelId=1,port=0,publicPort=null,allowedViewerOrigins=[],templeId='forest',storagePrefix='fb-forest',gameId='forest',wsToken=null,bindHost='127.0.0.1',publicHost=null,seats=2,resumeGraceMs=DEFAULT_RESUME_GRACE_MS}={}){
   if(!Number.isInteger(port)||port<0||port>65535)throw new RangeError('Invalid research port');
   if(publicPort!==null&&(!Number.isInteger(publicPort)||publicPort<1||publicPort>65535))
     throw new RangeError('Invalid public research port');
@@ -102,7 +103,12 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
       if(!__game.paused)throw Error('Waiting room did not pause');
     });
     const room=new Html5RoomCore({roomEpoch,seats}),peers=new Map();
-    let closed=false,failed=null,serial=Promise.resolve(),pendingTick=false,broadcastSeq=0;
+    /** 断线席位保留：刷新/短暂掉线后带票回到原席位，不用重新选关。 */
+    const presence=new SeatPresence({capacity:seats,graceMs:resumeGraceMs,onExpire:()=>{
+      if(!closed)notify();
+    }});
+    const socketsBySlot=new Map();
+    let closed=false,failed=null,lastError=null,serial=Promise.resolve(),pendingTick=false,broadcastSeq=0;
     let lastWinSnapshot=null;
     const send=(ws,obj)=>{if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(obj));};
     const broadcast=obj=>{
@@ -328,8 +334,9 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
     const server=http.createServer((req,res)=>{
       const okay=req.url==='/health'&&['GET','HEAD'].includes(req.method);
       const body=JSON.stringify({researchOnly:true,gameAssetsHosted:false,noVideo:true,
-        room:room.publicState(),gameId,templeId,gameSha256:host.sourceSha256,
-        servedSha256:host.servedSha256,failed:!!failed});
+        room:room.publicState(),reserved:presence.reservedSlots(),resumeGraceMs,
+        gameId,templeId,gameSha256:host.sourceSha256,
+        servedSha256:host.servedSha256,failed:!!failed,lastError});
       res.writeHead(okay?200:404,{'content-type':'application/json; charset=utf-8',
         'cache-control':'no-store','content-length':Buffer.byteLength(body)});
       res.end(req.method==='HEAD'?undefined:body);
@@ -341,7 +348,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
       const valid=allowedHostNames.has(hostName)&&
         (String(h??'').endsWith(':'+server.address()?.port)||
          String(h??'').endsWith(':'+(displayPort??server.address()?.port)));
-      let requestUrl=null,requestedSeat=null;
+      let requestUrl=null,requestedSeat=null,resumeToken=null;
       try{requestUrl=new URL(req.url,'http://'+h);}catch{}
       const seatRaw=requestUrl?.searchParams.get('seat')??null;
       // Seat index is validated against the room's real capacity, not a
@@ -350,6 +357,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
         const parsed=Number(seatRaw);
         if(parsed>=0&&parsed<room.capacity)requestedSeat=parsed;
       }
+      resumeToken=requestUrl?.searchParams.get('resume')??null;
       const tokenOkay=wsToken===null||requestUrl?.searchParams.get('token')===wsToken;
       if(!requestUrl||requestUrl.pathname!=='/ws'||!valid||!tokenOkay||
         (seatRaw!==null&&requestedSeat===null)||
@@ -357,19 +365,38 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
         closed||failed){
         socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;
       }
-      wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,requestedSeat));
+      wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,{requestedSeat,resumeToken}));
     });
-    wss.on('connection',(ws,requestedSeat)=>{
-      const memberId=id();let slot;
-      try{slot=room.attach(memberId,requestedSeat);}catch{send(ws,{type:'error',code:'ROOM_FULL'});ws.close();return;}
+    wss.on('connection',(ws,{requestedSeat,resumeToken})=>{
+      const memberId=id();let slot=null,resumed=false;
+      const claimed=presence.claim(resumeToken);
+      if(claimed!==null){
+        try{slot=room.attach(memberId,claimed);resumed=true;}
+        catch{slot=null;}
+      }
+      if(slot===null){
+        try{slot=room.attach(memberId,requestedSeat);}
+        catch{send(ws,{type:'error',code:'ROOM_FULL'});ws.close();return;}
+      }
+      presence.release(slot);
+      const seatToken=presence.issue(slot);
       peers.set(ws,{memberId,slot});
-      send(ws,{type:'welcome',slot,room:room.publicState(),level,
+      socketsBySlot.set(slot,ws);
+      send(ws,{type:'welcome',slot,resumed,resumeToken:seatToken,resumeGraceMs,
+        room:room.publicState(),level,
         gameId,templeId,gameSha256:host.sourceSha256,servedSha256:host.servedSha256,
         originalPackageBaseline:false});
       notify();ws.on('error',()=>{});
       ws.on('close',()=>{
         const owner=peers.get(ws);if(!owner)return;
-        peers.delete(ws);room.detach(memberId);
+        peers.delete(ws);
+        if(socketsBySlot.get(owner.slot)===ws)socketsBySlot.delete(owner.slot);
+        room.detach(memberId);
+        // 主动离开立刻放人，意外断开保留 20 秒。
+        if(!closed){
+          if(ws.leaving)presence.release(owner.slot);
+          else presence.hold(owner.slot);
+        }
         void enqueue(async()=>{
           await page.evaluate(seat=>{
             window.__html5RoomInput.resetSlot(seat,{newEpoch:true});
@@ -424,7 +451,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
             notify();
           });
         }else if(msg.type==='ping')send(ws,{type:'pong',id:msg.id});
-        else if(msg.type==='leave')ws.close();
+        else if(msg.type==='leave'){ws.leaving=true;ws.close();}
         else reject('UNKNOWN_MESSAGE');
       });
     });
@@ -530,6 +557,7 @@ export async function startHtml5ResearchRoom({root,script,requireScript,entryPat
       close(){
         closing??=(async()=>{
           closed=true;if(timer)clearTimeout(timer);
+          presence.dispose();
           for(const ws of peers.keys())ws.terminate();
           await serial.catch(()=>{});
           await new Promise(resolve=>wss.close(resolve));

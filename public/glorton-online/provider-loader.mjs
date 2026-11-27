@@ -58,6 +58,14 @@ function show() {
   panel.setAttribute('role', 'status');
   panel.style.cssText = 'padding:12px;border-radius:10px;background:#efe9ff;color:#352165;font:14px/1.5 system-ui,sans-serif;box-sizing:border-box';
   const message = document.createElement('div');
+  const progress = document.createElement('div');
+  progress.style.cssText = 'margin-top:10px';
+  progress.innerHTML = '<div class="glorton-provider-readout" style="display:flex;align-items:baseline;justify-content:flex-end;gap:2px;margin-bottom:6px;color:#4c2aad;font-variant-numeric:tabular-nums">'
+    + '<b class="glorton-provider-percent" style="font-size:26px;font-weight:850;line-height:1">0</b>'
+    + '<span style="font-size:13px;font-weight:750;color:#8b83ad">%</span></div>'
+    + '<div class="glorton-provider-track" role="progressbar" aria-label="游戏资源载入进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" '
+    + 'style="height:10px;border-radius:999px;background:#ddd2f6;box-shadow:inset 0 1px 2px #c3b2ea;overflow:hidden">'
+    + '<span style="display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#5b2ab8,#9a63f5 62%,#b98bff);transition:width .42s cubic-bezier(.22,.68,.32,1)"></span></div>';
   const actions = document.createElement('div');
   actions.style.cssText = 'display:none;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:8px';
   const download = document.createElement('a');
@@ -79,7 +87,7 @@ function show() {
   retry.textContent = '重新加载';
   retry.onclick = () => location.reload();
   actions.append(retry, importButton, download, input);
-  panel.append(message, actions);
+  panel.append(message, progress, actions);
   (document.querySelector('.glorton-provider-host') ?? document.body).append(panel);
   input.onchange = async () => {
     const file = input.files[0];
@@ -98,10 +106,35 @@ function show() {
     setArchive(file, cacheKeys.imported);
     report('mounting', '正在读取导入的游戏资源…');
   };
-  return {panel, message, actions};
+  return {panel, message, actions, progress};
 }
 
 const ui = show();
+
+// 百分比读数：目标值变了用 rAF 追上去，保证数字一直在动。
+const percentEl = ui.progress.querySelector('.glorton-provider-percent');
+const fillEl = ui.progress.querySelector('.glorton-provider-track > span');
+const trackEl = ui.progress.querySelector('.glorton-provider-track');
+let shownPercent = 0, targetPercent = 0, rafId = 0, tweenFrom = 0, tweenAt = 0;
+const easeOut = t => 1 - (1 - t) ** 3;
+function paintPercent(value) {
+  shownPercent = value;
+  const rounded = Math.round(value);
+  fillEl.style.width = value + '%';
+  percentEl.textContent = String(rounded);
+  trackEl.setAttribute('aria-valuenow', String(rounded));
+}
+function progressTo(value) {
+  targetPercent = Math.min(100, Math.max(targetPercent, value));
+  if (rafId) return;
+  tweenFrom = shownPercent; tweenAt = performance.now();
+  const step = now => {
+    const t = Math.min(1, (now - tweenAt) / 420);
+    paintPercent(tweenFrom + (targetPercent - tweenFrom) * easeOut(t));
+    rafId = t < 1 ? requestAnimationFrame(step) : 0;
+  };
+  rafId = requestAnimationFrame(step);
+}
 
 function report(phase, message) {
   ui.panel.hidden = phase === 'ready';
@@ -113,6 +146,9 @@ function report(phase, message) {
     error: '游戏引擎加载失败，请重新加载。',
   }[phase] || '';
   ui.actions.style.display = phase === 'error' ? 'flex' : 'none';
+  if (phase === 'ready') progressTo(100);
+  else if (phase === 'mounting' || phase === 'source') progressTo(92);
+  else if (phase === 'invalid' || phase === 'error') ui.progress.style.display = 'none';
   if (phase === 'ready' && activeArchive?.key === cacheKeys.imported)
     void cache('write', activeArchive.key, activeArchive.blob);
   if (phase === 'invalid' && activeArchive) {
@@ -169,6 +205,7 @@ window.GlortonProvider = Object.freeze({
 async function loadPublisherArchive() {
   const current = ++attempt;
   report('waiting', '正在从发行方加载游戏资源…');
+  progressTo(8);
   try {
     const imported = await cache('read', cacheKeys.imported);
     if (current !== attempt) return;
@@ -184,7 +221,10 @@ async function loadPublisherArchive() {
       const parts = await Promise.all(chunks.map(async (part) => {
         const blob = await readChunk(part);
         completed++;
-        if (current === attempt) report('waiting', `正在加载游戏资源 · ${completed}/${chunks.length}`);
+        if (current === attempt) {
+          report('waiting', `正在加载游戏资源 · ${completed}/${chunks.length}`);
+          progressTo(10 + 82 * (completed / chunks.length));
+        }
         return blob;
       }));
       if (current !== attempt) return;

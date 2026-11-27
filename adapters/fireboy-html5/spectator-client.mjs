@@ -7,14 +7,14 @@
 import {installHtml5Spectator} from './spectator-projection.mjs';
 
 export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices,smooth=false,smoothingMs=45,
-  expectedSeat=null,expectedServedSha256=null,expectedLevelId=null}={}){
+  expectedSeat=null,expectedServedSha256=null,expectedLevelId=null,resumeKey=null}={}){
   if(!game?.level||typeof wsUrl!=='string'||!/^wss?:\/\//.test(wsUrl))
     throw new TypeError('Loaded game and WebSocket URL required');
   if(typeof smooth!=='boolean')throw new TypeError('smooth must be boolean');
   if(!Number.isFinite(smoothingMs)||smoothingMs<5||smoothingMs>500)
     throw new RangeError('smoothingMs must be between 5 and 500');
-  if(expectedSeat!==null&&expectedSeat!==0&&expectedSeat!==1)
-    throw new RangeError('expectedSeat must be 0 or 1');
+  if(expectedSeat!==null&&(!Number.isInteger(expectedSeat)||expectedSeat<0||expectedSeat>3))
+    throw new RangeError('expectedSeat must be 0..3');
   if(expectedServedSha256!==null&&!/^[a-f0-9]{64}$/.test(expectedServedSha256))
     throw new TypeError('expectedServedSha256 must be a SHA-256');
   if(expectedLevelId!==null&&!Number.isInteger(expectedLevelId))
@@ -252,7 +252,15 @@ export function connectHtml5Spectator({game,wsUrl,devices=globalThis.Devices,smo
       }
       if(typeof message.templeId==='string'&&/^[a-z][a-z-]{1,31}$/.test(message.templeId))
         sessionTempleId=message.templeId;
-      if(seat!==0&&seat!==1){lastError='INVALID_SEAT';notify();return;}
+      const seatCapacity=Number.isInteger(message.room?.capacity)?message.room.capacity:2;
+      if(!Number.isInteger(seat)||seat<0||seat>=Math.min(4,seatCapacity))
+        {lastError='INVALID_SEAT';notify();return;}
+      // 席位续租票：刷新或短暂掉线后带回去坐回原位。
+      if(resumeKey&&typeof message.resumeToken==='string'){
+        try{sessionStorage.setItem(resumeKey,message.resumeToken);}catch{}
+      }
+      if(message.resumed&&typeof console!=='undefined')
+        console.info('HTML5 spectator resumed seat '+seat);
       if(expectedSeat===null)projection.setLocalSeat?.(seat);
       room=message.room;roundNumber=room.roundNumber??0;
       send({type:'ready',roundNumber});notify();return;

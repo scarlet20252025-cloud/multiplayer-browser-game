@@ -108,3 +108,68 @@ node scripts/verify-glorton-local.mjs http://127.0.0.1:19361 3
 切换前确认活跃对局，并保留上一个可启动版本和独立的房间数据。有资源缓存时核对实际返回的版本和内容。切换后从真实局域网和公网入口完成健康检测、建房、进房和对局测试，核对游戏卡、房间缩略图和备战区。详细回退与故障排查见 [联机工程总结的部署章节](NETPLAY_ENGINEERING_GUIDE.md#5-部署回退与故障排查)。
 
 提交时把源码、可公开的原稿、设计指引和相关测试放入 Git。开发者本机的运行包、授权素材、原始上传压缩包、构建缓存、日志、房间数据和部署凭据放在私有路径。生产发布与仓库提交分别记录版本，便于从用户看到的页面追溯到对应文件。
+
+## 6. 设计令牌与组件清单
+
+网页的视觉只有一套来源：`public/lobby/lobby.css` 的 `:root`。其他页面（对局外壳、加载页、游戏内 HUD）复制的是同一组值，改色时先改这里，再逐页核对。`design/carnival/reference-tokens.json` 是主视觉原稿的参考比例，不参与运行时。
+
+| 令牌 | 值 | 用在哪 |
+| --- | --- | --- |
+| `--ink` | `#20215c` | 正文与标题 |
+| `--muted` | `#645f84` | 次要说明、占位 |
+| `--purple` / `--purple-dark` | `#783af0` / `#6130ce` | 主交互、链接、进度条 |
+| `--purple-pale` | `#f0ebff` | 次级按钮底色、选中态 |
+| `--line` | `#e3dcf4` | 分隔线与描边 |
+| `--yellow` | `#ffd126` | 建房、开始对局等主行动 |
+| `--panel-shadow` | `0 7px 0 #dcddff, 0 15px 42px #303b9b38` | 卡片抬升感（硬阴影 + 柔光） |
+| `--content` | `1368px` | 桌面内容宽度上限 |
+
+版式规则：
+
+- 字号阶梯：`29–30` 进度读数 / `25` 页面或卡片主标题 / `18–21` 区块标题 / `15` 正文 / `13–14` 控件与说明 / `12` 微字。
+- 圆角：卡片 `18–24px`，按钮与输入框 `11–12px`，进度条与标签 `999px`。
+- 阴影：只允许两种——卡片用 `--panel-shadow`，按钮用 `0 2px 0` 的硬底边。不要再引入第三种模糊阴影。
+- 可点击元素最小高度 `42px`；`:focus-visible` 统一 `3px solid #2257bc`。
+- 动效时长：悬停/按下 `160ms`，进度与数值 `420ms`，都必须在 `prefers-reduced-motion: reduce` 下退化为无动画。
+- 三种背景：大厅是蓝天浮岛图；对局外壳是 `linear-gradient(155deg,#b9e8ff,#e0f0ff 43%,#eee5ff)`；加载遮罩是 `radial-gradient(ellipse at top,#49317b,#20173e 68%)`。
+
+组件清单（新页面按这套命名复用，不要另起一套）：
+
+| 组件 | 结构 | 状态 |
+| --- | --- | --- |
+| 游戏卡片 | 封面 + 标题 + 副标题 + 人数 | 有/无封面、进行中、已满 |
+| 房间面板 | 房名、密码、席位列表、准备/开始 | 等待、全员准备、开局中 |
+| 席位卡 | P1–P4、昵称、在线点、准备标记 | 在线、离线保留、空位 |
+| 备战面板 | 角色/装扮/地图/模式预览 + 规则说明 | 未选、已选、规则版本变更 |
+| 加载遮罩 | 标题、说明、百分比、进度条、重试/返回 | 见第 7 节 |
+| 对局 HUD | 比分、延迟、键位、返回 | 连接中、对局中、结算 |
+
+## 7. 加载与进度条规范
+
+所有进入游戏的页面都必须有同一个加载遮罩：**标题 + 一句说明 + 大号百分比 + 进度条**，失败时再出现「重试加载 / 返回房间」。不允许只留一行「正在加载…」。
+
+实现位置：
+
+| 页面 | 文件 |
+| --- | --- |
+| 泡泡堂 7、死神 vs 火影（帧同步外壳） | `public/lockstep/loading.mjs` + `loading.css`，由 `public/lockstep/client.mjs` 驱动 |
+| 迷宫坦克 | `public/tank-arena/index.html` 的 `#arena-entry` 内联脚本 |
+| 云台乱斗 | `public/platform-brawl/index.html` 的 `#boot-failure` 内联脚本 |
+| 疯狂小人乱斗 | `public/glorton-online/provider-loader.mjs` |
+| 闪翼双星 | `scripts/html5-research-host.mjs` 的 `#shanyi-gate` + `scripts/shanyi-mirror-client.mjs` |
+| 联机大厅首屏 | `scripts/html5-research-host.mjs` 的 `lobbyPage()` |
+| 死神 vs 火影下载 | `scripts/prepare-bvn33-sidecar.mjs` 给原版页面补的 `#download-percent` |
+
+百分比规则（照抄，别自己发明）：
+
+1. **只能向前**。新目标小于当前值时保持不动，避免回跳。
+2. 有真实字节数时按 `loaded / total` 算；下载阶段映射到 `10%–70%`，把余量留给校验和初始化。
+3. 没有字节数时按阶段预算：`connect 4 → cache 10 → download 12 → verify 72 → initialize 80 → ready 96 → waiting 100`。
+4. 只拿到「已完成 N/M 块」时用 `N/M` 线性映射（Glorton 就是 5 个包）。
+5. 完全拿不到进度（原版 SWF 启动、模块 import）时用慢爬：每 `380–520ms` 加 `1.2–1.4`，上限 `90–92`，就绪后补到 100。
+6. `waiting`（等其他人）和 `recover`（重连）固定显示 100% 或保持原值，文案改成等待，**不要继续爬**。
+7. 数字用 `font-variant-numeric: tabular-nums`，避免 9%→10% 时整行抖动。
+
+动画参数：数字用 `requestAnimationFrame` 在 `420ms` 内从旧值追到新值，缓动 `1-(1-t)^3`；进度条宽度用 CSS `transition: width .42s cubic-bezier(.22,.68,.32,1)`。无障碍上进度条是 `role="progressbar"`，同时维护 `aria-valuenow` 和 `aria-valuetext`，百分比文本本身标 `aria-hidden`，避免读屏重复朗读。
+
+验收：刷新页面时能看到数字从个位数连续涨到 100；断网或让资源 404 时出现重试；在「等待其他玩家」阶段数字停在 100 且进度条有流光；开启系统「减少动态效果」后不再有补间动画。

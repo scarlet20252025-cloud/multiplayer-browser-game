@@ -146,6 +146,8 @@ node --input-type=module -e "import {loadGameRegistry} from './server/game-adapt
 
 新增 HTML5 游戏时，除了 manifest，还必须提供与 `adapter` 对应的权威/观看适配器。当前只安装了 `fireboy-html5`（`adapters/fireboy-html5/`），四款神庙游戏共用同一引擎适配器；不同引擎需要新增适配器模块，并把它登记到 `SUPPORTED_ADAPTERS` 后才允许声明。manifest 的 `capabilities` 是声明，不是实现；未实现的能力不得设为 `true`。
 
+完整的逐步流程、每步产物和已踩过的坑见 [新游戏接入蓝图](NEW_GAME_ONBOARDING.md)。这份契约只保证「声明与校验」正确，跑通一局还需要蓝图里的房间、输入、进度条和验收脚本。
+
 ## 6. 当前注册表
 
 | id | runtime | 状态 | 说明 |

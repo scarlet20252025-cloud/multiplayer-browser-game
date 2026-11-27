@@ -96,3 +96,58 @@ test('mirror room rejects a wrong token and a third seat', async t=>{
   const error=await next(third,'mirror-error');
   assert.equal(error.code,'ROOM_FULL');
 });
+
+test('a dropped seat resumes with its token inside the grace window', async t=>{
+  const room=await startShanyiMirrorRoom({port:0,allowedViewerOrigins:[],wsToken:TOKEN,
+    resumeGraceMs:500});
+  t.after(()=>room.close());
+  const base=room.url.replace(/^http/,'ws')+'/ws?token='+TOKEN;
+  const first=await open(base+'&seat=0');
+  const welcome=await next(first,'welcome');
+  assert.equal(welcome.resumed,false);
+  assert.match(welcome.resumeToken,/^[a-f0-9]{32}$/);
+  first.close();
+  await new Promise(resolve=>setTimeout(resolve,60));
+
+  const again=await open(base+'&resume='+welcome.resumeToken);
+  const resumed=await next(again,'welcome');
+  assert.equal(resumed.seat,0);
+  assert.equal(resumed.resumed,true);
+  assert.notEqual(resumed.resumeToken,welcome.resumeToken,'each connection gets a fresh token');
+  again.close();
+});
+
+test('an expired resume token no longer claims the old seat', async t=>{
+  const room=await startShanyiMirrorRoom({port:0,allowedViewerOrigins:[],wsToken:TOKEN,
+    resumeGraceMs:60});
+  t.after(()=>room.close());
+  const base=room.url.replace(/^http/,'ws')+'/ws?token='+TOKEN;
+  const first=await open(base+'&seat=1');
+  const welcome=await next(first,'welcome');
+  first.close();
+  await new Promise(resolve=>setTimeout(resolve,140));
+  const again=await open(base+'&resume='+welcome.resumeToken+'&seat=1');
+  const resumed=await next(again,'welcome');
+  assert.equal(resumed.resumed,false,'the ticket died with the grace window');
+  again.close();
+});
+
+test('leaving on purpose frees the seat immediately', async t=>{
+  const room=await startShanyiMirrorRoom({port:0,allowedViewerOrigins:[],wsToken:TOKEN,
+    resumeGraceMs:5000});
+  t.after(()=>room.close());
+  const base=room.url.replace(/^http/,'ws')+'/ws?token='+TOKEN;
+  const first=await open(base+'&seat=0');
+  const welcome=await next(first,'welcome');
+  first.send(JSON.stringify({type:'leave'}));
+  await new Promise(resolve=>{
+    first.once('close',resolve);
+    setTimeout(resolve,400);
+  });
+  const state=await fetch(room.url+'/health').then(response=>response.json());
+  assert.deepEqual(state.room.reserved,[],'explicit leave must not reserve the seat');
+  const again=await open(base+'&resume='+welcome.resumeToken);
+  const resumed=await next(again,'welcome');
+  assert.equal(resumed.resumed,false);
+  again.close();
+});

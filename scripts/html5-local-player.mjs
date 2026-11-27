@@ -314,8 +314,13 @@ try{
   const wsTarget=new URL(wsUrl);
   if(token)wsTarget.searchParams.set('token',token);
   if(expectedSeat!==null)wsTarget.searchParams.set('seat',String(expectedSeat));
+  // 席位续租票：服务端保留 20 秒，刷新后带回去坐回原席位。
+  const resumeKey='fb-resume:'+location.pathname+location.search;
+  let resumeTicket=null;
+  try{resumeTicket=sessionStorage.getItem(resumeKey);}catch{}
+  if(resumeTicket)wsTarget.searchParams.set('resume',resumeTicket);
   player=connectHtml5Spectator({game,wsUrl:wsTarget.href,devices:window.Devices,
-    smooth:config.smooth!==false,smoothingMs:55,
+    smooth:config.smooth!==false,smoothingMs:55,resumeKey,
     expectedSeat,expectedServedSha256:config.servedSha256??null,expectedLevelId:levelId});
   window.__localHtml5Player=player;
   const unsubscribe=player.onStatus(renderStatus);

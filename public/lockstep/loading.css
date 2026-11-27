@@ -54,37 +54,66 @@
   margin-top: 15px;
 }
 
-.game-loader__track {
-  height: 10px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e6def7;
+/* 百分比读数：大号、等宽数字，避免 9%→10% 时整行抖动 */
+.game-loader__readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+  min-height: 34px;
 }
 
-.game-loader__fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #6230cf, #9155f5);
+.game-loader__percent {
+  font-size: 30px;
+  font-weight: 850;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #6230cf;
+  letter-spacing: -.02em;
 }
 
-.game-loader__track:not([aria-valuenow]) .game-loader__fill {
-  width: 40%;
-  animation: game-loader-sweep 1.35s ease-in-out infinite alternate;
-}
-
-@keyframes game-loader-sweep {
-  from { transform: translateX(0); }
-  to { transform: translateX(150%); }
+.game-loader__unit {
+  margin-left: 2px;
+  font-size: 15px;
+  font-weight: 750;
+  color: #8b83ad;
 }
 
 .game-loader__amount {
-  display: block;
-  margin-top: 6px;
   color: #595578;
   font-size: .75rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.game-loader__track {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6def7;
+  box-shadow: inset 0 1px 2px #cbbce9;
+}
+
+.game-loader__fill {
+  position: relative;
+  display: block;
+  width: 0;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6230cf, #9155f5 60%, #b57bff);
+  transition: width .42s cubic-bezier(.22, .68, .32, 1);
+}
+
+/* 已经 100%、在等别人时，不再推进，改成流动高光 */
+.game-loader__fill.is-waiting::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, #ffffff00 32%, #ffffff8c 50%, #ffffff00 68%);
+  animation: game-loader-sheen 1.5s linear infinite;
 }
 
 .game-loader__actions {
@@ -122,9 +151,12 @@
 .game-loader__back:hover { background: #f0e9ff; }
 .game-loader__actions :focus-visible { outline: 3px solid #2257bc; outline-offset: 2px; }
 
+@keyframes game-loader-sheen {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .game-loader__track:not([aria-valuenow]) .game-loader__fill {
-    margin-inline: auto;
-    animation: none;
-  }
+  .game-loader__fill { transition: none; }
+  .game-loader__fill.is-waiting::after { animation: none; }
 }

@@ -270,6 +270,13 @@ function flashPage({wrapperUrl,coreUrl,title,chatWsUrl=null}) {
 #player,#player>ruffle-player{display:block;width:100%!important;height:100%!important}
 #shanyi-gate{position:absolute;inset:0;background:#1d153eed;display:flex;align-items:center;justify-content:center;z-index:5;pointer-events:auto;text-align:center;line-height:1.6;padding:14px}
 #shanyi-gate[hidden]{display:none}#shanyi-gate b{display:block;font-size:18px;color:#ffdb5f;margin-bottom:8px}#shanyi-gate p{margin:0;color:#f1eaff}
+#shanyi-gate .gate-progress{width:min(280px,70vw);margin:14px auto 0}
+#shanyi-gate .gate-readout{display:flex;align-items:baseline;justify-content:center;gap:2px;margin-bottom:6px;color:#ffdb5f;font-variant-numeric:tabular-nums}
+#shanyi-gate .gate-readout b{display:inline;font-size:26px;line-height:1;margin:0}
+#shanyi-gate .gate-readout span{font-size:13px;font-weight:750;color:#c7b8ee}
+#shanyi-gate .gate-track{height:10px;border-radius:999px;background:#3a2c68;overflow:hidden;box-shadow:inset 0 1px 2px #120c28}
+#shanyi-gate .gate-track>span{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#ffc93c,#ff9f43 60%,#ffd873);transition:width .42s cubic-bezier(.22,.68,.32,1)}
+@media (prefers-reduced-motion:reduce){#shanyi-gate .gate-track>span{transition:none}}
 #shanyi-back{width:100%}
 @media(max-width:850px),(orientation:portrait){.flash-shell #game-center{aspect-ratio:4/3}#stage{width:100%}}
 @media(max-width:850px) and (max-height:600px) and (orientation:landscape) and (pointer:coarse){
@@ -278,7 +285,10 @@ function flashPage({wrapperUrl,coreUrl,title,chatWsUrl=null}) {
 </style></head>
 <body class="game-has-sidebars flash-shell">
 <div id="game-center"><div id="stage"><div id="player"></div>
-  <div id="shanyi-gate"><div><b>等待玩家就位</b><p id="shanyi-gate-text">正在加载游戏…</p></div></div>
+  <div id="shanyi-gate"><div><b>等待玩家就位</b><p id="shanyi-gate-text">正在加载游戏…</p>
+    <div class="gate-progress"><div class="gate-readout" aria-hidden="true"><b id="shanyi-gate-percent">0</b><span>%</span></div>
+    <div class="gate-track" role="progressbar" aria-label="游戏加载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="shanyi-gate-fill"></span></div></div>
+  </div></div>
 </div></div>
 <aside id="game-left" class="game-left">
   <div><div class="game-side-kicker">实验性输入镜像 · 非公开发行</div><h2>闪翼双星</h2><div id="shanyi-room"></div></div>
@@ -306,15 +316,54 @@ function lobbyPage(lobbyWsUrl, viewerOrigin, override=null) {
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#1878ec"><title>肥鱼乐园 · 联机大厅</title>
-<style>#lobby-boot{box-sizing:border-box;width:min(420px,calc(100% - 28px));margin:14vh auto;padding:24px;border:3px solid #e6ddff;border-radius:21px;background:#fff;color:#20215c;text-align:center;font:16px system-ui,sans-serif}#lobby-boot p{margin:8px 0}#lobby-boot button{margin-top:10px}body:has(#lobby-boot){background-color:#64c7f5}</style>
+<style>#lobby-boot{box-sizing:border-box;width:min(420px,calc(100% - 28px));margin:14vh auto;padding:24px;border:3px solid #e6ddff;border-radius:21px;background:#fff;color:#20215c;text-align:center;font:16px system-ui,sans-serif}#lobby-boot p{margin:8px 0}#lobby-boot button{margin-top:10px}
+#lobby-boot .lobby-boot-progress{margin:14px 0 2px}
+#lobby-boot .lobby-boot-readout{display:flex;align-items:baseline;justify-content:flex-end;gap:2px;margin-bottom:7px;color:#1878ec;font-variant-numeric:tabular-nums}
+#lobby-boot .lobby-boot-readout b{font-size:29px;font-weight:850;line-height:1}
+#lobby-boot .lobby-boot-readout span{font-size:14px;font-weight:750;color:#8b93ad}
+#lobby-boot .lobby-boot-track{height:11px;border-radius:999px;background:#e2ecfb;box-shadow:inset 0 1px 2px #bcd2ef;overflow:hidden}
+#lobby-boot .lobby-boot-track>span{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#1878ec,#4aa3ff 62%,#7cc4ff);transition:width .42s cubic-bezier(.22,.68,.32,1)}
+body:has(#lobby-boot){background-color:#64c7f5}</style>
 </head><body>
-<div id="app"><div id="lobby-boot"><strong>肥鱼乐园</strong><p id="lobby-boot-status" role="status">正在载入联机大厅…</p><button type="button" hidden>重新加载</button></div></div>
+<div id="app"><div id="lobby-boot"><strong>肥鱼乐园</strong><p id="lobby-boot-status" role="status">正在载入联机大厅…</p>
+<div class="lobby-boot-progress"><div class="lobby-boot-readout" aria-hidden="true"><b id="lobby-boot-percent">0</b><span>%</span></div>
+<div class="lobby-boot-track" role="progressbar" aria-label="大厅载入进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="lobby-boot-fill"></span></div></div>
+<button type="button" hidden>重新加载</button></div></div>
 <script>
 window.__LOBBY_CONFIG__=${config};
 (async()=>{
   const boot=document.getElementById('lobby-boot'),status=document.getElementById('lobby-boot-status');
   const button=boot.querySelector('button');
+  const percentEl=document.getElementById('lobby-boot-percent');
+  const fillEl=document.getElementById('lobby-boot-fill');
+  const trackEl=boot.querySelector('.lobby-boot-track');
   button.onclick=()=>location.reload();
+  let shown=0,target=0,raf=0,from=0,at=0;
+  const easeOut=t=>1-(1-t)**3;
+  function paint(value){
+    shown=value;const rounded=Math.round(value);
+    fillEl.style.width=value+'%';percentEl.textContent=String(rounded);
+    trackEl.setAttribute('aria-valuenow',String(rounded));
+  }
+  function goTo(value){
+    target=Math.min(100,Math.max(target,value));
+    if(raf)return;
+    from=shown;at=performance.now();
+    const step=now=>{
+      const t=Math.min(1,(now-at)/420);
+      paint(from+(target-from)*easeOut(t));
+      raf=t<1?requestAnimationFrame(step):0;
+    };
+    raf=requestAnimationFrame(step);
+  }
+  function creep(limit){
+    const timer=setInterval(()=>{
+      if(shown>=limit||target>=limit){clearInterval(timer);return;}
+      goTo(Math.min(limit,target+1.3));
+    },420);
+    return()=>clearInterval(timer);
+  }
+  goTo(6);
   function stylesheet(search){
     return new Promise(resolve=>{
       const link=document.createElement('link');
@@ -330,13 +379,17 @@ window.__LOBBY_CONFIG__=${config};
     const search='?entry='+attempt;
     if(attempt)status.textContent='正在重新连接大厅…';
     if(!styled)styled=await stylesheet(search);
-    if(!styled)continue;
+    if(!styled){goTo(14+attempt*4);continue;}
+    goTo(38);
     window.__LOBBY_BOOT_ATTEMPT__=String(attempt);
     let timer;
+    const stopCreep=creep(92);
     const imported=import('/__lobby__/lobby.mjs'+search).then(()=>true,()=>false);
     const ready=await Promise.race([imported,new Promise(resolve=>{timer=setTimeout(()=>resolve(false),5000);})]);
     clearTimeout(timer);
-    if(ready||!boot.isConnected)return;
+    stopCreep();
+    if(ready){goTo(100);return;}
+    if(!boot.isConnected)return;
     window.__LOBBY_BOOT_ATTEMPT__='';
   }
   status.textContent='大厅暂时无法加载，请重试。';

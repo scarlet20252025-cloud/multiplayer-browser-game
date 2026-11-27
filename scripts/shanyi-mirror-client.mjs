@@ -25,6 +25,10 @@ const configWs=typeof config.wsUrl==='string'?reachableWs(config.wsUrl,null):nul
 const wsUrl=reachableWs(query.get('ws'),configWs)||configWs||'';
 const token=query.get('token')??null;
 const roomName=query.get('room')??config.roomName??'';
+// 席位续租票：刷新/断线后带回来坐回原席位，服务端保留 20 秒。
+const resumeKey='shanyi-resume:'+location.pathname+location.search;
+let resumeToken=(()=>{try{return sessionStorage.getItem(resumeKey);}catch{return null;}})();
+let resumeDeadline=0,resumeAttempt=0;
 const seatParam=query.get('seat');
 // Seat index is a platform concept (P1..P4); the game itself still has two heroes.
 const parsedSeat=seatParam!==null&&/^\d{1,2}$/.test(seatParam)?Number(seatParam):null;
@@ -42,6 +46,35 @@ const peerEl=document.getElementById('shanyi-peer');
 const backButton=document.getElementById('shanyi-back');
 const gate=document.getElementById('shanyi-gate');
 const gateText=document.getElementById('shanyi-gate-text');
+const gatePercent=document.getElementById('shanyi-gate-percent');
+const gateFill=document.getElementById('shanyi-gate-fill');
+const gateTrack=document.querySelector('#shanyi-gate .gate-track');
+let gateShown=0,gateTarget=0,gateRaf=0,gateFrom=0,gateAt=0;
+const easeOut=t=>1-(1-t)**3;
+function paintGate(value){
+  gateShown=value;
+  const rounded=Math.round(value);
+  if(gateFill)gateFill.style.width=value+'%';
+  if(gatePercent)gatePercent.textContent=String(rounded);
+  gateTrack?.setAttribute('aria-valuenow',String(rounded));
+}
+function gateProgressTo(value){
+  gateTarget=Math.min(100,Math.max(gateTarget,value));
+  if(gateRaf)return;
+  gateFrom=gateShown;gateAt=performance.now();
+  const step=now=>{
+    const t=Math.min(1,(now-gateAt)/420);
+    paintGate(gateFrom+(gateTarget-gateFrom)*easeOut(t));
+    gateRaf=t<1?requestAnimationFrame(step):0;
+  };
+  gateRaf=requestAnimationFrame(step);
+}
+// 原版 SWF 没有可读的加载进度，用慢爬维持「在动」的观感，等真正就绪再补到 100。
+gateProgressTo(8);
+const gateCreep=setInterval(()=>{
+  if(localBooted||closed){clearInterval(gateCreep);return;}
+  gateProgressTo(Math.min(90,gateTarget+1.4));
+},520);
 const FIRE_KEYS=new Set([87,83,65,68]);
 const ICE_KEYS=new Set([38,40,37,39]);
 const CONTROL_KEYS=new Set([...FIRE_KEYS,...ICE_KEYS]);
@@ -190,6 +223,7 @@ function attachCanvas(){
 async function bootRuffle(){
   const ruffle=window.RufflePlayer?.newest?.();
   if(!ruffle)throw Error('Ruffle 运行时未加载');
+  gateProgressTo(46);
   player=ruffle.createPlayer();
   player.style.width='100%';
   player.style.height='100%';
@@ -206,6 +240,7 @@ async function bootRuffle(){
   call=(name,...args)=>instance.callExternalInterface(name,...args);
   window.__shanyi={player,instance,call,queryPage:()=>queryPage()};
   localBooted=true;
+  gateProgressTo(100);
   sendReady();
   renderGate();
   for(let attempt=0;attempt<120;attempt++){
@@ -229,6 +264,7 @@ function connect(){
   const target=new URL(wsUrl);
   if(token)target.searchParams.set('token',token);
   if(seat!==null&&seat!==undefined)target.searchParams.set('seat',String(seat));
+  if(resumeToken)target.searchParams.set('resume',resumeToken);
   ws=new WebSocket(target.href);
   ws.onopen=()=>{readySent=false;renderStatus();sendReady();};
   ws.onmessage=event=>{
@@ -236,9 +272,17 @@ function connect(){
     try{message=JSON.parse(event.data);}catch{return;}
     if(message.type==='welcome'){
       if(seat===null||seat===undefined)seat=message.seat;
+      if(typeof message.resumeToken==='string'){
+        resumeToken=message.resumeToken;
+        resumeDeadline=0;resumeAttempt=0;
+        try{sessionStorage.setItem(resumeKey,resumeToken);}catch{}
+      }
       peerConnected=message.peerConnected===true;
       setBothReady(message.bothReady===true);
-      renderStatus();return;
+      renderStatus();
+      if(message.resumed&&statusEl)
+        statusEl.textContent='已恢复原席位 '+seatLabel(seat)+'，等待其他玩家…';
+      return;
     }
     if(message.type==='ready-state'){
       setBothReady(message.bothReady===true);return;
@@ -307,7 +351,17 @@ function connect(){
   ws.onclose=()=>{
     peerConnected=false;setBothReady(false);readySent=false;
     renderStatus();
-    if(!closed)setTimeout(connect,1500);
+    if(closed)return;
+    // 服务端保留席位 20 秒：在这之内带票重连就能坐回原位，超时才提示返回大厅。
+    if(!resumeDeadline)resumeDeadline=Date.now()+20_000;
+    if(Date.now()>=resumeDeadline){
+      if(statusEl)statusEl.textContent='与房间的连接已断开，席位已释放，请返回大厅重新进入。';
+      return;
+    }
+    resumeAttempt++;
+    const wait=Math.min(3000,600*resumeAttempt);
+    if(statusEl)statusEl.textContent='连接中断，正在恢复原席位…（'+Math.ceil((resumeDeadline-Date.now())/1000)+' 秒）';
+    setTimeout(connect,wait);
   };
   ws.onerror=()=>{};
 }
@@ -337,6 +391,9 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)clearContro
   }catch(error){
     if(statusEl)statusEl.textContent='闪翼双星启动失败：'+String(error.message??error);
     if(gateText)gateText.textContent='游戏加载失败：'+String(error.message??error);
+    clearInterval(gateCreep);
+    const gateBar=document.querySelector('#shanyi-gate .gate-progress');
+    if(gateBar)gateBar.style.display='none';
     return;
   }
   setInterval(async()=>{

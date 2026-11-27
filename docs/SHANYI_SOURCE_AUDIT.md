@@ -230,6 +230,17 @@ local/tools/as3-probe/apache-flex-sdk-4.16.1-bin/bin/mxmlc \
 - 断线重连后的输入重放边界。
 - 第一关之后的关卡和存档等 HTML5 已有能力在镜像层未实现；返回选关投票已实现，但未做长局和断线重连后的完整验收。
 
+### 8.5 房间层重构（2026-11-28）
+
+闪翼原来的房间逻辑是手写的席位数组 + 准备数组 + 返回投票，和冰火人、合作关卡用的 `Html5RoomCore` 是两套实现。本轮把它并到同一条线上：
+
+- 席位、准备、返回投票改由 `server/html5-room-core.mjs` 管理；`server/shanyi-mirror-room.mjs` 只保留镜像转发（输入边沿、点击、在线页、英雄位置/速度）。
+- 断线席位交给 `server/seat-presence.mjs`：意外断开保留 20 秒，带 `?resume=<token>` 回来坐回原位；主动 `{type:'leave'}` 立即释放。
+- 对外消息形状保持兼容：`welcome` / `peer-connection` / `ready-state` / `return-request` / `return-state` / `return-approved` / `return-cancelled` / `mirror-error` 不变，只新增 `welcome.resumeToken`、`welcome.resumed`、`welcome.resumeGraceMs`、`ready-state.seats[].reserved` 和 `/health` 的 `room.reserved`。
+- 客户端 `scripts/shanyi-mirror-client.mjs` 把票存进 `sessionStorage`，断线后按 0.6→3 秒退避重连，20 秒内回到原席位，超时才提示返回大厅。
+
+已由 `tests/shanyi-mirror-room.test.mjs` 覆盖：双席位转发、错误 token/第三席位、断线续租、过期票失效、主动离开立即释放；`tests/seat-presence.test.mjs` 覆盖租约本身。真实双标签页的断线重连仍需在装有 Ruffle 与私有 SWF 的环境跑一次 `scripts/verify-shanyi-sync.mjs`。
+
 ## 编码记录
 
 本次源文件扫描没有 UTF-8 解码失败。另一个游戏的 `02-fireboy-watergirl/decompiled/3-export/script/scripts/system/Strings.as` 第 344 行包含一个字面量 U+FFFD。它可能是字符处理逻辑中的常量；工具仅报告它的存在，不将其自动判定为损坏，也不改写原文。`§§` 是有效 UTF-8 的反编译标记，不能与编码乱码混为一谈。

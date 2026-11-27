@@ -1,3 +1,5 @@
+**加载与席位（2026-11-28）：** 所有进入游戏的页面统一使用带百分比动画的加载遮罩（真实字节优先，没有字节按阶段推进），规范见 [网站设计流程第 7 节](docs/WEBSITE_DESIGN_WORKFLOW.md#7-加载与进度条规范)。房间共用 20 秒席位续租：意外断开保留原席位，带票回来坐回原位，主动离开立即释放，实现见 `server/seat-presence.mjs`。
+
 **本机双浏览器研究入口：** [安装与启动说明](docs/HTML5_LOCAL_TWO_TAB.md) · `scripts/start-html5-local-room.mjs` 能用本地私有 HTML5 资源启动一个权威服务，并让两个普通浏览器标签页自动加入。该入口仅监听 127.0.0.1；不是已授权的公网游戏发行。
 
 **生命周期验证：** [原生 retry() 与死亡双浏览器保护](docs/HTML5_NATIVE_RETRY.md) 已在固定研究版本真实 CI 中通过；目前是旧场景安全停机，尚非死亡后完整双人继续游戏。
@@ -145,6 +147,7 @@ python3 scripts/audit_fireboy.py \
 | [**交接给下一个 Agent**](docs/HANDOFF_TO_NEXT_AGENT.md) | **从这里开始**：当前状态、已验证结论、待做清单、代码位置速查、已踩过的坑 |
 | [HTML5 路线验证](docs/HTML5_ROUTE_FINDINGS.md) | HTML5 版 6 部实机运行、Node 可运行性、输入路径定位、输入桥验证 |
 | [通用游戏适配契约](docs/GAME_ADAPTER_CONTRACT.md) | manifest、运行时分层、准入探测、新游戏接入与闪翼研究注册表 |
+| [**新游戏接入蓝图**](docs/NEW_GAME_ONBOARDING.md) | 照抄泡泡堂跑通的九步流程：选同步方式、原版基线、房间六条、对局三件事、加载进度条、验收清单 |
 | [公网联机与延迟优化方案](docs/PUBLIC_NETWORK_PLAN.md) | TLS/WSS、区域权威、快照 delta、插值缓冲、预测校正与验收指标（规划，不是已上线能力） |
 | [坦克动荡 / 死神 vs 火影研究](docs/NETPLAY_RESEARCH.md) | 公开版本、联机架构、可移植性、适配器建议与授权边界 |
 | [死神 vs 火影帧同步](docs/BVN_LOCKSTEP.md) | 双人对战协议、私有浏览器构建接口和验收命令 |

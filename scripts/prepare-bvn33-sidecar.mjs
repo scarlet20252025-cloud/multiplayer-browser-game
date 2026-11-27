@@ -71,6 +71,20 @@ await edit('public/net-index.html', source => {
 <span><kbd>W A S D</kbd> 移动</span><span><kbd>J</kbd> 攻击 / 确认</span><span><kbd>K</kbd> 跳跃</span><span><kbd>L</kbd> 冲刺</span>
 <span><kbd>U</kbd> 远攻</span><span><kbd>I</kbd> 必杀</span><span><kbd>O</kbd> 援助</span><span><kbd>Esc</kbd> 取消</span></div>`);
 });
+await edit('public/net-index.html', source => source.replace('<script src="/live-capture.js"></script>', ''));
+// 加载条旁边加一个大号百分比：原版页面只有 <progress>，没有读数。
+await edit('public/net-index.html', source => {
+  if (source.includes('id="download-percent"')) return source;
+  return replace(source,
+    '<progress id="download-progress" max="100" hidden></progress><span id="download-detail"',
+    '<span id="download-percent" aria-hidden="true" style="display:inline-block;margin-right:6px;font-weight:800;font-size:20px;line-height:1;color:#ffd75e;font-variant-numeric:tabular-nums" hidden>0<span style="font-size:12px">%</span></span><progress id="download-progress" max="100" hidden></progress><span id="download-detail"');
+});
+await edit('public/net-client.js', source => {
+  if (source.includes("$('download-percent')")) return source;
+  return replace(source,
+    "$('download-progress').hidden=percent===undefined;$('reload-engine').hidden=true;if(percent!==undefined)$('download-progress').value=percent;}",
+    "$('download-progress').hidden=percent===undefined;const percentEl=$('download-percent');if(percentEl){percentEl.hidden=percent===undefined;if(percent!==undefined)percentEl.firstChild.nodeValue=String(Math.round(percent));}$('reload-engine').hidden=true;if(percent!==undefined)$('download-progress').value=percent;}");
+});
 await edit('public/net-engine.html', source => source.replace('<script src="/live-capture.js"></script>', ''));
 await edit('public/net-engine.js', source => {
   if (!source.includes('bvnLiveCapture')) return source;
