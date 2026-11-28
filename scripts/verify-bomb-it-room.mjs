@@ -42,7 +42,15 @@ try {
     viewerPort: 17693, lobbyPort: 17694, bombItSwf: values.swf,
   });
   const url = new URL(values.url ?? app.url);
-  browser = await chromium.launch(values.gpu ? {args: ['--enable-gpu']} : {});
+  // Background tabs get their animation frames throttled, which would be measured
+  // as a fake frame-rate collapse. Keep every peer rendering at full speed.
+  const launchArgs = [
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows',
+    ...(values.gpu ? ['--enable-gpu'] : []),
+  ];
+  browser = await chromium.launch({args: launchArgs});
   const peers = await Promise.all(Array.from({length: playerCount}, async () => {
     const context = await browser.newContext({
       viewport: {width, height: 800}, deviceScaleFactor: dpr, locale: 'en-US', timezoneId: 'UTC',

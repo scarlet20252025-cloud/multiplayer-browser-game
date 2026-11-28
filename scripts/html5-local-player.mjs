@@ -298,20 +298,32 @@ returnCancel.addEventListener('click',()=>{
   }
 });
 try{
+  // 关卡载入遮罩：拿到真实阶段就报真实阶段，没有字节就按阶段推进。
+  const boot=document.getElementById('game-boot');
+  const bootMounted=document.getElementById('game-boot-loader');
+  const bootLoader=bootMounted?await import('/loader/carnival-loader.mjs')
+    .then(module=>module.createCarnivalLoader(bootMounted,{layout:'inline'}))
+    .catch(()=>null):null;
+  const bootShow=(title,detail,percent,stage='initialize')=>
+    bootLoader?.show({phase:'running',stage,title,detail,percent});
+  bootShow('正在载入关卡','正在等待游戏脚本就绪。',8,'download');
   await until(()=>window.__game?.state?.current==='menu',60000);
   const game=window.__game;
   const temple=game.progress?.get('temples')?.find(x=>x.id===templeId);
   if(!temple)throw Error('Original temple menu unavailable: '+templeId);
+  bootShow('正在载入关卡','正在进入关卡选择。',34);
   game.state.states[game.state.current].startTemple(temple);
   await until(()=>game.state.current==='levelMenu'&&!game.state.fading&&
     game.state.states.levelMenu.buttons);
   const menu=game.state.states.levelMenu;
   const target=menu.templeData.levels.find(x=>Number(x.id)===levelId);
   if(!target||!(target.state>0))throw Error('Requested official level is locked or absent');
+  bootShow('正在载入关卡','正在启动第 '+levelId+' 关。',58);
   menu.startLevel({data:target});
   await until(()=>game.state.current==='level'&&game.level?.levelStarted&&
     game.level.pers1?.body&&game.level.pers2?.body&&
     !game.paused&&!game.physics.box2d.paused&&!game.state.fading);
+  bootShow('正在载入关卡','关卡已就绪，正在连接房间。',92);
   const {connectHtml5Spectator}=await import('/adapters/fireboy-html5/spectator-client.mjs');
   const wsTarget=new URL(wsUrl);
   if(token)wsTarget.searchParams.set('token',token);
@@ -328,9 +340,13 @@ try{
   const unsubscribe=player.onStatus(renderStatus);
   renderStatus(player.status());
   window.addEventListener('pagehide',()=>{unsubscribe();player.close();},{once:true});
+  // 房间链路建立后再撤掉载入遮罩，避免露出还没同步的画面。
+  bootShow('正在载入关卡','已进入房间，准备开始。',100);
+  if(boot)setTimeout(()=>{boot.hidden=true;},260);
 }catch(error){
   output.textContent='本地联机启动失败：'+error.message;
   restart.disabled=true;
   advance.disabled=true;
+  bootLoader?.show({phase:'error',stage:'initialize',title:'关卡载入失败',detail:error.message});
   console.error('HTML5_LOCAL_PLAYER_FAILED',error);
 }

@@ -30,3 +30,8 @@
 - `server/shanyi-native-room.mjs`：60Hz 服务端模拟，`/ws?seat=` 两席，`/health` 汇报 tick 与席位。
 - 测试 `tests/shanyi-native-room.test.mjs`：两席入场、tick 推进、输入驱动位移、health，2 项通过。
 - `server/game-adapter.mjs` 注册 `shanyi-native` 运行时与 adapter；`config/games/shanyi-native.json` 清单通过目录校验（`listed:false`，大厅入口未接）。
+
+### 2026-11-28 客户端联机模式
+
+- `client.mjs` 支持 `?ws=&seat=`：有 ws 时不再本地跑模拟，改为 12Hz 以上向服务端发输入、按服务端状态渲染。
+- Playwright 双标签实测：两页分别 seat=0/1 接入同一房间；按 D 后 P1 x 从 -118 → 73.8，**两个页面读到的 P1 坐标一致**（-118 → 73.8），无页面异常。

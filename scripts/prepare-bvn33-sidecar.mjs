@@ -72,18 +72,51 @@ await edit('public/net-index.html', source => {
 <span><kbd>U</kbd> 远攻</span><span><kbd>I</kbd> 必杀</span><span><kbd>O</kbd> 援助</span><span><kbd>Esc</kbd> 取消</span></div>`);
 });
 await edit('public/net-index.html', source => source.replace('<script src="/live-capture.js"></script>', ''));
-// 加载条旁边加一个大号百分比：原版页面只有 <progress>，没有读数。
+// 加载条换成缤纷嘉年华星星组件：原版页面只有一条 <progress>，没有读数。
+// 这里只替换那段进度 UI，下载事件本身仍由上游 net-client.js 上报。
 await edit('public/net-index.html', source => {
-  if (source.includes('id="download-percent"')) return source;
+  if (source.includes('id="download-loader"')) return source;
+  if (source.includes('id="download-percent"')) {
+    // 旧版是我们自己插的大号百分比，先撤掉再换成组件挂载点。
+    source = source.replace(
+      /<span id="download-percent"[^>]*>.*?<\/span><progress id="download-progress" max="100" hidden><\/progress>/s,
+      '<div id="download-loader"></div><progress id="download-progress" max="100" hidden></progress>',
+    );
+    return source;
+  }
   return replace(source,
     '<progress id="download-progress" max="100" hidden></progress><span id="download-detail"',
-    '<span id="download-percent" aria-hidden="true" style="display:inline-block;margin-right:6px;font-weight:800;font-size:20px;line-height:1;color:#ffd75e;font-variant-numeric:tabular-nums" hidden>0<span style="font-size:12px">%</span></span><progress id="download-progress" max="100" hidden></progress><span id="download-detail"');
+    '<div id="download-loader"></div><progress id="download-progress" max="100" hidden></progress><span id="download-detail"');
+});
+await edit('public/net-index.html', source => {
+  if (source.includes('/loader/loader.css')) return source;
+  return replace(source, '</head>',
+    '<link rel="stylesheet" href="/loader/loader.css">\n<link rel="stylesheet" href="/loader/carnival-loader.css">\n</head>');
 });
 await edit('public/net-client.js', source => {
-  if (source.includes("$('download-percent')")) return source;
-  return replace(source,
+  if (source.includes("downloadLoader")) return source;
+  // 原版只写 <progress> 的值；现在同时驱动星星组件。
+  source = replace(source,
     "$('download-progress').hidden=percent===undefined;$('reload-engine').hidden=true;if(percent!==undefined)$('download-progress').value=percent;}",
-    "$('download-progress').hidden=percent===undefined;const percentEl=$('download-percent');if(percentEl){percentEl.hidden=percent===undefined;if(percent!==undefined)percentEl.firstChild.nodeValue=String(Math.round(percent));}$('reload-engine').hidden=true;if(percent!==undefined)$('download-progress').value=percent;}");
+    "$('download-progress').hidden=percent===undefined;$('reload-engine').hidden=true;if(percent!==undefined){$('download-progress').value=percent;}window.bvnDownloadProgress?.(percent);}");
+  return source;
+});
+await edit('public/net-client.js', source => {
+  if (source.includes('bvnDownloadProgress=')) return source;
+  const hook = `
+// 下载进度接缤纷嘉年华星星组件（/loader/），拿不到挂载点就保持原 <progress>。
+let downloadLoader=null,downloadPending=null,downloadShown=0,downloadTarget=0,downloadRaf=0,downloadFrom=0,downloadAt=0;
+window.bvnDownloadProgress=function(percent){
+  if(percent===undefined){downloadPending={phase:'running',stage:'download',title:'正在加载游戏资源',detail:'正在准备下载。',percent:null};}
+  else{downloadTarget=Math.min(100,Math.max(downloadTarget,percent));downloadPending={phase:'running',stage:'download',title:'正在加载游戏资源',detail:'正在下载游戏资源。',percent:downloadTarget};}
+  downloadLoader?.show(downloadPending);
+};
+import('/loader/carnival-loader.mjs').then(m=>m.createCarnivalLoader(document.getElementById('download-loader'),{layout:'inline',compact:true})).then(instance=>{
+  downloadLoader=instance;
+  if(downloadPending)instance.show(downloadPending);
+}).catch(()=>{});
+`;
+  return source + hook;
 });
 await edit('public/net-engine.html', source => source.replace('<script src="/live-capture.js"></script>', ''));
 await edit('public/net-engine.js', source => {

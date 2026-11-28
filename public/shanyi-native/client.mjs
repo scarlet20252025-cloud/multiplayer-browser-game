@@ -4,6 +4,10 @@
  */
 import {createHero, stepHero, DT, HERO} from '/adapters/shanyi-native/sim.mjs';
 
+const query = new URLSearchParams(location.search);
+const wsUrl = query.get('ws');
+const mySeat = query.get('seat') !== null ? Number(query.get('seat')) : 0;
+
 const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
 const level = await fetch('./level-1.json').then(r => r.json());
@@ -22,6 +26,19 @@ addEventListener('keydown', e => { held.add(e.code); if (['ArrowUp','ArrowDown',
 addEventListener('keyup', e => held.delete(e.code));
 addEventListener('blur', () => held.clear());
 
+// 联机模式：服务端权威，客户端只发输入、收状态并插值显示。
+let socket = null;
+const netState = new Map();
+if (wsUrl) {
+  socket = new WebSocket(wsUrl.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws?seat=' + mySeat);
+  socket.onmessage = event => {
+    let msg; try { msg = JSON.parse(event.data); } catch { return; }
+    if (msg.type === 'state') for (const p of msg.players) netState.set(p.seat, p);
+    if (msg.type === 'welcome') location.hash = '';
+  };
+}
+const netSeat = wsUrl ? mySeat : null;
+
 let camera = {x: spawn.x - 480, y: 0};
 let last = performance.now();
 let acc = 0;
@@ -31,15 +48,32 @@ function frame(now) {
   last = now;
   acc += dtReal;
   while (acc >= DT) {
-    for (const p of players) {
-      const input = {
-        left: held.has(p.keys.left),
-        right: held.has(p.keys.right),
-        jump: held.has(p.keys.jump),
-      };
-      stepHero(p.hero, solids, input, DT, boxes);
+    if (!socket) {
+      for (const p of players) {
+        const input = {
+          left: held.has(p.keys.left),
+          right: held.has(p.keys.right),
+          jump: held.has(p.keys.jump),
+        };
+        stepHero(p.hero, solids, input, DT, boxes);
+      }
     }
     acc -= DT;
+  }
+  if (socket) {
+    const me = players[0].keys;
+    const mine = netSeat === 1 ? players[1].keys : me;
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({type: 'input', left: held.has(mine.left),
+        right: held.has(mine.right), jump: held.has(mine.jump)}));
+    }
+    // 服务端状态直接映射到显示对象（本阶段不做插值，先保证一致）
+    for (const [seat, st] of netState) {
+      const target = players[seat]?.hero;
+      if (!target) continue;
+      target.x = st.x; target.y = st.y; target.vx = st.vx; target.vy = st.vy;
+      target.onGround = st.onGround;
+    }
   }
   const focus = players[0].hero;
   camera.x += (focus.x - 480 - camera.x) * Math.min(1, dtReal * 6);

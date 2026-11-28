@@ -88,10 +88,21 @@ export async function createCarnivalLoader(host, { layout = 'overlay', compact =
   let lastPhase = 'idle';
   let lastDetail = '';
   let lastBytes = '';
+  // 组件本身的标题是阶段名（"正在下载游戏资源"），业务想显示自己的标题时用
+  // 这里覆盖；不传就沿用组件默认。
+  let titleOverride = '';
 
   const paint = (value, stage) => {
     shown = value;
     ui.update({ progress: value, stage, state: lastPhase, detail: lastDetail, bytes: lastBytes });
+    applyTitle();
+  };
+
+  // 组件 update() 不认 title，只能写完再覆盖一次文本。
+  const applyTitle = () => {
+    if (!titleOverride) return;
+    const node = slot.querySelector('.cl-title');
+    if (node && node.textContent !== titleOverride) node.textContent = titleOverride;
   };
 
   const animateTo = (next, stage) => {
@@ -99,6 +110,7 @@ export async function createCarnivalLoader(host, { layout = 'overlay', compact =
     if (clamped <= target) {
       // 目标没变也要把文案刷新出去，否则阶段变化会被吞掉。
       ui.update({ progress: target, stage, state: lastPhase, detail: lastDetail, bytes: lastBytes });
+      applyTitle();
       return;
     }
     target = clamped;
@@ -112,7 +124,6 @@ export async function createCarnivalLoader(host, { layout = 'overlay', compact =
     };
     frame = requestAnimationFrame(step);
   };
-
   /** 没有真实字节时用阶段预算估进度，保证数字一直在动。 */
   function estimate({ base, span = 0, fraction }) {
     if (Number.isFinite(fraction)) return base + span * Math.min(1, Math.max(0, fraction));
@@ -162,7 +173,7 @@ export async function createCarnivalLoader(host, { layout = 'overlay', compact =
 
       overlay.hidden = false;
       overlay.dataset.phase = phase;
-      if (title) ui.update({ title });
+      titleOverride = title || titleOverride;
       if (terminal) resetPending = true;
 
       if (resetPending && lastPhase !== 'error') {
@@ -173,6 +184,7 @@ export async function createCarnivalLoader(host, { layout = 'overlay', compact =
 
       if (lastPhase === 'error') {
         ui.update({ stage: nextStage, state: 'error', progress: shown, detail: lastDetail, bytes: '' });
+        applyTitle();
         return;
       }
       if (lastPhase === 'done') {
@@ -180,32 +192,40 @@ export async function createCarnivalLoader(host, { layout = 'overlay', compact =
         if (frame) { cancelAnimationFrame(frame); frame = 0; }
         paint(100, nextStage);
         ui.update({ stage: 'initialize', state: 'done', progress: 100, detail: lastDetail, bytes: '' });
+        applyTitle();
         return;
       }
       if (Number.isFinite(value)) animateTo(value, nextStage);
-      else ui.update({ progress: target, stage: nextStage, state: lastPhase, detail: lastDetail, bytes: lastBytes });
+      else {
+        ui.update({ progress: target, stage: nextStage, state: lastPhase, detail: lastDetail, bytes: lastBytes });
+        applyTitle();
+      }
     },
 
     /** 未知总量：不给假百分比，组件自己居中弹跳。 */
-    unknown({ stage = 'initialize', detail = '' } = {}) {
+    unknown({ stage = 'initialize', detail = '', title } = {}) {
       if (frame) { cancelAnimationFrame(frame); frame = 0; }
       shown = target = 0;
       lastPhase = 'running';
       lastDetail = detail;
       lastBytes = '';
+      titleOverride = title || titleOverride;
       overlay.hidden = false;
       ui.update({ progress: null, stage, state: 'running', detail, bytes: '' });
+      applyTitle();
     },
 
     /** 等待别人不是加载：满格 + 文案。 */
-    waiting({ detail = '', stage = 'initialize' } = {}) {
+    waiting({ detail = '', stage = 'initialize', title } = {}) {
       if (frame) { cancelAnimationFrame(frame); frame = 0; }
       shown = target = 100;
       lastPhase = 'running';
       lastDetail = detail;
       lastBytes = '';
+      titleOverride = title || titleOverride;
       overlay.hidden = false;
       ui.update({ progress: 100, stage, state: 'running', detail, bytes: '' });
+      applyTitle();
     },
 
     error({ title = '加载遇到问题', detail = '' } = {}) {
@@ -213,8 +233,10 @@ export async function createCarnivalLoader(host, { layout = 'overlay', compact =
       lastPhase = 'error';
       lastDetail = detail;
       lastBytes = '';
+      titleOverride = title;
       overlay.hidden = false;
       ui.update({ stage: 'download', state: 'error', progress: shown, detail, bytes: '' });
+      applyTitle();
     },
 
     hide() {

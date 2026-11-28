@@ -58,14 +58,11 @@ function show() {
   panel.setAttribute('role', 'status');
   panel.style.cssText = 'padding:12px;border-radius:10px;background:#efe9ff;color:#352165;font:14px/1.5 system-ui,sans-serif;box-sizing:border-box';
   const message = document.createElement('div');
+  message.className = 'glorton-provider-message';
+  // 进度改用缤纷嘉年华星星组件（/loader/），这里只留一个挂载点。
   const progress = document.createElement('div');
-  progress.style.cssText = 'margin-top:10px';
-  progress.innerHTML = '<div class="glorton-provider-readout" style="display:flex;align-items:baseline;justify-content:flex-end;gap:2px;margin-bottom:6px;color:#4c2aad;font-variant-numeric:tabular-nums">'
-    + '<b class="glorton-provider-percent" style="font-size:26px;font-weight:850;line-height:1">0</b>'
-    + '<span style="font-size:13px;font-weight:750;color:#8b83ad">%</span></div>'
-    + '<div class="glorton-provider-track" role="progressbar" aria-label="游戏资源载入进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" '
-    + 'style="height:10px;border-radius:999px;background:#ddd2f6;box-shadow:inset 0 1px 2px #c3b2ea;overflow:hidden">'
-    + '<span style="display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#5b2ab8,#9a63f5 62%,#b98bff);transition:width .42s cubic-bezier(.22,.68,.32,1)"></span></div>';
+  progress.className = 'glorton-provider-progress';
+  progress.style.cssText = 'margin-top:6px';
   const actions = document.createElement('div');
   actions.style.cssText = 'display:none;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:8px';
   const download = document.createElement('a');
@@ -111,30 +108,42 @@ function show() {
 
 const ui = show();
 
-// 百分比读数：目标值变了用 rAF 追上去，保证数字一直在动。
-const percentEl = ui.progress.querySelector('.glorton-provider-percent');
-const fillEl = ui.progress.querySelector('.glorton-provider-track > span');
-const trackEl = ui.progress.querySelector('.glorton-provider-track');
-let shownPercent = 0, targetPercent = 0, rafId = 0, tweenFrom = 0, tweenAt = 0;
+// 进度组件是异步加载的：拿到实例前的调用先记下来，就绪后按最后一次状态补画。
+let loader = null;
+let pendingView = null;
+let shownPercent = 0;
+let targetPercent = 0;
+let rafId = 0;
+let tweenFrom = 0;
+let tweenAt = 0;
 const easeOut = t => 1 - (1 - t) ** 3;
-function paintPercent(value) {
-  shownPercent = value;
-  const rounded = Math.round(value);
-  fillEl.style.width = value + '%';
-  percentEl.textContent = String(rounded);
-  trackEl.setAttribute('aria-valuenow', String(rounded));
-}
+
+const loaderReady = import('/loader/carnival-loader.mjs')
+  .then(module => module.createCarnivalLoader(ui.progress, {layout: 'inline'}))
+  .then((instance) => {
+    loader = instance;
+    if (pendingView) instance.show(pendingView);
+    return instance;
+  });
+
 function progressTo(value) {
   targetPercent = Math.min(100, Math.max(targetPercent, value));
-  if (rafId) return;
+  if (rafId || !loader) return;
   tweenFrom = shownPercent; tweenAt = performance.now();
   const step = now => {
     const t = Math.min(1, (now - tweenAt) / 420);
-    paintPercent(tweenFrom + (targetPercent - tweenFrom) * easeOut(t));
+    shownPercent = tweenFrom + (targetPercent - tweenFrom) * easeOut(t);
+    loader.show({
+      phase: 'running', stage: 'download', title: lastTitle,
+      detail: lastDetail, percent: shownPercent,
+    });
     rafId = t < 1 ? requestAnimationFrame(step) : 0;
   };
   rafId = requestAnimationFrame(step);
 }
+
+let lastTitle = '正在准备本地游戏';
+let lastDetail = '';
 
 function report(phase, message) {
   ui.panel.hidden = phase === 'ready';
@@ -146,9 +155,34 @@ function report(phase, message) {
     error: '游戏引擎加载失败，请重新加载。',
   }[phase] || '';
   ui.actions.style.display = phase === 'error' ? 'flex' : 'none';
-  if (phase === 'ready') progressTo(100);
-  else if (phase === 'mounting' || phase === 'source') progressTo(92);
-  else if (phase === 'invalid' || phase === 'error') ui.progress.style.display = 'none';
+  ui.progress.hidden = phase === 'ready';
+
+  const detail = ui.message.textContent;
+  const title = phase === 'error' ? '加载遇到问题'
+    : phase === 'ready' ? '准备完毕，出发吧！'
+      : '正在准备本地游戏';
+  if (phase === 'ready') {
+    pendingView = {phase: 'done', stage: 'initialize', title, detail: ''};
+    if (loader) loader.show(pendingView);
+    targetPercent = 100;
+    shownPercent = 100;
+    return;
+  }
+  if (phase === 'invalid' || phase === 'error') {
+    pendingView = {phase: 'error', stage: 'download', title, detail};
+    ui.progress.hidden = false;
+    loader?.show(pendingView);
+  } else {
+    lastTitle = title;
+    lastDetail = detail;
+    pendingView = {
+      phase: 'running', stage: phase === 'mounting' || phase === 'source' ? 'initialize' : 'download',
+      title, detail, percent: Math.max(targetPercent, phase === 'mounting' || phase === 'source' ? 92 : 8),
+    };
+    loader?.show(pendingView);
+    if (phase === 'mounting' || phase === 'source') progressTo(92);
+    else progressTo(8);
+  }
   if (phase === 'ready' && activeArchive?.key === cacheKeys.imported)
     void cache('write', activeArchive.key, activeArchive.blob);
   if (phase === 'invalid' && activeArchive) {

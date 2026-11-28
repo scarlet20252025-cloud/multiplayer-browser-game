@@ -11,3 +11,10 @@
 
 - 门（传送门_光）：sprite 258 无矢量子对象，只能拿到 181×40 的位图 bbox；世界矩阵平移为 0，说明位置由 AS3 在运行时设置。已知结论：**不能用 SWF 时间轴定位门**，要从 Level.as/Behavior 里找门的创建逻辑，或改用行为录制定位。
 - 尚未做黄金轨迹：原版一次输入录像（Ruffle + 现有 host）还没接。
+
+## 大厅入口接线（未完成，位置已定位）
+
+- `server/room-lobby.mjs:365` 的运行时分支需要新增 `game.runtime==='shanyi-native'` → `startShanyiNativeRoom({levelPath: <repo>/public/shanyi-native/level-1.json, port: mirrorPort, bindHost})`。
+- `server/room-lobby.mjs:398` 的 ws 地址拼接按 authority 处理；native 房需要改成 `room.localUrl` + `/ws`。
+- 席位入口需要 `/shanyi-native/index.html?ws=<room.localUrl>&seat=<n>`，当前大厅只对 flash 房拼 seat 参数，native 房要加同样分支。
+- `config/games/shanyi-native.json` 的 `listed` 仍为 false，接线完成前不应出现在大厅。

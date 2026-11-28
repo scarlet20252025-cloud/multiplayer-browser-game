@@ -30,7 +30,6 @@ export function mountGameLoader(container, {backUrl, onBack} = {}) {
   overlay.hidden = true;
   container.classList.add('game-loader-host');
   container.append(overlay);
-
   const actions = document.createElement('div');
   actions.className = 'game-loader__actions';
   actions.hidden = true;

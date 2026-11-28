@@ -46,34 +46,24 @@ const peerEl=document.getElementById('shanyi-peer');
 const backButton=document.getElementById('shanyi-back');
 const gate=document.getElementById('shanyi-gate');
 const gateText=document.getElementById('shanyi-gate-text');
-const gatePercent=document.getElementById('shanyi-gate-percent');
-const gateFill=document.getElementById('shanyi-gate-fill');
-const gateTrack=document.querySelector('#shanyi-gate .gate-track');
-let gateShown=0,gateTarget=0,gateRaf=0,gateFrom=0,gateAt=0;
-const easeOut=t=>1-(1-t)**3;
-function paintGate(value){
-  gateShown=value;
-  const rounded=Math.round(value);
-  if(gateFill)gateFill.style.width=value+'%';
-  if(gatePercent)gatePercent.textContent=String(rounded);
-  gateTrack?.setAttribute('aria-valuenow',String(rounded));
+// 加载条换成缤纷嘉年华星星组件；实例就绪前先把状态记下来。
+const gateMount=document.getElementById('shanyi-gate-loader');
+let gateLoader=null,gateView=null;
+import('/loader/carnival-loader.mjs')
+  .then(module=>module.createCarnivalLoader(gateMount,{layout:'inline',compact:true}))
+  .then(instance=>{gateLoader=instance;if(gateView)instance.show(gateView);})
+  .catch(()=>{});
+function gateShow(title,detail,percent){
+  gateView={phase:'running',stage:'initialize',title,detail,percent};
+  gateLoader?.show(gateView);
 }
-function gateProgressTo(value){
-  gateTarget=Math.min(100,Math.max(gateTarget,value));
-  if(gateRaf)return;
-  gateFrom=gateShown;gateAt=performance.now();
-  const step=now=>{
-    const t=Math.min(1,(now-gateAt)/420);
-    paintGate(gateFrom+(gateTarget-gateFrom)*easeOut(t));
-    gateRaf=t<1?requestAnimationFrame(step):0;
-  };
-  gateRaf=requestAnimationFrame(step);
-}
-// 原版 SWF 没有可读的加载进度，用慢爬维持「在动」的观感，等真正就绪再补到 100。
-gateProgressTo(8);
+// 原版 SWF 没有可读的加载进度：按阶段推进，数字只向前，等真正就绪再补满。
+let gateShown=8,gateTarget=8;
+gateShow('正在加载游戏', '正在等待 Ruffle 运行时。', gateShown);
 const gateCreep=setInterval(()=>{
   if(localBooted||closed){clearInterval(gateCreep);return;}
-  gateProgressTo(Math.min(90,gateTarget+1.4));
+  gateTarget=Math.min(90,gateTarget+1.4);
+  gateShow('正在加载游戏', '正在等待 Ruffle 运行时。', gateTarget);
 },520);
 const FIRE_KEYS=new Set([87,83,65,68]);
 const ICE_KEYS=new Set([38,40,37,39]);
@@ -136,6 +126,11 @@ function renderGate(){
   gate.hidden=bothReady;
   if(gateText)
     gateText.textContent=bothReady?'':(localBooted?'等待其他玩家进入游戏…':'正在加载游戏与对手状态…');
+  if(!bothReady) gateShow(
+    localBooted?'等待玩家就位':'正在加载游戏',
+    localBooted?'本机游戏已就绪，正在等其他玩家进入。':'正在等待 Ruffle 运行时与对手状态。',
+    localBooted?100:Math.max(8,gateTarget),
+  );
 }
 function sendReady(){
   if(!localBooted||readySent||ws?.readyState!==WebSocket.OPEN)return;
@@ -427,8 +422,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)clearContro
     if(statusEl)statusEl.textContent='闪翼双星启动失败：'+String(error.message??error);
     if(gateText)gateText.textContent='游戏加载失败：'+String(error.message??error);
     clearInterval(gateCreep);
-    const gateBar=document.querySelector('#shanyi-gate .gate-progress');
-    if(gateBar)gateBar.style.display='none';
+    gateLoader?.show({phase:'error',stage:'initialize',title:'游戏加载失败',detail:String(error.message??error)});
     return;
   }
   setInterval(async()=>{

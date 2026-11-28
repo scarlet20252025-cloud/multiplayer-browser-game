@@ -122,6 +122,11 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #783a
 #root,#container{position:absolute;inset:0;overflow:hidden}
 #container canvas{display:block}
 #hammer,#debug-fps{position:absolute;left:0;top:0;z-index:1}
+/* 关卡载入遮罩：星星组件盖在 #game-center 上，游戏真正可操作后再撤掉。 */
+#game-boot{position:absolute;z-index:8;inset:0;display:grid;place-items:center;padding:clamp(10px,3vw,26px);box-sizing:border-box;overflow:auto;background:radial-gradient(ellipse at top,#49317b,#20173e 68%)}
+#game-boot[hidden]{display:none}
+.game-boot-card{width:min(100%,430px);padding:clamp(14px,3vw,24px);border:2px solid #fff;border-radius:24px;background:linear-gradient(160deg,#fff,#f7f2ff);box-shadow:0 6px 0 #b7a6e6,0 16px 40px #110a32a6;box-sizing:border-box}
+.game-boot-card .cl-slot{padding:0;border:0;background:none;box-shadow:none}
 #game-left,#game-right{position:fixed;top:var(--game-gap);bottom:var(--game-gap);z-index:40;min-width:0;display:flex;flex-direction:column;overflow:auto;background:#fff;border:1px solid var(--game-line);border-radius:18px;box-shadow:0 3px 0 #9387cf38}
 #game-left{left:var(--game-gap);width:var(--game-left-w);padding:13px;gap:10px}
 #game-right{right:var(--game-gap);width:var(--game-right-w)}
@@ -246,10 +251,15 @@ function authoredPage(script, requireScript, playerConfig=null, {storagePrefix=n
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${pageTitle}</title>
+<link rel="stylesheet" href="/loader/loader.css">
+<link rel="stylesheet" href="/loader/carnival-loader.css">
 <style>${GAME_SHELL_CSS}#research-notice{position:fixed;z-index:2147483645;bottom:4px;left:50%;transform:translateX(-50%);padding:3px 8px;background:#111c;color:#fff;font:11px sans-serif;pointer-events:none;border-radius:4px}</style>
 </head><body${playerConfig?' class="game-has-sidebars"':''}>
 ${unlock}
 <div id="game-center"><div id="root"><div id="container"></div><div id="hammer"></div><div id="debug-fps"></div></div></div>
+${playerConfig?`<div id="game-boot" role="status" aria-live="polite">
+  <div class="game-boot-card"><div id="game-boot-loader"></div></div>
+</div>`:''}
 ${playerConfig?'':'<div id="research-notice">Instrumented research harness · 非原包基准</div>'}
 <script>window.h5api=window.h5api||{progress:function(){}};</script>
 <script>/* The served game script reads this instead of window.innerWidth/innerHeight. */
@@ -268,18 +278,19 @@ function flashPage({wrapperUrl,coreUrl,title,chatWsUrl=null}) {
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${String(title??'Flash').replace(/[<>&]/g,'')} · 实验性输入镜像联机</title>
+<link rel="stylesheet" href="/loader/loader.css">
+<link rel="stylesheet" href="/loader/carnival-loader.css">
 <style>${GAME_SHELL_CSS}
 #stage{position:relative;width:min(100%,calc((100dvh - 36px) * 4 / 3));aspect-ratio:4/3;background:#000;line-height:0;overflow:hidden}
 #player,#player>ruffle-player{display:block;width:100%!important;height:100%!important}
 #shanyi-gate{position:absolute;inset:0;background:#1d153eed;display:flex;align-items:center;justify-content:center;z-index:5;pointer-events:auto;text-align:center;line-height:1.6;padding:14px}
 #shanyi-gate[hidden]{display:none}#shanyi-gate b{display:block;font-size:18px;color:#ffdb5f;margin-bottom:8px}#shanyi-gate p{margin:0;color:#f1eaff}
-#shanyi-gate .gate-progress{width:min(280px,70vw);margin:14px auto 0}
-#shanyi-gate .gate-readout{display:flex;align-items:baseline;justify-content:center;gap:2px;margin-bottom:6px;color:#ffdb5f;font-variant-numeric:tabular-nums}
-#shanyi-gate .gate-readout b{display:inline;font-size:26px;line-height:1;margin:0}
-#shanyi-gate .gate-readout span{font-size:13px;font-weight:750;color:#c7b8ee}
-#shanyi-gate .gate-track{height:10px;border-radius:999px;background:#3a2c68;overflow:hidden;box-shadow:inset 0 1px 2px #120c28}
-#shanyi-gate .gate-track>span{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#ffc93c,#ff9f43 60%,#ffd873);transition:width .42s cubic-bezier(.22,.68,.32,1)}
-@media (prefers-reduced-motion:reduce){#shanyi-gate .gate-track>span{transition:none}}
+#shanyi-gate .gate-loader{width:min(400px,86vw);margin:12px auto 0}
+#shanyi-gate .gate-loader .cl-slot{padding:0;border:0;background:none;box-shadow:none}
+#shanyi-gate .cl-title{color:#ffdb5f}
+#shanyi-gate .cl-number{color:#ffdb5f}
+#shanyi-gate .cl-meta,#shanyi-gate .cl-stage{color:#d9cdf5}
+#shanyi-gate .cl-status{color:#f1eaff}
 #shanyi-back{width:100%}
 @media(max-width:850px),(orientation:portrait){.flash-shell #game-center{aspect-ratio:4/3}#stage{width:100%}}
 @media(max-width:850px) and (max-height:600px) and (orientation:landscape) and (pointer:coarse){
@@ -289,8 +300,7 @@ function flashPage({wrapperUrl,coreUrl,title,chatWsUrl=null}) {
 <body class="game-has-sidebars flash-shell">
 <div id="game-center"><div id="stage"><div id="player"></div>
   <div id="shanyi-gate"><div><b>等待玩家就位</b><p id="shanyi-gate-text">正在加载游戏…</p>
-    <div class="gate-progress"><div class="gate-readout" aria-hidden="true"><b id="shanyi-gate-percent">0</b><span>%</span></div>
-    <div class="gate-track" role="progressbar" aria-label="游戏加载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="shanyi-gate-fill"></span></div></div>
+    <div class="gate-loader" id="shanyi-gate-loader"></div>
   </div></div>
 </div></div>
 <aside id="game-left" class="game-left">
@@ -319,54 +329,27 @@ function lobbyPage(lobbyWsUrl, viewerOrigin, override=null) {
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#1878ec"><title>肥鱼乐园 · 联机大厅</title>
-<style>#lobby-boot{box-sizing:border-box;width:min(420px,calc(100% - 28px));margin:14vh auto;padding:24px;border:3px solid #e6ddff;border-radius:21px;background:#fff;color:#20215c;text-align:center;font:16px system-ui,sans-serif}#lobby-boot p{margin:8px 0}#lobby-boot button{margin-top:10px}
-#lobby-boot .lobby-boot-progress{margin:14px 0 2px}
-#lobby-boot .lobby-boot-readout{display:flex;align-items:baseline;justify-content:flex-end;gap:2px;margin-bottom:7px;color:#1878ec;font-variant-numeric:tabular-nums}
-#lobby-boot .lobby-boot-readout b{font-size:29px;font-weight:850;line-height:1}
-#lobby-boot .lobby-boot-readout span{font-size:14px;font-weight:750;color:#8b93ad}
-#lobby-boot .lobby-boot-track{height:11px;border-radius:999px;background:#e2ecfb;box-shadow:inset 0 1px 2px #bcd2ef;overflow:hidden}
-#lobby-boot .lobby-boot-track>span{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#1878ec,#4aa3ff 62%,#7cc4ff);transition:width .42s cubic-bezier(.22,.68,.32,1)}
+<link rel="stylesheet" href="/loader/loader.css">
+<link rel="stylesheet" href="/loader/carnival-loader.css">
+<style>#lobby-boot{box-sizing:border-box;width:min(430px,calc(100% - 28px));margin:12vh auto;padding:24px;border:3px solid #e6ddff;border-radius:24px;background:#fff;color:#20215c;text-align:center;font:16px system-ui,sans-serif}#lobby-boot p{margin:8px 0}#lobby-boot button{margin-top:10px}
+#lobby-boot .cl-slot{padding:0;border:0;background:none;box-shadow:none}
 body:has(#lobby-boot){background-color:#64c7f5}</style>
 </head><body>
 <div id="app"><div id="lobby-boot"><strong>肥鱼乐园</strong><p id="lobby-boot-status" role="status">正在载入联机大厅…</p>
-<div class="lobby-boot-progress"><div class="lobby-boot-readout" aria-hidden="true"><b id="lobby-boot-percent">0</b><span>%</span></div>
-<div class="lobby-boot-track" role="progressbar" aria-label="大厅载入进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="lobby-boot-fill"></span></div></div>
+<div id="lobby-boot-loader"></div>
 <button type="button" hidden>重新加载</button></div></div>
 <script>
 window.__LOBBY_CONFIG__=${config};
 (async()=>{
   const boot=document.getElementById('lobby-boot'),status=document.getElementById('lobby-boot-status');
   const button=boot.querySelector('button');
-  const percentEl=document.getElementById('lobby-boot-percent');
-  const fillEl=document.getElementById('lobby-boot-fill');
-  const trackEl=boot.querySelector('.lobby-boot-track');
   button.onclick=()=>location.reload();
-  let shown=0,target=0,raf=0,from=0,at=0;
-  const easeOut=t=>1-(1-t)**3;
-  function paint(value){
-    shown=value;const rounded=Math.round(value);
-    fillEl.style.width=value+'%';percentEl.textContent=String(rounded);
-    trackEl.setAttribute('aria-valuenow',String(rounded));
-  }
-  function goTo(value){
-    target=Math.min(100,Math.max(target,value));
-    if(raf)return;
-    from=shown;at=performance.now();
-    const step=now=>{
-      const t=Math.min(1,(now-at)/420);
-      paint(from+(target-from)*easeOut(t));
-      raf=t<1?requestAnimationFrame(step):0;
-    };
-    raf=requestAnimationFrame(step);
-  }
-  function creep(limit){
-    const timer=setInterval(()=>{
-      if(shown>=limit||target>=limit){clearInterval(timer);return;}
-      goTo(Math.min(limit,target+1.3));
-    },420);
-    return()=>clearInterval(timer);
-  }
-  goTo(6);
+  // 大厅载入没有真实字节：按阶段推进，数字只向前。
+  const loader=await import('/loader/carnival-loader.mjs')
+    .then(m=>m.createCarnivalLoader(document.getElementById('lobby-boot-loader'),{layout:'inline'}))
+    .catch(()=>null);
+  const show=(title,detail,percent)=>loader?.show({phase:'running',stage:'download',title,detail,percent});
+  show('正在载入联机大厅','正在准备大厅脚本与样式。',6);
   function stylesheet(search){
     return new Promise(resolve=>{
       const link=document.createElement('link');
@@ -380,22 +363,21 @@ window.__LOBBY_CONFIG__=${config};
   let styled=false;
   for(const attempt of [0,1,2]){
     const search='?entry='+attempt;
-    if(attempt)status.textContent='正在重新连接大厅…';
+    if(attempt)show('正在重新连接大厅','大厅样式没有就绪，正在重试。',14+attempt*4);
     if(!styled)styled=await stylesheet(search);
-    if(!styled){goTo(14+attempt*4);continue;}
-    goTo(38);
+    if(!styled){show('正在重新连接大厅','正在等待大厅样式返回。',14+attempt*4);continue;}
+    show('正在载入联机大厅','大厅样式已就绪，正在准备大厅脚本。',38);
     window.__LOBBY_BOOT_ATTEMPT__=String(attempt);
     let timer;
-    const stopCreep=creep(92);
     const imported=import('/__lobby__/lobby.mjs'+search).then(()=>true,()=>false);
     const ready=await Promise.race([imported,new Promise(resolve=>{timer=setTimeout(()=>resolve(false),5000);})]);
     clearTimeout(timer);
-    stopCreep();
-    if(ready){goTo(100);return;}
+    if(ready){show('正在载入联机大厅','大厅脚本已就绪。',100);return;}
     if(!boot.isConnected)return;
     window.__LOBBY_BOOT_ATTEMPT__='';
   }
   status.textContent='大厅暂时无法加载，请重试。';
+  loader?.show({phase:'error',stage:'download',title:'大厅暂时无法加载',detail:'可以点下面按钮重新加载。'});
   button.hidden=false;
 })();
 </script>
@@ -428,6 +410,7 @@ function lockstepPage({id: gameId, title, bridgeUrl}, lobbyWsUrl) {
 <title>${safeTitle} · 联机对战</title>
 <link rel="stylesheet" href="/__lockstep__/loading.css">
 <link rel="stylesheet" href="/loader/loader.css">
+<link rel="stylesheet" href="/loader/carnival-loader.css">
 <style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(155deg,#b9e8ff,#e0f0ff 43%,#eee5ff);color:#20215c;font:16px system-ui,sans-serif}
 main{width:min(1500px,100%);margin:auto;padding:clamp(12px,2.5vw,32px)}
