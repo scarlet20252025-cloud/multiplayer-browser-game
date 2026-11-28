@@ -146,6 +146,7 @@ python3 scripts/audit_fireboy.py \
 
 | 路径 | 内容 |
 | --- | --- |
+| [**闪翼原生逆向路线**](docs/SHANYI_NATIVE_REA.md) | 脱离 SWF 的分阶段计划：显示列表导出、参数还原、原生模拟与对照验收 |
 | [**冰火人手感与延迟**](docs/HTML5_FEEL_AND_LATENCY.md) | 回拉/跳跃黏手的根因、快照频率实测、四部曲验证命令 |
 | [**交接给下一个 Agent**](docs/HANDOFF_TO_NEXT_AGENT.md) | **从这里开始**：当前状态、已验证结论、待做清单、代码位置速查、已踩过的坑 |
 | [HTML5 路线验证](docs/HTML5_ROUTE_FINDINGS.md) | HTML5 版 6 部实机运行、Node 可运行性、输入路径定位、输入桥验证 |
