@@ -45,6 +45,22 @@
 - 已做的改动（无回归，306 测试全过）：`game-catalog.mjs` 把 `shanyi-native` 归入静态包分支；manifest 的 `package.levels` 指向 `levels.json`。
 - 下一条命令：直接在 `loadGameCatalog` 内部打印 `definitions.length` 与 `definition.dir/stat` 的结果（`server/game-manifest.mjs` 的实际导出名要以文件为准，上一轮猜错了模块名）。
 
+## 黄金轨迹：缺 playerglobal.swc（外部资源）
+
+M2 的参数对照与 M4 的黄金轨迹都需要先录一段原版轨迹，而录制需要编译 `adapters/shanyi-flash/src/ShanyiHost.as`：
+
+- 编译器在本仓库：`local/tools/as3-probe/apache-flex-sdk-4.16.1-bin/bin/mxmlc.bat`（Flex 4.16.1，可用）；
+- 编译失败于 `flex-config.xml(85): 无法打开 {playerglobalHome}/27.0` —— SDK 里**没有 playerglobal.swc**，它需要单独下载 Adobe 的 playerglobal（27.0）；
+- 已验证 SDK 目录下不存在任何 `playerglobal.swc`。
+
+因此这条链路不是代码问题，是缺一个外部二进制。补上 `frameworks/libs/player/27.0/playerglobal.swc` 后，命令是：
+
+```
+local/tools/as3-probe/apache-flex-sdk-4.16.1-bin/bin/mxmlc.bat   -output=local/private-games/shanyi/shanyi-host.swf   -source-path=adapters/shanyi-flash/src adapters/shanyi-flash/src/ShanyiHost.as
+```
+
+编译出 wrapper 后，用现有 `scripts/verify-shanyi-mirror.mjs` 跑一次并记录英雄坐标序列，即可开始参数拟合。
+
 ## 已关闭
 
 - 大厅入口与静态宿主均已通过 E2E，`listed` 已开启。剩余未完成项见 TASKS.md（Hero 参数对照、门、黄金轨迹）。
