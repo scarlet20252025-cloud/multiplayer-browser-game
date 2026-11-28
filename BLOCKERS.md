@@ -22,4 +22,5 @@
 ### 大厅入口：已接线，缺端到端验证
 
 - 房分支与 health 形状已接好，`tests/room-lobby.test.mjs` 10 项通过；但**还没有**一次「大厅建房 → 两席进 /shanyi-native/index.html」的真实 E2E。
-- 未验证点：`sessionPayload` 生成的席位 URL 是否带 `?ws=&seat=`、静态宿主是否把 `/shanyi-native/` 映射到 `public/`。下一步用一次 lobby E2E 脚本确认，通过后再把 `listed` 改 true。
+- 已验证：大厅前端 `navigateToGame()` 会把 `ws`、`seat`、`room`、`game`、`level` 一并拼进 entryPath（lobby.mjs:1085-1103），所以席位参数不是问题。
+- **新确认的阻塞**：`room-lobby` 只提供 API（`/health`、`/api/games`、`/api/rooms`），实测 `/shanyi-native/index.html` 返回 404；游戏页面由 `start-html5-research-host` 按 catalog 的 `ensureGame()` 逐个提供，其 `servedGames` 只登记 html5 脚本类游戏。原生页要可用，必须在 viewers host 里加一条静态路由（`/shanyi-native/*` → `public/shanyi-native/*`），或让 ensureGame 支持没有脚本的静态包。

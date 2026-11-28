@@ -20,7 +20,8 @@ body {
   min-width: 0;
   min-height: 100vh;
   color: var(--ink);
-  background: #69c9f3 url("/__lobby__/art/carnival.webp") center top / cover no-repeat fixed;
+  /* 背景图移到 .lobby-wall-art，才能跟着指针做视差；这里只留兜底色。 */
+  background: #69c9f3;
 }
 button, input, select { font: inherit }
 button {
@@ -678,4 +679,57 @@ button.danger:hover:not(:disabled) { background: #fdd7e5 }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important }
+}
+
+/* 视差层：和部署包（standalone）同一套参数 —— 背景 12/10 px、装饰 22/18 px，
+   0.18s 线性过渡，指针移动只在下一帧写一次自定义属性。 */
+.lobby-wall {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+  background: #69c9f3;
+}
+.lobby-wall-art {
+  position: absolute;
+  inset: -1.5%;
+  background: #69c9f3 url("/__lobby__/art/carnival.webp") center top / cover no-repeat;
+  transform: translate3d(var(--wall-x, 0px), var(--wall-y, 0px), 0);
+  transition: transform .18s linear;
+  will-change: transform;
+}
+.float-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transform: translate3d(var(--decor-x, 0px), var(--decor-y, 0px), 0);
+  will-change: transform;
+}
+.float-piece {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  left: var(--x);
+  top: var(--y);
+  opacity: var(--opacity, .9);
+  animation: float var(--duration) ease-in-out var(--delay) infinite alternate;
+  filter: drop-shadow(0 2px 3px #2570b326);
+}
+@keyframes float {
+  from { transform: translateY(-8px) rotate(-8deg) }
+  to { transform: translateY(14px) rotate(10deg) }
+}
+/* 动画开关：与部署包一致，暂停时连视差变换一起去掉。 */
+.motion-off .float-piece,
+body.tab-hidden .float-piece { animation-play-state: paused !important }
+.motion-off .lobby-wall-art,
+.motion-off .float-layer {
+  transform: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .float-piece { animation: none !important }
+  .lobby-wall-art,
+  .float-layer { transform: none !important; transition: none !important }
 }
