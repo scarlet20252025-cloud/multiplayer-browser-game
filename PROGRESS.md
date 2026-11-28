@@ -19,3 +19,8 @@
 
 - 箱子推动已实现并测试：`pushBoxes(hero, boxes, solids, fromX)`，英雄贴箱推进、箱子顶墙后反向挡住英雄；`tests/shanyi-native-box.test.mjs` 2 项通过。
 - 门（`传送门_光`，sprite 258）没有矢量子对象，FFDec 渲染出的内容只有 181×40 的一小块，且世界矩阵平移为 0，位置是运行时设置 → 暂时无法确定门的坐标。
+
+### 2026-11-28 渲染层
+
+- `public/shanyi-native/index.html` + `client.mjs`：canvas 渲染地形条带/箱子/两个角色，P1 WASD、P2 方向键，相机跟随 P1。
+- Playwright 实测：加载 86 个碰撞体，P1 落地 `onGround=true`，按 D 后 x 从 -118 → 69.8，无页面异常；截图确认地形、箱子、两名角色都在画面内。
