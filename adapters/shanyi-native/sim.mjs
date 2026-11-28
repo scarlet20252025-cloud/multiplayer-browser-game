@@ -55,7 +55,32 @@ function moveAxis(hero, solids, dx, dy) {
   }
 }
 
-export function stepHero(hero, solids, input, dt = DT) {
+/**
+ * 箱子推动：英雄水平挤到箱子时把箱子按重叠量顶开，箱子再和地形求解，
+ * 顶不动就反过来把英雄挡回去（贴住箱面）。
+ */
+export function pushBoxes(hero, boxes, solids, fromX) {
+  for (const box of boxes) {
+    if (!overlaps(hero, box)) continue;
+    const dir = hero.x > fromX ? 1 : hero.x < fromX ? -1 : 0;
+    if (!dir) continue;
+    const overlap = dir > 0
+      ? hero.x + hero.w - box.x
+      : box.x + box.w - hero.x;
+    if (overlap <= 0) continue;
+    const nextX = box.x + dir * overlap;
+    const moved = {...box, x: nextX};
+    const blocked = solids.some(s => overlaps(moved, s)) || boxes.some(b => b !== box && overlaps(moved, b));
+    if (blocked) {
+      hero.x = dir > 0 ? box.x - hero.w : box.x + box.w;
+      hero.vx = 0;
+    } else {
+      box.x = nextX;
+    }
+  }
+}
+
+export function stepHero(hero, solids, input, dt = DT, boxes = null) {
   const axis = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   if (axis) {
     hero.facing = axis;
@@ -81,7 +106,9 @@ export function stepHero(hero, solids, input, dt = DT) {
   }
 
   hero.vy = Math.min(HERO.maxFall, hero.vy + HERO.gravity * dt);
+  const beforeX = hero.x;
   moveAxis(hero, solids, hero.vx * dt, 0);
+  if (boxes) pushBoxes(hero, boxes, solids, beforeX);
   moveAxis(hero, solids, 0, hero.vy * dt);
   return hero;
 }
