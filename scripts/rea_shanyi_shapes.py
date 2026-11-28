@@ -194,6 +194,9 @@ def parse_shape(data, offset, shape_type):
     num_fill_bits = head.read(4)
     num_line_bits = head.read(4)
     base = cursor + 1
+    # 正确偏移的标志：轮廓总面积应当接近 RECT 声明的面积（方块类尤其明显），
+    # 只比「谁面积大」会把局部轮廓选中，这里改成「谁更接近声明面积」。
+    rect_area = abs(bounds['width'] * bounds['height']) or 1
     best = None
     for skip in range(8):
         try:
@@ -204,7 +207,10 @@ def parse_shape(data, offset, shape_type):
             continue
         contours, end_pos = result
         area = sum(polygon_area(c['points']) for c in contours)
-        score = (end_pos, area)
+        if area <= 0:
+            continue
+        error = abs(area - rect_area) / rect_area
+        score = -error
         if best is None or score > best[0]:
             best = (score, contours, skip)
     if best is None:
