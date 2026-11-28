@@ -18,3 +18,8 @@
 - `server/room-lobby.mjs:398` 的 ws 地址拼接按 authority 处理；native 房需要改成 `room.localUrl` + `/ws`。
 - 席位入口需要 `/shanyi-native/index.html?ws=<room.localUrl>&seat=<n>`，当前大厅只对 flash 房拼 seat 参数，native 房要加同样分支。
 - `config/games/shanyi-native.json` 的 `listed` 仍为 false，接线完成前不应出现在大厅。
+
+### 大厅入口：已接线，缺端到端验证
+
+- 房分支与 health 形状已接好，`tests/room-lobby.test.mjs` 10 项通过；但**还没有**一次「大厅建房 → 两席进 /shanyi-native/index.html」的真实 E2E。
+- 未验证点：`sessionPayload` 生成的席位 URL 是否带 `?ws=&seat=`、静态宿主是否把 `/shanyi-native/` 映射到 `public/`。下一步用一次 lobby E2E 脚本确认，通过后再把 `listed` 改 true。

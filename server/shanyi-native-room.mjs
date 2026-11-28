@@ -25,8 +25,13 @@ export async function startShanyiNativeRoom({port = 0, levelPath, bindHost = '12
   let tick = 0, timer = null, closed = false;
 
   const server = http.createServer((req, res) => {
-    const body = JSON.stringify({native: true, gameId: 'shanyi-native', tick,
-      players: players.map(p => ({seat: p.seat, x: p.hero.x, y: p.hero.y, connected: !!p.ws}))});
+    const connected = players.map(p => !!p.ws);
+    const body = JSON.stringify({
+      native: true, gameId: 'shanyi-native', tick, failed: false,
+      players: players.map(p => ({seat: p.seat, x: p.hero.x, y: p.hero.y, connected: !!p.ws})),
+      // 大厅的 readSession 读的是 authority 形状，这里给同一套字段。
+      room: {connected, bothReady: connected.every(Boolean), capacity: seats,
+        ready: connected, suspendedReason: null}});
     res.writeHead(req.url === '/health' ? 200 : 404,
       {'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store'});
     res.end(body);

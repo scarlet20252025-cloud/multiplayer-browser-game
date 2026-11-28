@@ -12,6 +12,7 @@ import {DEFAULT_SEATS,RoomLobbyCore} from './room-lobby-core.mjs';
 import {gameFor,loadGameCatalog,nextCatalogLevel,publicCatalog} from './game-catalog.mjs';
 import {startHtml5ResearchRoom} from './html5-research-room.mjs';
 import {startShanyiMirrorRoom} from './shanyi-mirror-room.mjs';
+import {startShanyiNativeRoom} from './shanyi-native-room.mjs';
 import {makeRoomCode,probeExternalRoom} from './external-game-server.mjs';
 import {createLockstepMatch} from './lockstep-match.mjs';
 import {
@@ -362,6 +363,11 @@ export async function startRoomLobby({
         ? (bvn33Service?.start({roomName:room.name,lobbyOrigin:viewerOrigin,
           playerNames:room.members.map(member=>member.displayName)})??
           Promise.reject(Error('BVN 3.3 服务未配置')))
+        : game.runtime==='shanyi-native'
+        ? startShanyiNativeRoom({
+          levelPath: path.join(REPO_ROOT, 'public', 'shanyi-native', 'level-1.json'),
+          ...allocatePorts(ticket, mirrorPort, mirrorPublicPort), bindHost,
+        })
         : game.runtime==='flash-ruffle'
         ? startShanyiMirrorRoom({
           levelId:proposal.levelId,gameId:game.id,seats:game.seats??DEFAULT_SEATS,

@@ -35,3 +35,8 @@
 
 - `client.mjs` 支持 `?ws=&seat=`：有 ws 时不再本地跑模拟，改为 12Hz 以上向服务端发输入、按服务端状态渲染。
 - Playwright 双标签实测：两页分别 seat=0/1 接入同一房间；按 D 后 P1 x 从 -118 → 73.8，**两个页面读到的 P1 坐标一致**（-118 → 73.8），无页面异常。
+
+### 2026-11-28 大厅分支
+
+- `shanyi-native-room` 的 `/health` 改为同时输出 authority 形状（`room.connected/bothReady/capacity`），大厅 `readSession` 可直接读取。
+- `room-lobby.mjs` 新增 `game.runtime==='shanyi-native'` 分支，用 `public/shanyi-native/level-1.json` 起房；相关大厅测试 10 项仍通过。
