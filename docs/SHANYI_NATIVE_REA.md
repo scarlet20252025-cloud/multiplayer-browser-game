@@ -90,6 +90,14 @@ id=79  RECT(-500..500)  fills=1(solid FFFF00)  lines=0  nf=1 nl=0
 - `adapters/shanyi-flash/` + `server/shanyi-mirror-room.mjs`：现有输入镜像方案，作为过渡保留。
 - `scripts/rea_shanyi.py`：本轮的显示列表导出器。
 
+## 已经能跑的原生切片（2026-11-28）
+
+- `adapters/shanyi-native/sim.mjs`：固定 60 Hz 的两角色平台物理（跑/摩擦/跳跃/二段跳/AABB 地形），只吃每 tick 输入，不读 wall clock。
+- `public/shanyi-native/level-1.json`：从 Level1 的 Ground 多边形导出的 52 个碰撞矩形，范围 -156…498 px。
+- `tests/shanyi-native-sim.test.mjs`：落地、加速上限、摩擦、跳跃、二段跳、侧面阻挡、高速不隧穿，7 项全过。
+
+这证明「不依赖 SWF 的模拟 + 碰撞」这条路能走通；但参数还没和原版逐帧对照，关卡也只覆盖 Ground 一层。
+
 ## 下一阶段（按顺序，每步都可验收）
 
 1. **坐标与几何（进行中）**：RECT 包围盒与叶子筛选已完成，但地形是整块绘制、碰撞由 WCK `BodyShape` 从轮廓派生，AABB 不够。下一步解析 `DefineShape` 的 edge 记录得到多边形，输出碰撞地形。验收：多边形叠加游戏截图能对上平台、坑和门。
