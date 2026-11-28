@@ -23,6 +23,7 @@ TAG_PLACE2 = 26
 TAG_REMOVE2 = 28
 TAG_SPRITE = 39
 TAG_SYMBOL_CLASS = 76
+TAG_DEFINE_SHAPE = {2, 22, 32, 83}
 TAG_PLACE3 = 70
 
 
@@ -89,6 +90,22 @@ def read_matrix(data, offset):
 def read_string(data, offset):
     end = data.index(b'\x00', offset)
     return data[offset:end].decode('utf-8', 'replace'), end - offset + 1
+
+
+def read_rect(data, offset):
+    """DefineShape 的边界框：5 位 nbits，随后四个有符号值，单位 twips。"""
+    bits = Bits(data[offset:])
+    nbits = bits.read(5)
+    values = []
+    for _ in range(4):
+        raw = bits.read(nbits)
+        if nbits and raw & (1 << (nbits - 1)):
+            raw -= 1 << nbits
+        values.append(raw)
+    bits.align()
+    xmin, xmax, ymin, ymax = values
+    return {'xMin': xmin, 'xMax': xmax, 'yMin': ymin, 'yMax': ymax,
+            'width': xmax - xmin, 'height': ymax - ymin}, bits.byte_pos
 
 
 def iter_tags(data):
@@ -192,6 +209,7 @@ def parse_swf(path):
 def collect(swf):
     symbols = {}
     sprites = {}
+    shapes = {}
     for code, body, _ in iter_tags(swf['tags']):
         if code == TAG_SYMBOL_CLASS:
             count = read_uint(body, 0, 2)
@@ -205,7 +223,14 @@ def collect(swf):
             sprite_id = read_uint(body, 0, 2)
             frame_count = read_uint(body, 2, 2)
             sprites[sprite_id] = {'frameCount': frame_count, 'body': body[4:]}
-    return symbols, sprites
+        elif code in TAG_DEFINE_SHAPE:
+            shape_id = read_uint(body, 0, 2)
+            try:
+                bounds, _ = read_rect(body, 2)
+                shapes[shape_id] = bounds
+            except Exception:
+                shapes[shape_id] = None
+    return symbols, sprites, shapes
 
 
 def sprite_placements(body):
@@ -239,15 +264,56 @@ def sprite_placements(body):
     return frames
 
 
+def resolve_bounds(char_id, sprites, shapes, cache, depth=0):
+    """递归算一个字符的局部包围盒（twips）。sprite 取所有子对象变换后的并集。"""
+    if char_id in cache:
+        return cache[char_id]
+    if depth > 6:
+        return None
+    bounds = None
+    if char_id in shapes:
+        bounds = shapes[char_id]
+    elif char_id in sprites:
+        cache[char_id] = None
+        union = None
+        for entry in sprite_placements(sprites[char_id]['body']):
+            child = resolve_bounds(entry.get('characterId'), sprites, shapes, cache, depth + 1)
+            if not child:
+                continue
+            matrix = entry.get('matrix') or {'x': 0, 'y': 0, 'scaleX': 1, 'scaleY': 1}
+            sx = matrix.get('scaleX', 1) or 1
+            sy = matrix.get('scaleY', 1) or 1
+            # twips 与矩阵平移同单位；这里只处理平移+缩放，旋转地形极少见。
+            box = {
+                'xMin': child['xMin'] * sx + matrix['x'],
+                'xMax': child['xMax'] * sx + matrix['x'],
+                'yMin': child['yMin'] * sy + matrix['y'],
+                'yMax': child['yMax'] * sy + matrix['y'],
+            }
+            if union is None:
+                union = box
+            else:
+                union = {
+                    'xMin': min(union['xMin'], box['xMin']),
+                    'xMax': max(union['xMax'], box['xMax']),
+                    'yMin': min(union['yMin'], box['yMin']),
+                    'yMax': max(union['yMax'], box['yMax']),
+                }
+        bounds = union
+    cache[char_id] = bounds
+    return bounds
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('swf')
     parser.add_argument('--level', default='Level1')
     parser.add_argument('--output')
     parser.add_argument('--depth', type=int, default=2)
+    parser.add_argument('--svg')
     args = parser.parse_args()
     swf = parse_swf(args.swf)
-    symbols, sprites = collect(swf)
+    symbols, sprites, shapes = collect(swf)
     by_name = {name: char_id for char_id, name in symbols.items()}
     target_id = by_name.get(args.level)
     if target_id is None:
@@ -258,6 +324,8 @@ def main():
         raise SystemExit(f'{args.level} is not a DefineSprite')
     placements = sprite_placements(sprite['body'])
 
+    bounds_cache = {}
+
     def annotate(entries, depth, path, seen):
         for entry in entries:
             cid = entry.get('characterId')
@@ -265,6 +333,20 @@ def main():
             entry['targetKind'] = ('sprite' if cid in sprites else 'other') if cid else None
             entry['path'] = path
             entry['level'] = depth
+            box = resolve_bounds(cid, sprites, shapes, bounds_cache) if cid else None
+            if box and entry.get('matrix'):
+                mx = entry['matrix'].get('x', 0)
+                my = entry['matrix'].get('y', 0)
+                sx = entry['matrix'].get('scaleX', 1) or 1
+                sy = entry['matrix'].get('scaleY', 1) or 1
+                entry['boundsTwips'] = {
+                    'xMin': round(box['xMin'] * sx + mx, 1),
+                    'xMax': round(box['xMax'] * sx + mx, 1),
+                    'yMin': round(box['yMin'] * sy + my, 1),
+                    'yMax': round(box['yMax'] * sy + my, 1),
+                }
+            elif box:
+                entry['boundsTwips'] = {k: round(v, 1) for k, v in box.items()}
             if cid in sprites and depth < args.depth and cid not in seen:
                 child = sprite_placements(sprites[cid]['body'])
                 annotate(child, depth + 1, f'{path}/{entry.get("name") or cid}', seen | {cid})
@@ -290,11 +372,39 @@ def main():
         'levelFrameCount': sprite['frameCount'],
         'symbolCount': len(symbols),
         'spriteCount': len(sprites),
+        'shapeCount': len(shapes),
         'objectCount': len(flat),
         'topLevelCount': len(placements),
         'objects': placements,
         'symbols': {str(cid): name for cid, name in sorted(symbols.items())},
     }
+    if args.svg:
+        boxes = [e['boundsTwips'] for e in flat if e.get('boundsTwips')]
+        if boxes:
+            x0 = min(b['xMin'] for b in boxes) / 20.0
+            y0 = min(b['yMin'] for b in boxes) / 20.0
+            x1 = max(b['xMax'] for b in boxes) / 20.0
+            y1 = max(b['yMax'] for b in boxes) / 20.0
+            palette = {'Ground': '#4d7c4d', 'BG2': '#1b2436', '箱子': '#b07a3c',
+                       '传送门_光': '#59a7ff', 'CPS': '#c9c9c9'}
+            parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0:.1f} {y0:.1f} '
+                     f'{x1 - x0:.1f} {y1 - y0:.1f}" width="1200">',
+                     f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{x1 - x0:.1f}" height="{y1 - y0:.1f}" fill="#0d1117"/>']
+            for e in flat:
+                b = e.get('boundsTwips')
+                if not b:
+                    continue
+                top = (e.get('path') or '').split('/')[1] if '/' in (e.get('path') or '') else ''
+                fill = palette.get(top, '#8a8fa3')
+                parts.append(
+                    f'<rect x="{b["xMin"]/20:.1f}" y="{b["yMin"]/20:.1f}" '
+                    f'width="{(b["xMax"]-b["xMin"])/20:.1f}" height="{(b["yMax"]-b["yMin"])/20:.1f}" '
+                    f'fill="{fill}" fill-opacity=".55" stroke="{fill}" stroke-width="1"/>')
+            parts.append('</svg>')
+            Path(args.svg).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.svg).write_text('\n'.join(parts), encoding='utf-8')
+            print(json.dumps({'svg': args.svg, 'objects': len(boxes),
+                              'viewBoxPx': [round(x0), round(y0), round(x1 - x0), round(y1 - y0)]}))
     text = json.dumps(report, ensure_ascii=False, indent=2)
     if args.output:
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)
