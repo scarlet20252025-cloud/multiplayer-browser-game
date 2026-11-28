@@ -97,23 +97,10 @@ def signed(bits, n):
     return value
 
 
-def parse_shape(data, offset, shape_type):
-    """返回 (轮廓列表, shapeId, bounds, 消耗字节数)。轮廓是 twips 坐标的点串。"""
-    has_alpha = shape_type in (32, 83)
-    shape_id, cursor = _u16(data, offset)
-    bounds, used = read_rect(data, cursor)
-    cursor += used
-    if shape_type == 83:
-        _, used = read_rect(data, cursor)  # edgeBounds
-        cursor += used
-        cursor += 1  # reserved/usesFillWindingRule 等
-    fills, cursor = read_fill_styles(data, cursor, has_alpha)
-    cursor = read_line_styles(data, cursor, has_alpha)
-    base = cursor
+def _parse_records(data, base, num_fill_bits, num_line_bits, skip_bits):
     bits = Bits(data[base:])
-    num_fill_bits = bits.read(4)
-    num_line_bits = bits.read(4)
-
+    if skip_bits:
+        bits.read(skip_bits)
     contours = []
     current = None
     fill0 = fill1 = 0
@@ -135,54 +122,44 @@ def parse_shape(data, offset, shape_type):
     guard = 0
     while True:
         guard += 1
-        if guard > 200000:
-            raise ValueError('shape record loop guard')
+        if guard > 100000:
+            return None
+        if (bits.pos >> 3) >= len(data) - base:
+            return None
         is_edge = bits.read(1)
         if is_edge == 0:
             flags = bits.read(5)
-            new_styles = bool(flags & 0x10)
-            line_style = bool(flags & 0x08)
-            fill_style1 = bool(flags & 0x04)
-            fill_style0 = bool(flags & 0x02)
-            move_to = bool(flags & 0x01)
             if flags == 0:
-                break  # EndShapeRecord
-            if move_to:
-                nbits = bits.read(5)
-                x = signed(bits, nbits)
-                y = signed(bits, nbits)
                 flush()
-                pen = (x, y)
+                return contours, bits.pos
+            if flags & 0x10:          # NewStyles：本实现到此收尾
+                flush()
+                return contours, bits.pos
+            if flags & 0x01:
+                nbits = bits.read(5)
+                if nbits == 0 or nbits > 20:
+                    return None
+                pen = (signed(bits, nbits), signed(bits, nbits))
+                flush()
                 subpath_start = pen
-            if fill_style0:
-                fill0 = bits.read(num_fill_bits) if num_fill_bits else 0
-            if fill_style1:
-                fill1 = bits.read(num_fill_bits) if num_fill_bits else 0
-            if line_style:
-                if num_line_bits:
-                    bits.read(num_line_bits)
-            if new_styles:
-                # 新样式表需要重读 fill/line 数组，SWF 里对不齐就会把后续字节当样式。
-                # 碰撞只需要主体轮廓：遇到 NewStyles 就收尾，保存已解析的轮廓。
-                break
+            if flags & 0x02 and num_fill_bits:
+                fill0 = bits.read(num_fill_bits)
+            if flags & 0x04 and num_fill_bits:
+                fill1 = bits.read(num_fill_bits)
+            if flags & 0x08 and num_line_bits:
+                bits.read(num_line_bits)
             continue
-
         straight = bits.read(1)
         num_bits = bits.read(4)
+        if num_bits == 0:
+            return None
         if straight:
-            general = bits.read(1)
-            if general:
-                dx = signed(bits, num_bits)
-                dy = signed(bits, num_bits)
+            if bits.read(1):
+                pen = (pen[0] + signed(bits, num_bits), pen[1] + signed(bits, num_bits))
+            elif bits.read(1):
+                pen = (pen[0], pen[1] + signed(bits, num_bits))
             else:
-                vertical = bits.read(1)
-                if vertical:
-                    dx = 0
-                    dy = signed(bits, num_bits)
-                else:
-                    dx = signed(bits, num_bits)
-                    dy = 0
-            pen = (pen[0] + dx, pen[1] + dy)
+                pen = (pen[0] + signed(bits, num_bits), pen[1])
             add_point(pen)
         else:
             cx = pen[0] + signed(bits, num_bits)
@@ -192,12 +169,47 @@ def parse_shape(data, offset, shape_type):
             x0, y0 = pen
             for step in range(1, CURVE_SEGMENTS + 1):
                 t = step / CURVE_SEGMENTS
-                x = (1 - t) ** 2 * x0 + 2 * (1 - t) * t * cx + t * t * ax
-                y = (1 - t) ** 2 * y0 + 2 * (1 - t) * t * cy + t * t * ay
-                add_point((round(x, 1), round(y, 1)))
+                add_point((round((1 - t) ** 2 * x0 + 2 * (1 - t) * t * cx + t * t * ax, 1),
+                           round((1 - t) ** 2 * y0 + 2 * (1 - t) * t * cy + t * t * ay, 1)))
             pen = (ax, ay)
-    flush()
-    return contours, shape_id, bounds, base + bits.byte_pos
+
+
+def parse_shape(data, offset, shape_type):
+    """返回 (轮廓列表, shapeId, bounds, 记录区版本)。读不到时抛 ValueError。
+
+    样式表之后可能还有几位的填充位（不同导出器不一致），这里对 0..7 bit
+    逐个尝试，选第一个能走到 EndShapeRecord、且轮廓面积合理的结果。
+    """
+    has_alpha = shape_type in (32, 83)
+    shape_id, cursor = _u16(data, offset)
+    bounds, used = read_rect(data, cursor)
+    cursor += used
+    if shape_type == 83:
+        _, used = read_rect(data, cursor)
+        cursor += used
+        cursor += 1
+    fills, cursor = read_fill_styles(data, cursor, has_alpha)
+    cursor = read_line_styles(data, cursor, has_alpha)
+    head = Bits(data[cursor:])
+    num_fill_bits = head.read(4)
+    num_line_bits = head.read(4)
+    base = cursor + 1
+    best = None
+    for skip in range(8):
+        try:
+            result = _parse_records(data, base, num_fill_bits, num_line_bits, skip)
+        except Exception:
+            continue
+        if not result:
+            continue
+        contours, end_pos = result
+        area = sum(polygon_area(c['points']) for c in contours)
+        score = (end_pos, area)
+        if best is None or score > best[0]:
+            best = (score, contours, skip)
+    if best is None:
+        raise ValueError('no record offset produced a terminating parse')
+    return best[1], shape_id, bounds, best[2]
 
 
 def polygon_area(points):
