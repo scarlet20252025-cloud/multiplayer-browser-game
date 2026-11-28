@@ -1,13 +1,22 @@
 /**
- * 共用的游戏加载遮罩。
+ * 共用的游戏加载遮罩：缤纷嘉年华星星组件（public/loader/）的薄包装。
  *
- * 改之前先读这四条约定：
- * - **百分比只能向前**。有真实字节时按字节算；没有字节时按阶段预算推进，
- *   不允许出现「卡在 40% 不动」。
- * - **数字要动画**。目标值变了不直接跳，用 rAF 在 420ms 内追上去，看起来像在数数。
- * - **等待别人不是加载**。`waiting` / `recover` 固定 100%，文案改成等待。
- * - **错误可重试**。`error` 阶段隐藏进度条，露出重试与返回。
+ * 对外 API 与旧的数值进度条一致，调用方（client.mjs）的状态机不用改：
+ * - `show(progress)` 收阶段 + 文案 + 可选字节数；
+ * - `reset()` 重新从 0 开始数；
+ * - `hide()` 收起遮罩。
+ *
+ * 三条约定，改之前先读：
+ * - **百分比只能向前**。有真实字节时按字节算；没有字节时按阶段预算推进。
+ * - **等待别人不是加载**。`waiting` / `ready` / `recover` 固定 100%，文案改成等待。
+ * - **错误可重试**。`error` 停在当前进度，露出重试与返回。
  */
+import {createCarnivalLoader} from '../loader/carnival-loader.mjs';
+
+const PHASE_STAGE = {
+  connect: 'download', cache: 'download', download: 'download',
+  verify: 'verify', initialize: 'initialize',
+};
 
 function formatBytes(bytes) {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -15,65 +24,32 @@ function formatBytes(bytes) {
   return `${bytes} B`;
 }
 
-// 进入某阶段时至少到的百分比，保证单调向前。
-const PHASE_BASE = {
-  connect: 4,
-  cache: 10,
-  download: 12,
-  verify: 72,
-  initialize: 80,
-  ready: 96,
-  waiting: 100,
-};
-
-const DOWNLOAD_SPAN = 58; // 下载占 12% → 70%
-const TWEEN_MS = 420;
-const easeOut = t => 1 - (1 - t) ** 3;
-
 export function mountGameLoader(container, {backUrl, onBack} = {}) {
-  const overlay = container.ownerDocument.createElement('div');
+  const overlay = document.createElement('div');
   overlay.className = 'game-loader';
   overlay.hidden = true;
-  overlay.innerHTML = `
-    <div class="game-loader__card">
-      <div class="game-loader__status" role="status" aria-atomic="true">
-        <h2 class="game-loader__title"></h2>
-        <p class="game-loader__detail" hidden></p>
-      </div>
-      <div class="game-loader__progress">
-        <div class="game-loader__readout">
-          <span class="game-loader__percent" aria-hidden="true"><span class="game-loader__digits">0</span><span class="game-loader__unit">%</span></span>
-          <span class="game-loader__amount" aria-hidden="true" hidden></span>
-        </div>
-        <div class="game-loader__track" role="progressbar" aria-label="加载进度"
-             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%">
-          <span class="game-loader__fill"></span>
-        </div>
-      </div>
-      <div class="game-loader__actions" hidden>
-        <button class="game-loader__retry" type="button" hidden>重试加载</button>
-        <a class="game-loader__back" hidden>返回房间</a>
-      </div>
-    </div>`;
-  const title = overlay.querySelector('.game-loader__title');
-  const detail = overlay.querySelector('.game-loader__detail');
-  const progress = overlay.querySelector('.game-loader__progress');
-  const track = overlay.querySelector('.game-loader__track');
-  const fill = overlay.querySelector('.game-loader__fill');
-  const amount = overlay.querySelector('.game-loader__amount');
-  const actions = overlay.querySelector('.game-loader__actions');
-  const retryButton = overlay.querySelector('.game-loader__retry');
-  const backLink = overlay.querySelector('.game-loader__back');
-  const digits = overlay.querySelector('.game-loader__digits'); // 单独节点，别依赖 firstChild
-  let retryLoad;
-  let shown = 0;   // 当前显示的百分比
-  let target = 0;  // 目标百分比（只增不减）
-  let frameHandle = 0;
-  let tweenStart = 0;
-  let tweenFrom = 0;
-  let resetPending = false; // 上次以错误收尾：下次非终态展示从 0 重新开始
+  container.classList.add('game-loader-host');
+  container.append(overlay);
 
+  const actions = document.createElement('div');
+  actions.className = 'game-loader__actions';
+  actions.hidden = true;
+  const retryButton = document.createElement('button');
+  retryButton.type = 'button';
+  retryButton.className = 'game-loader__retry';
+  retryButton.textContent = '重试加载';
+  retryButton.hidden = true;
+  const backLink = document.createElement('a');
+  backLink.className = 'game-loader__back';
+  backLink.textContent = '返回房间';
+  backLink.hidden = true;
   if (backUrl) backLink.href = backUrl;
+  actions.append(retryButton, backLink);
+
+  let loader = null;
+  let pending = null;
+  let retryLoad;
+
   if (onBack) {
     if (!backUrl) backLink.href = '#';
     backLink.addEventListener('click', (event) => {
@@ -85,102 +61,59 @@ export function mountGameLoader(container, {backUrl, onBack} = {}) {
     retryButton.disabled = true;
     retryLoad?.();
   });
-  container.classList.add('game-loader-host');
-  container.append(overlay);
 
-  function paint(value) {
-    shown = value;
-    const rounded = Math.round(value);
-    digits.textContent = String(rounded);
-    fill.style.width = `${value}%`;
-    track.setAttribute('aria-valuenow', String(rounded));
-    track.setAttribute('aria-valuetext', `${rounded}%`);
-  }
+  createCarnivalLoader(overlay, {layout: 'inline', compact: true}).then((instance) => {
+    loader = instance;
+    // 重试/返回按钮放进卡片里，跟着组件一起居中和换肤。
+    instance.slot.append(actions);
+    if (pending) emit(pending);
+  });
 
-  function animateTo(next) {
-    // 只对「旧 target」取 max：一次补间还没跑完时传入更小的值不能把数字拉回去。
-    const clamped = Math.min(100, Math.max(0, next));
-    if (clamped <= target) return;
-    target = clamped;
-    if (frameHandle) return; // 正在追，step 会读到新的 target
-    tweenFrom = shown;
-    tweenStart = performance.now();
-    const step = (now) => {
-      const t = Math.min(1, (now - tweenStart) / TWEEN_MS);
-      paint(tweenFrom + (target - tweenFrom) * easeOut(t));
-      if (t < 1) frameHandle = requestAnimationFrame(step);
-      else frameHandle = 0;
-    };
-    frameHandle = requestAnimationFrame(step);
-  }
+  function emit(progress) {
+    const terminal = progress.phase === 'error' || progress.phase === 'ended' || progress.phase === 'result';
+    const stage = PHASE_STAGE[progress.phase] ?? 'initialize';
+    const hasLoaded = Number.isFinite(progress.loaded) && progress.loaded >= 0;
+    const hasTotal = hasLoaded && Number.isFinite(progress.total) && progress.total > 0;
+    const bytes = hasTotal ? `${formatBytes(progress.loaded)} / ${formatBytes(progress.total)}`
+      : hasLoaded ? `已接收 ${formatBytes(progress.loaded)}` : '';
 
-  /** 没有真实字节时，用阶段预算估一个百分比。 */
-  function estimate({phase, loaded, total}) {
-    if (Number.isFinite(loaded) && Number.isFinite(total) && total > 0) {
-      const fraction = Math.min(1, Math.max(0, loaded / total));
-      if (phase === 'download') return 10 + DOWNLOAD_SPAN * fraction;
-      return Math.max(PHASE_BASE[phase] ?? 0, 100 * fraction);
+    overlay.dataset.phase = progress.phase;
+    if (progress.phase === 'error') {
+      loader.show({phase: 'error', stage, title: progress.title, detail: progress.detail ?? ''});
+    } else if (progress.phase === 'ended' || progress.phase === 'result') {
+      loader.show({phase: 'done', stage: 'initialize', title: progress.title, detail: progress.detail ?? ''});
+    } else if (progress.phase === 'waiting' || progress.phase === 'ready' || progress.phase === 'recover') {
+      loader.show({phase: 'waiting', stage: 'initialize', title: progress.title, detail: progress.detail ?? '', percent: 100});
+    } else {
+      loader.show({
+        phase: 'running', stage, title: progress.title, detail: progress.detail ?? '',
+        percent: Number.isFinite(progress.percent) ? progress.percent : null,
+        loaded: hasTotal ? progress.loaded : undefined,
+        total: hasTotal ? progress.total : undefined,
+        bytes,
+      });
     }
-    // 已确定在下载、但还没拿到第一个字节：给个小起步，别停在 12%。
-    if (phase === 'download') return 16;
-    return PHASE_BASE[phase] ?? 0;
+
+    retryLoad = typeof progress.retry === 'function' ? progress.retry : undefined;
+    retryButton.hidden = !retryLoad;
+    retryButton.textContent = progress.retryLabel ?? '重试加载';
+    retryButton.disabled = false;
+    backLink.hidden = !terminal || !(backUrl || onBack);
+    actions.hidden = retryButton.hidden && backLink.hidden;
   }
 
   return {
-    /**
-     * @param {{phase:string,title:string,detail?:string,loaded?:number,total?:number,percent?:number,
-     *   retry?:Function,retryLabel?:string}} progress
-     */
-    show({phase, title: heading, detail: description = '', loaded, total, percent, retry, retryLabel = '重试加载'}) {
-      const terminal = phase === 'error' || phase === 'ended' || phase === 'result';
-      const hasLoaded = Number.isFinite(loaded) && loaded >= 0;
-      const hasTotal = hasLoaded && Number.isFinite(total) && total > 0;
-      retryLoad = typeof retry === 'function' ? retry : undefined;
-      overlay.dataset.phase = phase;
+    show(progress) {
       overlay.hidden = false;
-      if (terminal) resetPending = true;
-      if (title.textContent !== heading) title.textContent = heading;
-      if (detail.textContent !== description) detail.textContent = description;
-      detail.hidden = !description;
-      progress.hidden = terminal;
-      if (!terminal) {
-        // 上次是错误收尾：这次重新加载，从 0 开始重新数，而不是停在 100%。
-        if (resetPending) {
-          if (frameHandle) { cancelAnimationFrame(frameHandle); frameHandle = 0; }
-          shown = target = 0;
-          paint(0);
-          resetPending = false;
-        }
-        // 重连不是重新加载：保持当前百分比，只换文案。
-        if (phase !== 'recover')
-          animateTo(Number.isFinite(percent) ? percent : estimate({phase, loaded, total}));
-        fill.classList.toggle('is-waiting', phase === 'waiting' || phase === 'recover');
-        if (hasTotal) amount.textContent = `${formatBytes(loaded)} / ${formatBytes(total)}`;
-        else if (hasLoaded) amount.textContent = `已接收 ${formatBytes(loaded)}`;
-        else amount.textContent = '';
-        amount.hidden = !amount.textContent;
-      }
-      retryButton.hidden = !retryLoad;
-      retryButton.textContent = retryLabel;
-      retryButton.disabled = false;
-      backLink.hidden = !terminal || !(backUrl || onBack);
-      actions.hidden = retryButton.hidden && backLink.hidden;
+      pending = progress;
+      if (loader) emit(progress);
     },
-
     hide() {
       overlay.hidden = true;
-      if (frameHandle) { cancelAnimationFrame(frameHandle); frameHandle = 0; }
-      // 保留 shown/target：对局中掉线走 recover 时应该显示「100% 正在重连」，
-      // 而不是从 0 重新爬。下一次 show() 会按需继续推进。
-      retryLoad = undefined;
+      loader?.hide();
     },
-
-    /** 重新开始一次完整加载（首次进入、再开一局、点重试）：数字归零重新数。 */
     reset() {
-      if (frameHandle) { cancelAnimationFrame(frameHandle); frameHandle = 0; }
-      shown = target = 0;
-      resetPending = false;
-      paint(0);
+      loader?.reset();
     },
   };
 }

@@ -17,8 +17,11 @@ export const DEFAULT_ADAPTER = 'fireboy-html5';
 export const FLASH_MIRROR_ADAPTER = 'flash-mirror';
 export const TANK_COLYSEUS_ADAPTER = 'tank-trouble-colyseus';
 export const LOCKSTEP_ADAPTER = 'frame-lockstep';
+export const SHANYI_NATIVE_RUNTIME = 'shanyi-native';
+export const SHANYI_NATIVE_ADAPTER = 'shanyi-native';
 export const SUPPORTED_ADAPTERS = Object.freeze([
   DEFAULT_ADAPTER, FLASH_MIRROR_ADAPTER, TANK_COLYSEUS_ADAPTER, LOCKSTEP_ADAPTER, ARENA_RUNTIME, BRAWL_RUNTIME,
+  SHANYI_NATIVE_ADAPTER,
 ]);
 
 const arenaPolicy = Object.freeze({
@@ -43,6 +46,14 @@ export const RUNTIME_POLICY = Object.freeze({
     online: true,
     requiredCapabilities: Object.freeze(['authority', 'levelVote', 'restartVote', 'returnVote']),
     optionalCapabilities: Object.freeze(['save']),
+  }),
+  // 原生还原的闪翼：服务端跑固定步长模拟，客户端只发输入收状态。
+  [SHANYI_NATIVE_RUNTIME]: Object.freeze({
+    label: '闪翼双星 / 原生',
+    online: true,
+    requiredCapabilities: Object.freeze(['authority', 'levelVote', 'returnVote']),
+    optionalCapabilities: Object.freeze(['save']),
+    experimental: true,
   }),
   [ARENA_RUNTIME]: arenaPolicy,
   [BRAWL_RUNTIME]: arenaPolicy,

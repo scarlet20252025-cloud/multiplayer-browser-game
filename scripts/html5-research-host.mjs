@@ -37,6 +37,9 @@ const LOBBY_ART = new Set([
   ...['Rooftop','Mogadishu','B52','Space'].map(id => 'art/glorton/maps/'+id+'.png'),
 ]);
 const LOCKSTEP_FILES = new Set(['client.mjs','protocol.mjs','loading.mjs','loading.css']);
+// 星星加载组件：loader.js/css 是 vendored 的生产文件，asset 只有一张图集。
+const LOADER_FILES = new Set(['loader.js','loader.css','carnival-loader.mjs','carnival-loader.css']);
+const LOADER_ASSETS = new Set(['star-atlas.webp']);
 const INSTANCE_ANCHOR = '(o = new h.Game(m)),';
 const INSTANCE_EXPOSURE = '(o = window.__game = new h.Game(m)),';
 const VIEWPORT_WIDTH_READ = 'window.innerWidth || $(window).width()';
@@ -424,6 +427,7 @@ function lockstepPage({id: gameId, title, bridgeUrl}, lobbyWsUrl) {
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${safeTitle} · 联机对战</title>
 <link rel="stylesheet" href="/__lockstep__/loading.css">
+<link rel="stylesheet" href="/loader/loader.css">
 <style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(155deg,#b9e8ff,#e0f0ff 43%,#eee5ff);color:#20215c;font:16px system-ui,sans-serif}
 main{width:min(1500px,100%);margin:auto;padding:clamp(12px,2.5vw,32px)}
@@ -789,6 +793,20 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
           if(!LOCKSTEP_FILES.has(name))return reply(404,'text/plain; charset=utf-8','Not Found');
           return reply(200,name.endsWith('.css')?TYPES['.css']:TYPES['.js'],
             await readContainedFile(REPO_ROOT,'public/lockstep/'+name));
+        }
+        // 星星加载组件：静态文件在 public/loader/，由各游戏页面自己引入。
+        // 同时接受 /loader/ 与 /__loader__/，前者是页面里用的正式路径。
+        if(pathname.startsWith('/__loader__/')||pathname.startsWith('/loader/')){
+          const name=pathname.slice(pathname.startsWith('/__loader__/')?'/__loader__/'.length:'/loader/'.length);
+          if(name.startsWith('assets/')){
+            const asset=name.slice('assets/'.length);
+            if(!LOADER_ASSETS.has(asset))return reply(404,'text/plain; charset=utf-8','Not Found');
+            return reply(200,TYPES[path.extname(asset)],await readContainedFile(REPO_ROOT,'public/loader/assets/'+asset),
+              {'cache-control':'public, max-age=86400'});
+          }
+          if(!LOADER_FILES.has(name))return reply(404,'text/plain; charset=utf-8','Not Found');
+          const type=name.endsWith('.css')?TYPES['.css']:TYPES['.js'];
+          return reply(200,type,await readContainedFile(REPO_ROOT,'public/loader/'+name));
         }
       } else if (pathname === entryPath || (entryPath === '/' && pathname === '/index.html')) {
         return reply(200, 'text/html; charset=utf-8', authoredPage(primary.script, primary.requireScript,

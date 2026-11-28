@@ -24,3 +24,9 @@
 
 - `public/shanyi-native/index.html` + `client.mjs`：canvas 渲染地形条带/箱子/两个角色，P1 WASD、P2 方向键，相机跟随 P1。
 - Playwright 实测：加载 86 个碰撞体，P1 落地 `onGround=true`，按 D 后 x 从 -118 → 69.8，无页面异常；截图确认地形、箱子、两名角色都在画面内。
+
+### 2026-11-28 原生权威房
+
+- `server/shanyi-native-room.mjs`：60Hz 服务端模拟，`/ws?seat=` 两席，`/health` 汇报 tick 与席位。
+- 测试 `tests/shanyi-native-room.test.mjs`：两席入场、tick 推进、输入驱动位移、health，2 项通过。
+- `server/game-adapter.mjs` 注册 `shanyi-native` 运行时与 adapter；`config/games/shanyi-native.json` 清单通过目录校验（`listed:false`，大厅入口未接）。

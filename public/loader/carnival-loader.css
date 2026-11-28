@@ -1,0 +1,49 @@
+/* 适配层的遮罩与卡片定位；星星本体样式全部来自 loader.css。 */
+.cl-overlay {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: clamp(10px, 3vw, 26px);
+  background: radial-gradient(ellipse at top, #49317b, #20173e 68%);
+  box-sizing: border-box;
+}
+
+.cl-overlay[hidden] {
+  display: none;
+}
+
+/* 全屏遮罩：host 不是定位父级时也能盖住视口。 */
+.cl-overlay--fixed {
+  position: fixed;
+  z-index: 2147483000;
+}
+
+.cl-overlay--inline {
+  position: static;
+  inset: auto;
+  padding: 0;
+  background: none;
+  display: block;
+}
+
+.cl-slot {
+  width: min(100%, 430px);
+  padding: clamp(14px, 3vw, 24px);
+  border: 2px solid #fff;
+  border-radius: 24px;
+  background: linear-gradient(160deg, #fff, #f7f2ff);
+  box-shadow: 0 6px 0 #b7a6e6, 0 16px 40px #110a32a6;
+  box-sizing: border-box;
+}
+
+.cl-overlay--inline .cl-slot {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
