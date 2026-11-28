@@ -40,3 +40,8 @@
 
 - `shanyi-native-room` 的 `/health` 改为同时输出 authority 形状（`room.connected/bothReady/capacity`），大厅 `readSession` 可直接读取。
 - `room-lobby.mjs` 新增 `game.runtime==='shanyi-native'` 分支，用 `public/shanyi-native/level-1.json` 起房；相关大厅测试 10 项仍通过。
+
+### 2026-11-28 静态路由
+
+- `html5-research-host` 新增 `/shanyi-native/*` 与 `/adapters/shanyi-native/*` 白名单静态路由（后缀限 html/mjs/json/css/png）。
+- 实测观看端：`/shanyi-native/index.html`、`client.mjs`、`/adapters/shanyi-native/sim.mjs` 均返回 200（此前 404）。注意要打观看端端口，大厅端口只提供 API。

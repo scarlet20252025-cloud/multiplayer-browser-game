@@ -1,3 +1,4 @@
+import {DECOR,FLOAT_PIECES} from './decor.mjs';
 const cfg=window.__LOBBY_CONFIG__;
 if(typeof window.__LOBBY_BOOT_ATTEMPT__==='string'&&
     new URL(import.meta.url).searchParams.get('entry')!==window.__LOBBY_BOOT_ATTEMPT__)throw Error('大厅加载已重试');

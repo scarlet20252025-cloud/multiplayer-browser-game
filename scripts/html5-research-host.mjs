@@ -22,7 +22,7 @@ import {ORIGINAL_SWF_BYTES, ORIGINAL_SWF_PATH, ORIGINAL_SWF_SHA256} from '../exp
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODULE_NAMES = new Set(['pause-bridge.mjs', 'state-snapshot.mjs', 'jump-observer.mjs', 'jump-analysis.mjs', 'authority-input.mjs', 'spectator-projection.mjs', 'spectator-client.mjs']);
 const MODULE_PREFIX = 'adapters/fireboy-html5/';
-const LOBBY_FILES = new Set(['index.html','lobby.mjs','lobby.css','game-chat.mjs']);
+const LOBBY_FILES = new Set(['index.html','lobby.mjs','lobby.css','game-chat.mjs','decor.mjs']);
 const GLORTON_LOCAL_PREFIX='/glorton-local/';
 const GLORTON_LOCAL_FILES=new Set(['.html','.js','.mjs','.css','.json','.webmanifest','.wasm','.zip','.apk','.data','.png','.ico','.whl','.txt']);
 const LOBBY_COVERS = ['forest','light','ice','crystal','shanyi','tank-trouble','bvn33','platform-brawl','bomb-it-7','glorton'];
@@ -729,6 +729,21 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
         if (['/glorton-online/local-session.mjs','/glorton-online/local-hud.mjs','/glorton-online/frame-wire.mjs'].includes(pathname)) {
           return reply(200,'text/javascript; charset=utf-8',
             await readContainedFile(REPO_ROOT,'public'+pathname));
+        }
+        // 原生还原的游戏页没有脚本包，直接按静态目录提供；只放行白名单后缀。
+        if (pathname.startsWith('/shanyi-native/') || pathname.startsWith('/adapters/shanyi-native/')) {
+          const relative = pathname.startsWith('/adapters/')
+            ? pathname.slice(1)
+            : 'public' + pathname;
+          const ext = path.extname(relative);
+          if (!['.html', '.mjs', '.json', '.css', '.png'].includes(ext))
+            return reply(404, 'text/plain; charset=utf-8', 'Not Found');
+          try {
+            const bytes = await readContainedFile(REPO_ROOT, relative);
+            return reply(200, TYPES[ext] ?? 'application/octet-stream', bytes);
+          } catch {
+            return reply(404, 'text/plain; charset=utf-8', 'Not Found');
+          }
         }
         if (glortonLocalWebRoot && pathname.startsWith(GLORTON_LOCAL_PREFIX)) {
           const relative=pathname.slice(GLORTON_LOCAL_PREFIX.length)||'index.html';
