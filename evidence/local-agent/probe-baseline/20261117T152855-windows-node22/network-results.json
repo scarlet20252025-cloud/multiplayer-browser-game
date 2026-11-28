@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "recordedAt": "2026-11-17T07:28:55.902Z",
+  "scope": "Authored AS3 probe and local synthetic delays only; original games and real Internet networks are not validated",
+  "environment": {
+    "node": "v22.22.2",
+    "network": "loopback and application-level fixed delay relay"
+  },
+  "checks": [
+    {
+      "name": "real WebSocket inputs reach a real AS3 authority",
+      "status": "passed",
+      "detail": {
+        "room": "6BDB94",
+        "initialTick": 2
+      }
+    },
+    {
+      "name": "room capacity, build compatibility and resume ownership enforced",
+      "status": "passed",
+      "detail": {}
+    },
+    {
+      "name": "seat spoofing, client state replacement and stale input rejected",
+      "status": "passed",
+      "detail": {}
+    },
+    {
+      "name": "down and up in one tick survive WebSocket, Node buffer and AS3",
+      "status": "passed",
+      "detail": {
+        "timingAttempts": 1,
+        "tick": 7,
+        "pressedCount": 1,
+        "releasedCount": 1
+      }
+    },
+    {
+      "name": "silent client releases held keys after input timeout",
+      "status": "passed",
+      "detail": {
+        "configuredTimeoutMs": 600
+      }
+    },
+    {
+      "name": "loopback input-to-authoritative-ack measurement",
+      "status": "passed",
+      "detail": {
+        "count": 12,
+        "samplesMs": [
+          47.123,
+          45.201,
+          45.245,
+          45.684,
+          45.08,
+          45.769,
+          46.734,
+          47.818,
+          43.9,
+          45.431,
+          45.969,
+          45.494
+        ],
+        "p50Ms": 45.494,
+        "p95Ms": 47.818
+      }
+    },
+    {
+      "name": "disconnect pauses room and token resumes original seat",
+      "status": "passed",
+      "detail": {
+        "slot": 0,
+        "room": "6BDB94"
+      }
+    },
+    {
+      "name": "inputs and authoritative acknowledgements cross a 40 ms each-way delay relay",
+      "status": "passed",
+      "detail": {
+        "simulatedOneWayMs": 40,
+        "simulatedBaseRoundTripMs": 80,
+        "count": 12,
+        "samplesMs": [
+          138.144,
+          137.561,
+          137.842,
+          137.804,
+          138.383,
+          137.887,
+          135.968,
+          138.54,
+          136.532,
+          137.515,
+          136.603,
+          135.384
+        ],
+        "p50Ms": 137.561,
+        "p95Ms": 138.54,
+        "meaning": "Input send to acknowledged authoritative snapshot arrival; excludes browser render/paint; no packet loss or jitter model"
+      }
+    }
+  ],
+  "metrics": {
+    "createdRooms": 2,
+    "rejectedMessages": 5,
+    "staleInputs": 1,
+    "droppedSnapshots": 0,
+    "statePayloadBytes": 49480,
+    "stateMessages": 152,
+    "missedTickSlots": 0,
+    "inputMessages": 28,
+    "stepSamples": 76,
+    "stepP50Ms": 2.885,
+    "stepP95Ms": 5.382,
+    "activeRooms": 1,
+    "nodeRssBytes": 127971328
+  }
+}

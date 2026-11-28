@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "bleach-vs-naruto-research",
+  "title": "死神 vs 火影 · 研究登记",
+  "subtitle": "Flash 格斗 / 帧同步候选",
+  "runtime": "flash-native",
+  "online": false,
+  "blockers": [
+    "NO_COMPATIBLE_BROWSER_PACKAGE",
+    "AIR_RELEASE_REQUIRES_BROWSER_ADAPTATION",
+    "DETERMINISTIC_GAME_BRIDGE_UNVERIFIED"
+  ],
+  "evidence": [
+    "docs/NETPLAY_RESEARCH.md",
+    "docs/BVN_LOCKSTEP.md"
+  ],
+  "notes": "大厅已具备双人帧同步协议。原版可对战构建、确定性步进桥接及双方实机验收仍待完成。"
+}

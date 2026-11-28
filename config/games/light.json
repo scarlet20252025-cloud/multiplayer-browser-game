@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "light",
+  "title": "光明神庙",
+  "subtitle": "Fireboy & Watergirl in The Light Temple",
+  "runtime": "html5-phaser",
+  "adapter": "fireboy-html5",
+  "order": 2,
+  "seats": 2,
+  "online": true,
+  "capabilities": {
+    "authority": true,
+    "spectator": true,
+    "levelVote": true,
+    "restartVote": true,
+    "returnVote": true,
+    "save": true
+  },
+  "package": {
+    "dir": "2-light-temple",
+    "entry": "index.html",
+    "levels": "data/light/temple.json",
+    "templeId": "light",
+    "storagePrefix": "fb-light"
+  },
+  "evidence": [
+    "docs/HTML5_ROUTE_FINDINGS.md",
+    "docs/INPUT_AND_CLOCK_CONTRACT.md"
+  ],
+  "notes": "Verified in the loopback lobby with authority + frozen spectator clients."
+}

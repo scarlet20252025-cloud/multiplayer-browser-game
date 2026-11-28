@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "shanyi-native-research",
+  "title": "闪翼双星 · 原生运行研究",
+  "subtitle": "Adobe Flash Player projector baseline",
+  "runtime": "flash-native",
+  "online": false,
+  "blockers": [
+    "NO_BROWSER_RUNTIME",
+    "CHAINED_LOADBYTES"
+  ],
+  "evidence": [
+    "docs/SHANYI_SOURCE_AUDIT.md",
+    "docs/HTML5_ROUTE_FINDINGS.md"
+  ],
+  "notes": "Research-only record of the native projector baseline. The playable browser tier is the separate shanyi game (flash-ruffle + flash-mirror input relay), which uses a merged package built for the Ruffle nightly."
+}

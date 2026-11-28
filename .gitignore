@@ -15,3 +15,15 @@ test-results/
 *.rar
 *.har
 # The authored test SWF is intentionally included; original games are not.
+# Screenshot covers derived from third-party games are provisioned privately.
+public/lobby/art/covers/forest.webp
+public/lobby/art/covers/light.webp
+public/lobby/art/covers/ice.webp
+public/lobby/art/covers/crystal.webp
+public/lobby/art/covers/shanyi.webp
+public/lobby/art/covers/bvn33.webp
+# The hidden prototype's current cover has no verified publication source.
+public/lobby/art/covers/platform-brawl.webp
+# Covers derived from third-party games stay in the private deployment.
+public/lobby/art/covers/bomb-it-7.webp
+public/lobby/art/covers/glorton.webp

@@ -1,0 +1,431 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-17T15:30:52+08:00",
+  "testedCommit": "1d31780d6e64be65f9c18adaeef6f6a7536578ee",
+  "workingTreeDirty": true,
+  "workingTreeNote": "被测代码未改动；工作区差异仅为本次新增的报告、清单与证据目录。",
+  "environment": {
+    "os": "Windows 11",
+    "node": "v22.22.2",
+    "npm": "10.9.7",
+    "python": "3.13.14",
+    "playwright": "1.62.1",
+    "browser": "chromium-headless-shell 151.0.7922.34 (SwiftShader)",
+    "ruffle": "0.7.1 (package-lock.json)",
+    "bind": "127.0.0.1 only",
+    "harness": "scripts/original-game-host.mjs + scripts/verify-original-baseline.mjs（本次原创）"
+  },
+  "games": [
+    {
+      "gameId": "fireboy-1",
+      "baselinePlayable": false,
+      "netplayVerified": false,
+      "blockers": [
+        "AGdom.initDomain() 的发行站点绑定：loaderURL 不含 addictinggames.com / shockwave.com 时，getServer() 不执行，AGinitToolkit(CreatePreloader) 的回调永不触发，影片停在预加载帧。",
+        "未采用 hosts 伪造或改写绑定等绕行手段，因此记为 blocked 而非 passed。"
+      ],
+      "observation": "三个发行版本表现一致：Ruffle 加载成功、isPlaying=true、预加载圆弧持续旋转、无 AS3 异常、无 404；8–15 秒内始终未进入菜单。",
+      "runs": {
+        "addictinggames": {
+          "entry": "1-forest-temple_addictinggames.swf",
+          "fileSha256": "324063c8f1918242ff20e1a6eacd0b343ef65aaddd12f9dce16bc39f4e645d1c",
+          "runtime": {
+            "ruffle": "0.7.1",
+            "browser": "chromium-headless-shell 151.0.7922.34"
+          },
+          "loadStatus": "loaded",
+          "metadata": {
+            "width": 640,
+            "height": 520,
+            "frameRate": 25,
+            "backgroundColor": "#000000"
+          },
+          "checks": [
+            {
+              "name": "swf-loaded",
+              "status": "passed",
+              "detail": "Ruffle 报告加载完成，画面 640×520 @ 25fps",
+              "evidence": null
+            },
+            {
+              "name": "renderer-active",
+              "status": "failed",
+              "detail": "canvas 0 个，player 640×520，舞台 640×520",
+              "evidence": null
+            },
+            {
+              "name": "no-page-error",
+              "status": "passed",
+              "detail": "页面无未捕获异常",
+              "evidence": null
+            },
+            {
+              "name": "no-failed-request",
+              "status": "passed",
+              "detail": "无失败的资源请求",
+              "evidence": null
+            },
+            {
+              "name": "no-missing-asset",
+              "status": "passed",
+              "detail": "无 4xx/5xx 资源响应",
+              "evidence": null
+            }
+          ],
+          "errors": [],
+          "consoleWarnings": [],
+          "screenshots": [
+            {
+              "path": "local/screenshots/1-forest-temple_addictinggames/00-loaded.png",
+              "bytes": 13818,
+              "sha256": "8b80046e5bf487b50a4d37ad2dd238baae5d3c1a87c9372c74fef1bd0087cd3e"
+            }
+          ]
+        },
+        "kizi": {
+          "entry": "1-forest-temple_kizi.swf",
+          "fileSha256": "cfcd0eab530695844e15c463307d716cf7fde4c66631e7cb0667d87f0366e84d",
+          "runtime": {
+            "ruffle": "0.7.1",
+            "browser": "chromium-headless-shell 151.0.7922.34"
+          },
+          "loadStatus": "loaded",
+          "metadata": {
+            "width": 640,
+            "height": 480,
+            "frameRate": 25,
+            "backgroundColor": "#000000"
+          },
+          "checks": [
+            {
+              "name": "swf-loaded",
+              "status": "passed",
+              "detail": "Ruffle 报告加载完成，画面 640×480 @ 25fps",
+              "evidence": null
+            },
+            {
+              "name": "renderer-active",
+              "status": "failed",
+              "detail": "canvas 0 个，player 640×480，舞台 640×480",
+              "evidence": null
+            },
+            {
+              "name": "no-page-error",
+              "status": "passed",
+              "detail": "页面无未捕获异常",
+              "evidence": null
+            },
+            {
+              "name": "no-failed-request",
+              "status": "failed",
+              "detail": "1 个请求失败",
+              "evidence": null
+            },
+            {
+              "name": "no-missing-asset",
+              "status": "passed",
+              "detail": "无 4xx/5xx 资源响应",
+              "evidence": null
+            }
+          ],
+          "errors": [
+            {
+              "url": "http://oopla.com/api/ooplaAPI.swf",
+              "reason": "net::ERR_FAILED"
+            }
+          ],
+          "consoleWarnings": [
+            {
+              "type": "error",
+              "text": "Access to fetch at 'http://oopla.com/api/ooplaAPI.swf' from origin 'http://127.0.0.1:64575' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+            },
+            {
+              "type": "error",
+              "text": "Failed to load resource: net::ERR_FAILED"
+            }
+          ],
+          "screenshots": [
+            {
+              "path": "local/screenshots/1-forest-temple_kizi/00-loaded.png",
+              "bytes": 9972,
+              "sha256": "7b318aa3b015ed6c33983eea22b879a12963be755aba4a48de2b87250be581c8"
+            }
+          ]
+        },
+        "sikids": {
+          "entry": "1-forest-temple_sikids.swf",
+          "fileSha256": "c007c8ef959f037820eb91e8551f4e19deb89b7960e71c53faf14385f778cbe2",
+          "runtime": {
+            "ruffle": "0.7.1",
+            "browser": "chromium-headless-shell 151.0.7922.34"
+          },
+          "loadStatus": "loaded",
+          "metadata": {
+            "width": 640,
+            "height": 480,
+            "frameRate": 25,
+            "backgroundColor": "#000000"
+          },
+          "checks": [
+            {
+              "name": "swf-loaded",
+              "status": "passed",
+              "detail": "Ruffle 报告加载完成，画面 640×480 @ 25fps",
+              "evidence": null
+            },
+            {
+              "name": "renderer-active",
+              "status": "failed",
+              "detail": "canvas 0 个，player 640×480，舞台 640×480",
+              "evidence": null
+            },
+            {
+              "name": "no-page-error",
+              "status": "passed",
+              "detail": "页面无未捕获异常",
+              "evidence": null
+            },
+            {
+              "name": "no-failed-request",
+              "status": "passed",
+              "detail": "无失败的资源请求",
+              "evidence": null
+            },
+            {
+              "name": "no-missing-asset",
+              "status": "passed",
+              "detail": "无 4xx/5xx 资源响应",
+              "evidence": null
+            }
+          ],
+          "errors": [],
+          "consoleWarnings": [],
+          "screenshots": [
+            {
+              "path": "local/screenshots/1-forest-temple_sikids/00-loaded.png",
+              "bytes": 35916,
+              "sha256": "76d97576d7b97b5a66ea6eb318937b7a2ecc81c8a16c4746dd8497fd7c5a0639"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "gameId": "shanyi-core",
+      "baselinePlayable": false,
+      "netplayVerified": false,
+      "blockers": [
+        "外层壳请求 http://cdn.comment.4399pk.com/control/A4399dv_base.swf，被 CORS 拦截（net::ERR_FAILED）。",
+        "core_3（纯代码）与 core_4（纯资源）尚未合并，合并后能否独立运行未验证。"
+      ],
+      "observation": "shanyi-binary.swf 能被 Ruffle 解析并创建 WebGL 画布（800×600 @30fps），但平台模块请求失败；脱壳后的 core_3.swf 单独加载为纯白画面，符合「只有代码、没有资源」。",
+      "runs": {
+        "original": {
+          "entry": "shanyi-binary.swf",
+          "fileSha256": "cc23c8c09cfe86766ac7f8a1b2d18df5e9bc683da5645a3975713dfe7023c4ee",
+          "runtime": {
+            "ruffle": "0.7.1",
+            "browser": "chromium-headless-shell 151.0.7922.34"
+          },
+          "loadStatus": "loaded",
+          "metadata": {
+            "width": 800,
+            "height": 600,
+            "frameRate": 30,
+            "backgroundColor": null
+          },
+          "checks": [
+            {
+              "name": "swf-loaded",
+              "status": "passed",
+              "detail": "Ruffle 报告加载完成，画面 800×600 @ 30fps",
+              "evidence": null
+            },
+            {
+              "name": "renderer-active",
+              "status": "passed",
+              "detail": "canvas 1 个（800×600, WebGL），player 800×600",
+              "evidence": null
+            },
+            {
+              "name": "no-page-error",
+              "status": "passed",
+              "detail": "页面无未捕获异常",
+              "evidence": null
+            },
+            {
+              "name": "no-failed-request",
+              "status": "failed",
+              "detail": "1 个请求失败",
+              "evidence": null
+            },
+            {
+              "name": "no-missing-asset",
+              "status": "passed",
+              "detail": "无 4xx/5xx 资源响应",
+              "evidence": null
+            }
+          ],
+          "errors": [
+            {
+              "url": "http://cdn.comment.4399pk.com/control/A4399dv_base.swf",
+              "reason": "net::ERR_FAILED"
+            }
+          ],
+          "consoleWarnings": [
+            {
+              "type": "error",
+              "text": "Access to fetch at 'http://cdn.comment.4399pk.com/control/A4399dv_base.swf' from origin 'http://127.0.0.1:50402' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+            },
+            {
+              "type": "error",
+              "text": "Failed to load resource: net::ERR_FAILED"
+            }
+          ],
+          "screenshots": [
+            {
+              "path": "local/screenshots/shanyi-binary/00-loaded.png",
+              "bytes": 10239,
+              "sha256": "494f4d6094636370a18505b2fed604f741d25b9d90f1be5c69acb3d24e7e467e"
+            }
+          ]
+        },
+        "decryptedCore3Only": {
+          "entry": "decrypted/core_3.swf",
+          "fileSha256": "98d06167b9947dd16d01885f15f5ec3319c188f8c2ef75d1dc7d6dd9bbf13478",
+          "runtime": {
+            "ruffle": "0.7.1",
+            "browser": "chromium-headless-shell 151.0.7922.34"
+          },
+          "loadStatus": "loaded",
+          "metadata": {
+            "width": 800,
+            "height": 600,
+            "frameRate": 30,
+            "backgroundColor": "#FFFFFF"
+          },
+          "checks": [
+            {
+              "name": "swf-loaded",
+              "status": "passed",
+              "detail": "Ruffle 报告加载完成，画面 800×600 @ 30fps",
+              "evidence": null
+            },
+            {
+              "name": "renderer-active",
+              "status": "passed",
+              "detail": "canvas 1 个（800×600, WebGL），player 800×600",
+              "evidence": null
+            },
+            {
+              "name": "no-page-error",
+              "status": "passed",
+              "detail": "页面无未捕获异常",
+              "evidence": null
+            },
+            {
+              "name": "no-failed-request",
+              "status": "passed",
+              "detail": "无失败的资源请求",
+              "evidence": null
+            },
+            {
+              "name": "no-missing-asset",
+              "status": "passed",
+              "detail": "无 4xx/5xx 资源响应",
+              "evidence": null
+            }
+          ],
+          "errors": [],
+          "consoleWarnings": [],
+          "screenshots": [
+            {
+              "path": "local/screenshots/decrypted_core_3/00-loaded.png",
+              "bytes": 10158,
+              "sha256": "676ee8e77d89f648af276913cdb22ac1a43e51c0c943c157491dce013e19ef4b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "gameId": "shanyi-lightning",
+      "displayName": "闪翼双星之闪电行动（对照，非正传）",
+      "baselinePlayable": true,
+      "netplayVerified": false,
+      "purpose": "仅用于证明本地 Ruffle 0.7.1 与闪翼引擎链路可用；不能替代正传验收。",
+      "observation": "完整显示主菜单：标题「闪翼双星 之闪电行动 体验版」、开始游戏 / 更多游戏按钮、角色立绘、底部工具栏（主页 / 设置 / 帮助 / 音乐 / 奖杯 / 全屏）、版本号 0.001。",
+      "runs": {
+        "lightning": {
+          "entry": "extracted-C-lightning.swf",
+          "fileSha256": "122e365c025cfb4f8fd2defd736be86568efd6505c551f115340a5f37e3234a1",
+          "runtime": {
+            "ruffle": "0.7.1",
+            "browser": "chromium-headless-shell 151.0.7922.34"
+          },
+          "loadStatus": "loaded",
+          "metadata": {
+            "width": 800,
+            "height": 600,
+            "frameRate": 30,
+            "backgroundColor": "#000000"
+          },
+          "checks": [
+            {
+              "name": "swf-loaded",
+              "status": "passed",
+              "detail": "Ruffle 报告加载完成，画面 800×600 @ 30fps",
+              "evidence": null
+            },
+            {
+              "name": "renderer-active",
+              "status": "passed",
+              "detail": "canvas 1 个（800×600, WebGL），player 800×600",
+              "evidence": null
+            },
+            {
+              "name": "no-page-error",
+              "status": "passed",
+              "detail": "页面无未捕获异常",
+              "evidence": null
+            },
+            {
+              "name": "no-failed-request",
+              "status": "passed",
+              "detail": "无失败的资源请求",
+              "evidence": null
+            },
+            {
+              "name": "no-missing-asset",
+              "status": "passed",
+              "detail": "无 4xx/5xx 资源响应",
+              "evidence": null
+            }
+          ],
+          "errors": [],
+          "consoleWarnings": [],
+          "screenshots": [
+            {
+              "path": "local/screenshots/extracted-C-lightning/00-loaded.png",
+              "bytes": 620491,
+              "sha256": "d13967f2fa6c901c0cdfb6c8e7048d100bb9b4eba70213ca507e63db72e240b8"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "probeBaseline": {
+    "runId": "20261117T152855-windows-node22",
+    "path": "evidence/local-agent/probe-baseline/20261117T152855-windows-node22/",
+    "summary": "npm test exit 0；test:python 12/13（1 项 Windows 换行缺陷）；check:utf8 exit 0；test:network passed 8/8；test:e2e passed 13/13",
+    "note": "本次为本机复现，不是 GitHub Actions 重跑；未覆盖历史 CI 证据。"
+  },
+  "notCovered": [
+    "未修改原包的通关验证（0 关）",
+    "双角色独立控制（未进入关卡，无法测试）",
+    "原游戏输入桥与联机适配",
+    "音频验收",
+    "公网或异地网络条件"
+  ]
+}

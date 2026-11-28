@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "status": "blocked-by-runtime-environment",
+  "recordedAt": "2026-11-17T06:33:25.837Z",
+  "scope": "Authored AS3 probe only; original games have NOT been run",
+  "environment": {
+    "node": "v24.22.1",
+    "browser": null,
+    "network": "local loopback; not an Internet latency result"
+  },
+  "checks": [
+    {
+      "name": "failure",
+      "status": "failed",
+      "message": "browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝\n    at launchAuthorityBrowser (/workspace/scratch/0a3f00d4e215/multiplayer-browser-game/server/ruffle-authority.mjs:7:19)\n    at /workspace/scratch/0a3f00d4e215/multiplayer-browser-game/scripts/verify-e2e.mjs:14:17"
+    }
+  ],
+  "metrics": {
+    "createdRooms": 0,
+    "rejectedMessages": 0,
+    "staleInputs": 0,
+    "droppedSnapshots": 0,
+    "statePayloadBytes": 0,
+    "stateMessages": 0,
+    "missedTickSlots": 0,
+    "inputMessages": 0,
+    "stepSamples": 0,
+    "stepP50Ms": null,
+    "stepP95Ms": null,
+    "activeRooms": 0,
+    "nodeRssBytes": 120078336
+  },
+  "browserErrors": [],
+  "explanation": "The system Chromium could not create its process singleton socket (EPERM). The official Playwright headless-shell download was attempted but returned an invalid archive; this invocation therefore could not launch a browser. Separate GitHub Actions verification is configured."
+}

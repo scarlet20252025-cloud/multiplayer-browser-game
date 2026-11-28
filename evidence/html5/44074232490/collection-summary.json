@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "test": "actual-original-Box2D-diamond-sensor-collection-and-two-viewer-removal",
+  "sourceCommit": "723bc1610dede9120ad45d00c878ae8059f7870f",
+  "testedGameScriptSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "candidateNotUserUploadedBuild": true,
+  "runId": 44074232490,
+  "ciUrl": "https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44074232490",
+  "artifactId": 14323558664,
+  "artifactZipSha256": "d6d629b688a63c35362723b85b83090751b7aca2d69aa79081e8a433bf94b123",
+  "observations": {
+    "player": "fire",
+    "trigger": "normal-browser-ArrowRight-keyboard-through-WebSocket-and-Box2D",
+    "diamondPosition": {
+      "x": 656,
+      "y": 848
+    },
+    "diamondColor": "fb",
+    "gameplayDiamondCountBefore": 7,
+    "gameplayDiamondCountAfter": 6,
+    "fireDiamondCountBefore": 0,
+    "fireDiamondCountAfter": 1,
+    "viewerVisibleDiamonds": [
+      6,
+      6
+    ],
+    "movementTrace": [
+      {
+        "x": 227.47240655179664,
+        "y": 860.5440295995511
+      },
+      {
+        "x": 253.69822696779025,
+        "y": 860.560384
+      },
+      {
+        "x": 303.2221406092478,
+        "y": 860.6661639097904
+      },
+      {
+        "x": 377.7328496358506,
+        "y": 860.5493655980422
+      },
+      {
+        "x": 449.97383125438404,
+        "y": 860.5593701976712
+      },
+      {
+        "x": 511.1594410628496,
+        "y": 860.55448576
+      },
+      {
+        "x": 568.2148494988005,
+        "y": 860.55448576
+      },
+      {
+        "x": 642.3345068495594,
+        "y": 874.3655553033599
+      }
+    ],
+    "stepsWithClientPhysics": [
+      0,
+      0
+    ]
+  },
+  "browserChecksPassed": 12,
+  "diagnostics": {
+    "knownH5apiPageErrors": 6
+  },
+  "limitations": [
+    "Only a fixed third-party research candidate and one tutorial level; user-uploaded ZIP unverified by browser",
+    "Does not test rejoin after collection, collision on different maps, complete game state, or public release rights"
+  ]
+}

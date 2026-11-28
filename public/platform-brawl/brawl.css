@@ -1,0 +1,151 @@
+:root {
+  color-scheme: light;
+  --ink: #222349;
+  --muted: #645f81;
+  --line: #d9d5ec;
+  --purple: #663dbd;
+  --mint: #c6eddf;
+  font: 15px/1.45 "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+}
+* { box-sizing: border-box }
+body {
+  min-height: 100dvh;
+  margin: 0;
+  padding: 16px max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  color: var(--ink);
+  background: radial-gradient(ellipse at 6% 0%, #cbeaf4 0, #cbeaf400 44%), linear-gradient(160deg, #ebeffd, #f8eff8);
+}
+button, a { -webkit-tap-highlight-color: transparent }
+button { font: inherit; cursor: pointer }
+button:focus-visible, a:focus-visible { outline: 3px solid #5276c9; outline-offset: 3px }
+h1, h2, p { margin: 0 }
+.match { max-width: 1420px; margin-inline: auto }
+.masthead {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 62px; margin-bottom: 14px; padding: 9px 12px;
+  background: #ffffffee; border: 1px solid #fff; border-radius: 20px;
+  box-shadow: 0 3px 0 #dbd8ed, 0 8px 24px #43286712;
+}
+.brand { display: flex; align-items: center; gap: 9px; min-width: 0 }
+.brand > div:last-child { min-width: 0 }
+.brand-icon {
+  flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px;
+  background: #e6dffd; color: var(--purple);
+}
+.brand-icon svg { width: 32px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round }
+.brand-icon path:last-child { fill: #ffdd75 }
+.brand h1 { font-size: clamp(20px, 3vw, 32px); line-height: 1.06; font-weight: 900; white-space: nowrap }
+.brand p { margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px }
+.match-actions { flex: none; display: flex; gap: 6px }
+.match-actions button, .return-link, .retry {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 42px; padding: 7px 12px;
+  border: 1px solid #d6c8f6; border-radius: 11px; background: #f5efff;
+  color: #4e348e; text-decoration: none; font-weight: 750; white-space: nowrap;
+}
+.match-actions button:hover, .retry:hover { background: #ecdeff }
+.match-actions .return-link { background: #ffdc6d; color: #50331d; border-color: #f2bc4a; box-shadow: 0 2px 0 #ecbd58 }
+.match-actions .return-link:hover { background: #ffe78d }
+.game-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .28fr); align-items: start; gap: 13px }
+.play { display: grid; grid-column: 1; grid-row: 1; min-width: 0; gap: 7px }
+.play-meta {
+  display: flex; align-items: center; justify-content: space-between; gap: 9px;
+  min-width: 0; padding: 7px 12px; border: 1px solid #fff;
+  background: #ffffffec; border-radius: 12px; box-shadow: 0 2px 0 #d9d4ed;
+}
+.play-meta > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px }
+.round-number { color: var(--muted); font-size: 12px }
+.latency {
+  white-space: nowrap; padding: 3px 7px; color: #51437a; background: #f0ecfb;
+  border-radius: 7px; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums;
+}
+.latency.connected { color: #21554a; background: #dff1ed }
+.court {
+  position: relative; overflow: hidden; display: grid; place-items: center;
+  min-width: 0; border: 3px solid #fff; border-radius: 19px; background: #263450;
+  box-shadow: 0 3px 0 #ccc7e5, 0 7px 18px #3c2a4d28;
+}
+#field { display: block; width: 100%; height: auto; aspect-ratio: 960 / 550 }
+.overlay {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  padding: 9px; background: #28244758;
+}
+.overlay-card {
+  width: min(440px, 92%); padding: clamp(10px, 2.3vw, 22px); text-align: center;
+  color: #27244a; background: #fff9ed; border: 2px solid #fff; border-radius: 18px;
+  box-shadow: 0 4px 0 #eabf77, 0 8px 30px #1a203866;
+}
+.overlay-kicker { font-size: 12px; font-weight: 800; color: #69439f }
+.overlay-card h2 { margin: 2px 0; color: #2c2650; font-size: clamp(21px, 3.4vw, 38px); line-height: 1.15 }
+.overlay-card p { color: #564d67; font-size: clamp(11px, 1.5vw, 14px) }
+.retry { margin-top: 8px; min-height: 36px }
+.side { display: grid; grid-column: 2; grid-row: 1 / span 2; gap: 11px; min-width: 0 }
+.panel {
+  background: #fff; border: 1px solid #f5f0ff; border-radius: 17px;
+  padding: 13px 12px; box-shadow: 0 3px 0 #ded9ee, 0 7px 20px #3b2b5412;
+}
+.panel h2 { font-size: 17px; font-weight: 900 }
+.scores header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px }
+.scores header span {
+  flex: none; padding: 4px 7px; background: #f1ecfe; color: #6944aa; border-radius: 999px;
+  font-size: 11px; font-weight: 800;
+}
+#players { list-style: none; display: grid; gap: 5px; margin: 0; padding: 0 }
+.player {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; min-width: 0; align-items: center;
+  gap: 7px; padding: 5px 6px; border: 1px solid #ede9fb; border-radius: 9px; background: #f8f6ff;
+}
+.player.you { border-color: #b0d6da; background: #effcf7 }
+.player-badge {
+  display: grid; place-items: center; width: 27px; height: 27px; border-radius: 9px;
+  background: var(--seat-color); color: #29223b; font-size: 10px; font-weight: 900;
+}
+.player-note { display: block; min-width: 0 }
+.player-name { display: block; overflow: hidden; font-weight: 750; white-space: nowrap; text-overflow: ellipsis }
+.player-activity { display: block; color: var(--muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.player-score { font-size: 22px; font-weight: 900; line-height: 1; color: #4e3977; font-variant-numeric: tabular-nums }
+.player.offline .player-badge { opacity: .47 }
+.controls h2 { margin-bottom: 6px }
+.controls > div { display: flex; align-items: center; gap: 5px; margin: 5px 0; font-size: 13px }
+kbd { display: inline-grid; place-items: center; min-width: 25px; padding: 2px 4px; background: #f3edff; color: #443769; border: 1px solid #e8def8; border-radius: 5px; font: 800 12px system-ui,sans-serif }
+.controls p { border-top: 1px solid #ede9f7; padding-top: 9px; margin-top: 9px; color: var(--muted); font-size: 12px }
+.match-touch--brawl { grid-column: 1; grid-row: 2; margin-top: 2px }
+.play:fullscreen { background: #292446; display: flex; justify-content: center; align-items: center }
+.play:fullscreen .play-meta { display: none }
+.play:fullscreen .court { width: min(100vw, calc(100dvh * 960 / 550)); max-height: 100dvh; border: none; border-radius: 0 }
+
+@media (max-width: 800px) {
+  .game-grid { display: flex; flex-direction: column; gap: 9px }
+  .game-grid > * { width: 100% }
+  .side { gap: 8px }
+  #players { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+}
+@media (max-width: 520px) {
+  body { padding-top: 8px; padding-inline: max(7px, env(safe-area-inset-left)) max(7px, env(safe-area-inset-right)) }
+  .masthead { margin-bottom: 8px; border-radius: 14px; min-height: 51px; padding: 5px 6px }
+  .brand { gap: 5px }
+  .brand-icon { width: 31px; height: 31px }
+  .brand-icon svg { width: 25px }
+  .brand h1 { font-size: 19px }
+  .brand p { font-size: 10px }
+  .match-actions button, .return-link { padding-inline: 6px; font-size: 12px }
+  .play-meta { padding: 5px 8px }
+  .court { border-radius: 12px; border-width: 2px }
+}
+body:has(.match-touch--brawl:not([hidden])) :is(.controls h2, .controls > div, #fullscreen) { display: none }
+body:has(.match-touch--brawl:not([hidden])) .controls p { margin: 0; padding: 0; border: none }
+@media (orientation: landscape) and (max-height: 480px) {
+  body:has(.match-touch--brawl:not([hidden])) { padding-block: 5px }
+  body:has(.match-touch--brawl:not([hidden])) .masthead { min-height: 42px; padding: 4px 7px; margin-bottom: 6px }
+  body:has(.match-touch--brawl:not([hidden])) .brand-icon { width: 30px; height: 30px }
+  body:has(.match-touch--brawl:not([hidden])) .brand-icon svg { width: 24px }
+  body:has(.match-touch--brawl:not([hidden])) .brand h1 { font-size: 20px }
+  body:has(.match-touch--brawl:not([hidden])) .brand p { margin-top: 0; font-size: 10px }
+  body:has(.match-touch--brawl:not([hidden])) :is(.match-actions button, .return-link) { min-height: 33px; padding-block: 3px }
+  .game-grid:has(.match-touch--brawl:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 7px }
+  .game-grid:has(.match-touch--brawl:not([hidden])) > * { width: auto }
+  .game-grid:has(.match-touch--brawl:not([hidden])) .side { grid-column: 1 / -1; grid-row: 2 }
+  .game-grid:has(.match-touch--brawl:not([hidden])) .play-meta { padding-block: 4px }
+  .game-grid:has(.match-touch--brawl:not([hidden])) .court { width: min(100%, calc((100dvh - 112px) * 960 / 550)); margin-inline: auto }
+  .match-touch--brawl:not([hidden]) { grid-column: 2; grid-row: 1; flex-direction: column; align-self: center; padding-inline: 4px }
+}

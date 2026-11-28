@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "shanyi",
+  "title": "闪翼双星",
+  "subtitle": "Escape from the Lab · 实验性输入镜像",
+  "runtime": "flash-ruffle",
+  "adapter": "flash-mirror",
+  "order": 5,
+  "seats": 2,
+  "online": true,
+  "capabilities": {
+    "mirrorInput": true
+  },
+  "package": {
+    "dir": "shanyi",
+    "entry": "index.html",
+    "levels": "levels.json",
+    "templeId": "shanyi",
+    "storagePrefix": "shanyi",
+    "wrapper": "shanyi-host.swf",
+    "game": "core_4_abc.swf"
+  },
+  "evidence": [
+    "docs/SHANYI_SOURCE_AUDIT.md#8",
+    "docs/GAME_ADAPTER_CONTRACT.md"
+  ],
+  "notes": "Ruffle 夜间版运行 wrapper 载入的原包，页面通过 ExternalInterface 注入 WASD/方向键与菜单点击，双方各跑一份本地游戏、由回环中继同步输入，并交换各自英雄的位置/速度做对端纠偏。实验性：无服务器权威、无画面串流、暂不写存档；复杂交互与长时间漂移未验收。"
+}

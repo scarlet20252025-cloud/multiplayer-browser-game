@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "scope": "One real native HTML5 Box2D authority, two browser-rendered frozen spectators",
+  "result": "passed",
+  "ciRun": 44084005637,
+  "ciUrl": "https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44084005637",
+  "ciTestCommit": "8063a5c40e58f7ba4097c54dbfdb1f9d7ce7d6cf",
+  "ciArtifact": {
+    "id": 14329215199,
+    "zipSha256": "e65cbef94161d69cba4adb421a90d130387b3b3008cf908d744b4d10e7ca685f"
+  },
+  "gameScriptSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "userUploadedGameScriptSha256": "98666cf499473dfadb9b708af10ef2e5e13b50300881a32b7c8d65d7756a5700",
+  "level": {
+    "id": 52,
+    "file": "forest/levels/forest_04_1.json"
+  },
+  "realInput": {
+    "playerSlot": 1,
+    "keyboard": "KeyA",
+    "physicalContact": true,
+    "directObjectMutations": false
+  },
+  "buttonPlatform": {
+    "button": {
+      "originalState": 0,
+      "triggeredState": 1,
+      "baselineY": 160,
+      "triggeredY": 177.2208158430814
+    },
+    "platform": {
+      "baselineY": 912,
+      "observedTriggerY": 897.9200000000003,
+      "viewerY": [
+        892.8000000000004,
+        892.8000000000004
+      ]
+    }
+  },
+  "box": {
+    "baseline": {
+      "x": 1039.998370601732,
+      "y": 129.89859470523965
+    },
+    "authorityPhysicalPushSample": {
+      "x": 962.903579642434,
+      "y": 137.65275702119087,
+      "deltaX": -77.09479095929794
+    },
+    "viewerSnapshotAtLaterMoment": {
+      "x": [
+        979.8473211543981,
+        979.8473211543981
+      ]
+    },
+    "validation": "Each frozen viewer matched its own received authority snapshot; the earlier authority sample and later viewer frame are not timestamp-identical"
+  },
+  "viewerBox2dSteps": [
+    0,
+    0
+  ],
+  "passedChecks": [
+    "two-frozen-native-viewers",
+    "button-state-observed-on-both-viewers",
+    "linked-platform-rendered-on-both-viewers",
+    "local-physics-stays-frozen",
+    "real-dynamic-box-moved-and-rendered-on-both-viewers"
+  ],
+  "browserExceptions": {
+    "knownPlatformProgressCallback": "h5api is not defined",
+    "observedCount": 6
+  },
+  "remaining": [
+    "Does not demonstrate every box in every level is pushable",
+    "No complete level victory/death/restart test",
+    "No browser baseline for user-uploaded HTML5 ZIP",
+    "No public deployment authorization",
+    "No internet latency test for native viewer rendering"
+  ]
+}

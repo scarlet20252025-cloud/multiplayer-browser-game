@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>闪翼双星 · 原生</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0f14;color:#e8eef5;font:14px/1.5 "Microsoft YaHei UI",system-ui,sans-serif}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  canvas{max-width:100%;max-height:100%;background:#121a24;image-rendering:pixelated}
+  #hud{position:fixed;left:12px;top:10px;font-size:12px;color:#9fb0c3;letter-spacing:.02em}
+  #hud b{color:#e8eef5}
+</style>
+</head>
+<body>
+<div id="hud"><b>闪翼双星 · 原生模拟</b> · P1 WASD · P2 方向键 · 重力/跳跃/二段跳/推箱</div>
+<div id="wrap"><canvas id="stage" width="960" height="600"></canvas></div>
+<script type="module" src="./client.mjs"></script>
+</body>
+</html>

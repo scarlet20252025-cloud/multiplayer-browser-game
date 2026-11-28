@@ -1,0 +1,184 @@
+{
+  "scope": "Native P behavior and adapted request/authoritative-apply interface; no production room transport",
+  "native": {
+    "before": {
+      "gamePaused": false,
+      "physicsPaused": false,
+      "physicsSteps": 280,
+      "water": {
+        "x": 96,
+        "y": 732.5440245090822
+      },
+      "clockSeconds": 6
+    },
+    "afterPress": {
+      "gamePaused": true,
+      "physicsPaused": false,
+      "physicsSteps": 285,
+      "water": {
+        "x": 96,
+        "y": 732.5440245090822
+      },
+      "clockSeconds": 6
+    },
+    "afterWait": {
+      "gamePaused": true,
+      "physicsPaused": false,
+      "physicsSteps": 285,
+      "water": {
+        "x": 96,
+        "y": 732.5440245090822
+      },
+      "clockSeconds": 6
+    },
+    "afterResume": {
+      "gamePaused": false,
+      "physicsPaused": false,
+      "physicsSteps": 300,
+      "water": {
+        "x": 96,
+        "y": 732.5440245090822
+      },
+      "clockSeconds": 6
+    }
+  },
+  "adapted": {
+    "before": {
+      "gamePaused": false,
+      "physicsPaused": false,
+      "physicsSteps": 315,
+      "water": {
+        "x": 96,
+        "y": 732.5440245090822
+      },
+      "clockSeconds": 6
+    },
+    "requestOnly": {
+      "requests": [
+        {
+          "type": "room-command",
+          "command": "pause.set",
+          "roomEpoch": "research-room-1",
+          "commandId": "research-page-1:1",
+          "sequence": 1,
+          "baseRevision": 0,
+          "desiredPaused": true
+        }
+      ],
+      "inspect": {
+        "installed": true,
+        "roomEpoch": "research-room-1",
+        "revision": 0,
+        "confirmedPaused": false,
+        "localGamePaused": false,
+        "localPhysicsPaused": false,
+        "pendingCommand": {
+          "type": "room-command",
+          "command": "pause.set",
+          "roomEpoch": "research-room-1",
+          "commandId": "research-page-1:1",
+          "sequence": 1,
+          "baseRevision": 0,
+          "desiredPaused": true
+        },
+        "lastTransportError": null
+      },
+      "sentinelCalls": 1
+    },
+    "afterRequest": {
+      "gamePaused": false,
+      "physicsPaused": false,
+      "physicsSteps": 340,
+      "water": {
+        "x": 96,
+        "y": 732.5440245090822
+      },
+      "clockSeconds": 7
+    },
+    "apply": {
+      "accepted": true,
+      "changed": true,
+      "reason": "applied"
+    },
+    "authoritativePaused": {
+      "gamePaused": true,
+      "physicsPaused": false,
+      "physicsSteps": 343,
+      "water": {
+        "x": 96,
+        "y": 732.5440245090822
+      },
+      "clockSeconds": 7
+    },
+    "duplicate": {
+      "accepted": true,
+      "changed": false,
+      "reason": "duplicate"
+    },
+    "resumeRequest": {
+      "requests": [
+        {
+          "type": "room-command",
+          "command": "pause.set",
+          "roomEpoch": "research-room-1",
+          "commandId": "research-page-1:1",
+          "sequence": 1,
+          "baseRevision": 0,
+          "desiredPaused": true
+        },
+        {
+          "type": "room-command",
+          "command": "pause.set",
+          "roomEpoch": "research-room-1",
+          "commandId": "research-page-1:2",
+          "sequence": 2,
+          "baseRevision": 1,
+          "desiredPaused": false
+        }
+      ],
+      "localPaused": true
+    },
+    "resumed": {
+      "gamePaused": false,
+      "physicsPaused": false,
+      "physicsSteps": 355,
+      "water": {
+        "x": 96,
+        "y": 732.5440245090822
+      },
+      "clockSeconds": 7
+    },
+    "uiMethod": {
+      "requests": [
+        {
+          "type": "room-command",
+          "command": "pause.set",
+          "roomEpoch": "research-room-1",
+          "commandId": "research-page-1:1",
+          "sequence": 1,
+          "baseRevision": 0,
+          "desiredPaused": true
+        },
+        {
+          "type": "room-command",
+          "command": "pause.set",
+          "roomEpoch": "research-room-1",
+          "commandId": "research-page-1:2",
+          "sequence": 2,
+          "baseRevision": 1,
+          "desiredPaused": false
+        },
+        {
+          "type": "room-command",
+          "command": "pause.set",
+          "roomEpoch": "research-room-1",
+          "commandId": "research-page-1:3",
+          "sequence": 3,
+          "baseRevision": 2,
+          "desiredPaused": true
+        }
+      ],
+      "localPaused": false
+    }
+  }
+}

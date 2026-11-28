@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#e9eefb">
+  <title>云台乱斗 · 肥鱼乐园</title>
+  <link rel="stylesheet" href="/loader/loader.css">
+  <link rel="stylesheet" href="/loader/carnival-loader.css">
+  <style>
+    [hidden]{display:none!important}
+    #boot-failure{box-sizing:border-box;width:min(430px,calc(100% - 28px));margin:12vh auto;padding:24px;
+      border:2px solid #e5dbfe;border-radius:24px;background:#fff;color:#20215c;text-align:center;
+      box-shadow:0 6px 0 #a393d14d;font:16px "Microsoft YaHei UI",system-ui,sans-serif}
+    #boot-failure h1{margin:0 0 2px;font-size:25px}
+    #boot-failure .cl-slot{padding:0;border:0;background:none;box-shadow:none}
+    #boot-failure button,#boot-failure a{display:inline-grid;place-items:center;min-height:42px;margin:14px 8px 0 0;padding:6px 13px;box-sizing:border-box;font:700 14px system-ui,sans-serif;color:#5f2cc4;text-decoration:none;background:#f3edff;border:1px solid #ddd0fe;border-radius:11px;cursor:pointer}
+    #boot-failure button{color:#fff;background:#6731d4;border-color:#6731d4}
+    body{background:linear-gradient(155deg,#b9e8ff,#e0f0ff 43%,#eee5ff);min-height:100vh;margin:0}
+  </style>
+</head>
+<body>
+  <div id="boot-failure" role="status">
+    <h1>云台乱斗</h1>
+    <div id="boot-loader"></div>
+    <button id="boot-retry" type="button" hidden>重新加载</button>
+    <a id="boot-return" href="/">返回房间</a>
+  </div>
+  <main class="match" id="match" hidden>
+    <header class="masthead">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 36 36"><path d="M8 26h19a5 5 0 0 0 0-10h-1a9 9 0 0 0-17-2 6 6 0 0 0-1 12Z"/><path d="m18 9 2 4 5 .5-3.5 3.2 1 4.8-4.5-2.4-4.5 2.4 1-4.8-3.5-3.2 5-.5Z"/></svg>
+        </div>
+        <div><h1>云台乱斗</h1><p id="room-label" hidden></p></div>
+      </div>
+      <nav class="match-actions" aria-label="对局操作">
+        <button type="button" id="audio-toggle" aria-pressed="true">音效开</button>
+        <button type="button" id="fullscreen" hidden>全屏</button>
+        <a class="return-link" id="return" href="/">返回房间</a>
+      </nav>
+    </header>
+    <div class="game-grid">
+      <section class="play" aria-label="云台竞技场">
+        <div class="play-meta">
+          <div><strong>风铃云台</strong><span class="round-number" id="round">第 1 局</span></div>
+          <span class="latency" id="latency">连接中</span>
+        </div>
+        <div class="court">
+          <canvas id="field" width="960" height="550" aria-label="风铃云台格斗画面"></canvas>
+          <div class="overlay" id="overlay" role="status">
+            <div class="overlay-card">
+              <span class="overlay-kicker" id="overlay-kicker">对局连接</span>
+              <h2 id="overlay-title">正在连接</h2>
+              <p id="overlay-detail"></p>
+              <button class="retry" type="button" id="retry" hidden>重试连接</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <aside class="side" aria-label="得分和操作">
+        <section class="panel scores">
+          <header><h2>得分</h2><span id="score-target">先得 5 分</span></header>
+          <ol id="players"></ol>
+        </section>
+        <div id="match-reactions"></div>
+        <section class="panel controls" aria-label="玩法和键盘操作">
+          <h2>操作</h2>
+          <div><kbd>A</kbd><kbd>D</kbd><span>左右移动</span></div>
+          <div><kbd>W</kbd><kbd>空格</kbd><span>跳跃，可二段跳</span></div>
+          <div><kbd>J</kbd><span>快速攻击</span></div>
+          <div><kbd>K</kbd><span>重击，击退更远</span></div>
+          <p>将对手击落云台得 1 分。伤害百分比越高，越容易被击飞。</p>
+        </section>
+      </aside>
+    </div>
+  </main>
+  <script type="module">
+    (() => {
+      const retry = document.getElementById('boot-retry');
+      retry.onclick = () => location.reload();
+      const room = new URL(location.href).searchParams.get('room');
+      if (room) {
+        const back = new URL('/', location.origin);
+        back.searchParams.set('room', room);
+        document.getElementById('boot-return').href = back;
+      }
+
+      // 资源载入没有真实字节：按阶段推进，数字只向前。
+      const mount = document.getElementById('boot-loader');
+      let loader;
+      const ready = import('/loader/carnival-loader.mjs')
+        .then(module => module.createCarnivalLoader(mount, {layout: 'inline'}))
+        .then(instance => (loader = instance));
+      const show = (title, detail, percent) =>
+        loader?.show({phase: 'running', stage: 'download', title, detail, percent});
+
+      function stylesheet(search) {
+        return new Promise(resolve => {
+          const sheet = document.createElement('link');
+          const done = loaded => {
+            clearTimeout(timer);
+            sheet.onload = sheet.onerror = null;
+            if (!loaded) sheet.remove();
+            resolve(loaded);
+          };
+          const timer = setTimeout(() => done(false), 4000);
+          sheet.href = './brawl.css' + search;
+          sheet.rel = 'stylesheet';
+          sheet.onload = () => done(true);
+          sheet.onerror = () => done(false);
+          document.head.append(sheet);
+        });
+      }
+      (async () => {
+        await ready.catch(() => undefined);
+        show('正在载入云台乱斗', '正在准备游戏样式。', 6);
+        let styled = false;
+        for (const attempt of [0, 1, 2]) {
+          const search = '?boot=' + attempt;
+          if (attempt) show('正在重新连接游戏资源', '游戏样式没有就绪，正在重试。', 12 + attempt * 6);
+          const sheetOk = await stylesheet(search);
+          styled ||= sheetOk;
+          if (!styled) { show('正在重新连接游戏资源', '正在等待游戏样式返回。', 26 + attempt * 6); continue; }
+          show('正在载入云台乱斗', '游戏样式已就绪，正在准备对局脚本。', 52);
+          window.brawlBootVersion = search;
+          let deadline;
+          const loaded = import('./brawl.mjs' + search).then(() => true, () => false);
+          const settled = await Promise.race([loaded, new Promise(resolve => {
+            deadline = setTimeout(() => resolve(false), 5000);
+          })]);
+          clearTimeout(deadline);
+          if (settled) { show('正在载入云台乱斗', '对局脚本已就绪，正在进入战场。', 100); return; }
+          window.brawlBootVersion = '';
+        }
+        loader?.show({
+          phase: 'error', stage: 'download', title: '暂时无法载入云台乱斗',
+          detail: '游戏资源暂时无法载入，可保留原席位重试。',
+        });
+        retry.hidden = false;
+      })();
+    })();
+  </script>
+  <script type="module" src="/__lobby__/game-chat.mjs"></script>
+</body>
+</html>

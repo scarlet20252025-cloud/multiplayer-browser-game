@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>迷宫坦克</title>
+  <link rel="stylesheet" href="/loader/loader.css">
+  <link rel="stylesheet" href="/loader/carnival-loader.css">
+  <style>
+    [hidden]{display:none!important}
+    body{margin:0;color:#20215c;font:16px "Microsoft YaHei UI",system-ui,sans-serif}
+    #arena-entry{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:20px;box-sizing:border-box;background:linear-gradient(155deg,#b9e8ff,#e0f0ff 43%,#eee5ff)}
+    #arena-entry>div{width:min(100%,430px);box-sizing:border-box;padding:24px;background:#fff;border:2px solid #e5dbfe;border-radius:24px;box-shadow:0 6px 0 #a393d14d}
+    #arena-entry h1{margin:0;font-size:25px}#arena-entry p{color:#5d5a83;line-height:1.5}
+    #arena-entry .cl-slot{padding:0;border:0;background:none;box-shadow:none}
+    #arena-entry button,#arena-entry a{display:inline-grid;place-items:center;min-height:42px;margin:14px 8px 0 0;padding:6px 11px;box-sizing:border-box;font:700 14px system-ui,sans-serif;color:#5f2cc4;text-decoration:none;background:#f3edff;border:1px solid #ddd0fe;border-radius:11px;cursor:pointer}
+    #arena-entry button{color:#fff;background:#6731d4;border-color:#6731d4}
+  </style>
+</head>
+<body>
+  <section id="arena-entry" aria-labelledby="entry-title">
+    <div>
+      <h1 id="entry-title">迷宫坦克</h1>
+      <div id="entry-loader"></div>
+      <button id="entry-retry" type="button" hidden>重新加载</button><a id="entry-return" href="/">返回房间</a>
+    </div>
+  </section>
+  <main class="arena-page" id="arena-page" hidden>
+    <header class="game-bar">
+      <div class="heading"><h1>迷宫坦克</h1><p id="room-label" hidden></p></div>
+      <nav class="room-actions" aria-label="游戏操作">
+        <button id="sound" type="button" aria-pressed="true">音效</button>
+        <a id="return" href="/">返回房间</a>
+      </nav>
+    </header>
+    <div class="battle-layout">
+      <aside class="battle-side left" aria-label="赛况和左侧玩家">
+        <section class="side-panel match-panel" aria-labelledby="match-info-title">
+          <h2 id="match-info-title">赛况</h2>
+          <div class="match-heading">
+            <strong id="mode-title">迷宫对战</strong>
+            <p id="round"></p>
+          </div>
+          <dl class="match-facts">
+            <div><dt>在线玩家</dt><dd id="players-online">—</dd></div>
+            <div><dt title="浏览器与对局服务器的往返延迟">延迟</dt><dd id="latency">连接中</dd></div>
+          </dl>
+        </section>
+        <div class="roster" id="roster-left" role="group" aria-label="左侧玩家"></div>
+        <section class="side-panel mode-panel" aria-labelledby="modes-title">
+          <div class="panel-heading"><h2 id="modes-title">模式投票</h2><span id="vote-threshold"></span></div>
+          <div class="mode-options" id="mode-options"></div>
+          <p id="vote-note">在线玩家过半后开启新赛局，比分归零。</p>
+        </section>
+      </aside>
+      <section class="battle-center" aria-label="对局">
+        <div class="battle-field">
+          <div class="board" aria-label="坦克战场">
+            <canvas id="field" width="960" height="600" aria-label="随机迷宫坦克战场"></canvas>
+            <div class="board-top"><span id="map-name">正在载入战场</span><time id="clock" hidden></time></div>
+            <div class="respawn-hint" id="respawn-hint" role="status" hidden></div>
+            <div class="overlay" id="overlay"><div class="overlay-card">
+              <p id="overlay-note">对局连接</p><h2 id="overlay-title" role="status">正在建立连接</h2>
+              <p id="overlay-detail" hidden></p>
+              <div id="overlay-actions" class="overlay-actions" hidden><button id="match-retry" type="button">重试连接</button><a id="match-return" href="/">返回房间</a></div>
+            </div></div>
+          </div>
+          <details class="stats-panel" open>
+            <summary>得分统计</summary>
+            <div id="match-stats" class="scorecards" role="region" aria-label="玩家得分卡片" tabindex="0"></div>
+          </details>
+        </div>
+      </section>
+      <aside class="battle-side right" aria-label="键位和右侧玩家">
+        <section class="side-panel keys-panel" aria-labelledby="keys-title">
+          <h2 id="keys-title">操作键位</h2>
+          <dl class="key-bindings">
+            <div><dt>前进 / 后退</dt><dd><kbd>W</kbd> <kbd>S</kbd> 或 <kbd>↑</kbd> <kbd>↓</kbd></dd></div>
+            <div><dt>左转 / 右转</dt><dd><kbd>A</kbd> <kbd>D</kbd> 或 <kbd>←</kbd> <kbd>→</kbd></dd></div>
+            <div><dt>朝车头开火</dt><dd><kbd>空格</kbd></dd></div>
+          </dl>
+          <p id="guide-hint" hidden>遥控导弹飞行中，按左右转向键调整方向。</p>
+        </section>
+        <div class="roster" id="roster-right" role="group" aria-label="右侧玩家"></div>
+        <div id="match-reactions"></div>
+        <details class="side-panel supply-help">
+          <summary>补给与反弹</summary>
+          <p>靠近补给箱拾取。炮弹反弹后可能击中自己。</p>
+          <dl id="supply-list"></dl>
+        </details>
+      </aside>
+    </div>
+  </main>
+  <template id="player-card">
+    <section class="player-card">
+      <div class="player-heading"><span class="seat-label"></span><h2>等待玩家</h2><small class="you" hidden>你</small></div>
+      <dl>
+        <div><dt>连接</dt><dd class="connection">等待连接</dd></div>
+        <div><dt>战况</dt><dd class="condition">待命</dd></div>
+        <div><dt>护甲</dt><dd class="armor">无</dd></div>
+        <div><dt>武器</dt><dd class="supply">标准炮</dd></div>
+      </dl>
+    </section>
+  </template>
+  <template id="score-card">
+    <article class="scorecard">
+      <header class="player-heading"><span class="seat-label"></span><h3>等待玩家</h3></header>
+      <p class="round-score"><span>当前比分</span><strong>0</strong></p>
+      <dl class="score-totals">
+        <div><dt>累计得分</dt><dd data-stat="score">0</dd></div>
+        <div><dt>击毁</dt><dd data-stat="kills">0</dd></div>
+        <div><dt>被击毁</dt><dd data-stat="deaths">0</dd></div>
+        <div><dt>胜局</dt><dd data-stat="wins">0</dd></div>
+      </dl>
+    </article>
+  </template>
+  <script type="module">
+    (() => {
+      const entry = document.getElementById('arena-entry');
+      const retry = document.getElementById('entry-retry');
+      const address = new URL(location.href);
+      const attempt = Math.min(2, Math.max(0, parseInt(address.searchParams.get('arenaLoad') || '0', 10) || 0));
+      const lobby = new URL('/', location.href);
+      if (address.searchParams.has('room')) lobby.searchParams.set('room', address.searchParams.get('room'));
+      document.getElementById('entry-return').href = lobby.href;
+      retry.onclick = () => {
+        const target = new URL(location.href);
+        if (target.searchParams.has('arenaLoad')) {
+          target.searchParams.delete('arenaLoad');
+          location.replace(target.href);
+        } else location.reload();
+      };
+
+      // 界面载入没有真实字节：按阶段推进，数字只向前。
+      const mount = document.getElementById('entry-loader');
+      let loader;
+      const ready = import('/loader/carnival-loader.mjs')
+        .then(module => module.createCarnivalLoader(mount, {layout: 'inline'}))
+        .then(instance => (loader = instance));
+
+      function show(title, detail, percent) {
+        loader?.show({phase: 'running', stage: 'initialize', title, detail, percent});
+      }
+      function fail(detail) {
+        loader?.show({phase: 'error', stage: 'initialize', title: '暂时无法载入对战界面', detail});
+        retry.hidden = false;
+      }
+
+      function stylesheet(index) {
+        return new Promise(resolve => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = './arena.css' + (index ? '?retry=' + index : '');
+          function finish(loaded) {
+            clearTimeout(timer);
+            link.onload = link.onerror = null;
+            if (!loaded) link.remove();
+            resolve(loaded);
+          }
+          link.onload = () => finish(true);
+          link.onerror = () => finish(false);
+          const timer = setTimeout(() => finish(false), 4200);
+          document.head.append(link);
+        });
+      }
+
+      async function begin() {
+        await ready.catch(() => undefined);
+        show('正在载入对战界面', '正在准备对战样式。', 6);
+        for (let index = 0;; index++) {
+          if (index || attempt) show('正在重新载入对战界面', '对战样式没有就绪，正在重试。', 12 + index * 6);
+          // 样式表最多等 4 秒；进度按索引递增，不会因为等待而倒退。
+          const styled = await stylesheet(index);
+          if (styled) break;
+          if (index === 2) {
+            fail('可保留席位重新加载。');
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 400 * (index + 1)));
+        }
+        show('正在载入对战界面', '对战样式已就绪，正在准备联机组件。', 52);
+        let active = true;
+        window.arenaEntryActive = () => active;
+        let timer;
+        try {
+          await Promise.race([import('./arena.mjs'), new Promise((_, reject) => {
+            timer = setTimeout(() => reject(Error('Module timeout')), 6500);
+          })]);
+          show('正在载入对战界面', '联机组件已就绪，正在进入战场。', 100);
+          await new Promise(resolve => setTimeout(resolve, 220));
+          document.getElementById('arena-page').hidden = false;
+          entry.hidden = true;
+          const target = new URL(location.href);
+          if (target.searchParams.has('arenaLoad')) {
+            target.searchParams.delete('arenaLoad');
+            history.replaceState(null, '', target.href);
+          }
+        } catch {
+          active = false;
+          if (attempt < 2) {
+            show('正在重新加载', '联机组件暂时不可用，正在重新加载。', 70);
+            setTimeout(() => {
+              const target = new URL(location.href);
+              target.searchParams.set('arenaLoad', String(attempt + 1));
+              location.replace(target.href);
+            }, 450 * (attempt + 1));
+          } else {
+            fail('联机组件暂时无法载入，可保留席位重新加载。');
+          }
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      void begin();
+    })();
+  </script>
+  <script type="module" src="/__lobby__/game-chat.mjs"></script>
+</body>
+</html>

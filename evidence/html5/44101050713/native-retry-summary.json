@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "game": "Forest Temple HTML5 fixed third-party research candidate",
+  "status": "passed",
+  "authorityScriptSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "userUploadDifferentSha256": "98666cf499473dfadb9b708af10ef2e5e13b50300881a32b7c8d65d7756a5700",
+  "run": 44101050713,
+  "runUrl": "https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44101050713",
+  "kind": "native handler invocation in authoritative browser plus two WebSocket seats",
+  "observed": {
+    "beforeLevelEpoch": 1,
+    "afterLevelEpoch": 2,
+    "haltReason": "LEVEL_EPOCH_CHANGED",
+    "originalRetryHandlerCalled": true,
+    "roomOldInputsRejected": "ROOM_SUSPENDED",
+    "errors": []
+  },
+  "passedChecks": [
+    "native-retry-replaced-level-identity",
+    "old-room-suspended",
+    "original-lifecycle-notified",
+    "old-seat-input-rejected"
+  ],
+  "verifiedScope": {
+    "oldRoomFailsClosed": true,
+    "deathTriggeredByGameplay": false,
+    "liveTwoBrowserRearm": false,
+    "fullLevelVictory": false,
+    "gameFilesDistributed": false
+  },
+  "artifactId": 14336501515,
+  "artifactSha256": "2944c163c185de1a3bb23bba38ff089db6601c3189a00677096a8c37ea449cc8",
+  "caveats": [
+    "The CI directly invokes the real existing retry() handler for research, not a player button",
+    "A second UI step is still needed to rebuild native spectators and authority input safely",
+    "The user's private original ZIP version is not browser verified by these results"
+  ]
+}

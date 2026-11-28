@@ -1,0 +1,58 @@
+/* lockstep 加载遮罩的定位层。星星本体、卡片底色、进度轨都在
+   /loader/loader.css 里，这里只负责「盖住对战画面」和按钮排布。 */
+.game-loader-host {
+  position: relative;
+  isolation: isolate;
+}
+
+.game-loader {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: clamp(10px, 3vw, 26px);
+  background: radial-gradient(ellipse at top, #49317b, #20173e 68%);
+  box-sizing: border-box;
+}
+
+.game-loader[hidden],
+.game-loader [hidden] {
+  display: none;
+}
+
+.game-loader__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.game-loader__retry,
+.game-loader__back {
+  display: inline-grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 7px 15px;
+  border: 1px solid #d8c7f2;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.game-loader__retry {
+  border-color: #6430c9;
+  background: #6430c9;
+  color: #fff;
+  cursor: pointer;
+}
+
+.game-loader__retry:hover { background: #5126a6; }
+.game-loader__retry:disabled { cursor: wait; opacity: 0.6; }
+.game-loader__back { background: #fff; color: #4f2e98; }
+.game-loader__back:hover { background: #f0e9ff; }
+.game-loader__actions :focus-visible { outline: 3px solid #2257bc; outline-offset: 2px; }

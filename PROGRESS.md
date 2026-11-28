@@ -1,0 +1,57 @@
+# 进度记录
+
+## 2026-11-28
+
+- `rea_shanyi.py`：显示列表 + 完整矩阵（a/b/c/d/tx/ty）逐层累乘；489/490 形状解析。
+- `rea_shanyi_svg_shapes.py`：直接读 FFDec `shape/<id>.svg`（M/L/H/V/Q/C/Z + matrix），避开手写边记录的坑。
+- `rea_shanyi_layers.py`：8 类层合成，全量 shape 导出后 missing 0，包围盒 3066×1202。
+- `rea_shanyi_overlay.py`：逐层 bbox + 地罩覆盖率；确认 Level1 真实关卡空间 **2828×600**（BG2），基准图 1927 高是舞台外装饰。
+- `rea_shanyi_collide.py`：Ground 多边形按 8px 扫描线拆条带 → **86 个碰撞矩形**（ground 85 + box 1），尺寸 1838×600，原点 -238。
+- `adapters/shanyi-native/sim.mjs`：60Hz 物理，跑/摩擦/跳跃/二段跳/AABB。
+- 测试：`shanyi-native-sim.test.mjs` 7 项、`shanyi-native-level.test.mjs` 3 项，全部通过。
+
+### 已纠正的错误判断
+
+- 曾以为矩阵平移量级异常（0.0–0.6），实际是带旋转（hasRotate=1, nbits=21），补上旋转后地形才成形。
+- 曾以为关卡宽 2903/高 1927，实际那是 FFDec 把舞台外装饰一起渲染；真实舞台 800×600，关卡 2828×600。
+
+### 2026-11-28 追加
+
+- 箱子推动已实现并测试：`pushBoxes(hero, boxes, solids, fromX)`，英雄贴箱推进、箱子顶墙后反向挡住英雄；`tests/shanyi-native-box.test.mjs` 2 项通过。
+- 门（`传送门_光`，sprite 258）没有矢量子对象，FFDec 渲染出的内容只有 181×40 的一小块，且世界矩阵平移为 0，位置是运行时设置 → 暂时无法确定门的坐标。
+
+### 2026-11-28 渲染层
+
+- `public/shanyi-native/index.html` + `client.mjs`：canvas 渲染地形条带/箱子/两个角色，P1 WASD、P2 方向键，相机跟随 P1。
+- Playwright 实测：加载 86 个碰撞体，P1 落地 `onGround=true`，按 D 后 x 从 -118 → 69.8，无页面异常；截图确认地形、箱子、两名角色都在画面内。
+
+### 2026-11-28 原生权威房
+
+- `server/shanyi-native-room.mjs`：60Hz 服务端模拟，`/ws?seat=` 两席，`/health` 汇报 tick 与席位。
+- 测试 `tests/shanyi-native-room.test.mjs`：两席入场、tick 推进、输入驱动位移、health，2 项通过。
+- `server/game-adapter.mjs` 注册 `shanyi-native` 运行时与 adapter；`config/games/shanyi-native.json` 清单通过目录校验（`listed:false`，大厅入口未接）。
+
+### 2026-11-28 客户端联机模式
+
+- `client.mjs` 支持 `?ws=&seat=`：有 ws 时不再本地跑模拟，改为 12Hz 以上向服务端发输入、按服务端状态渲染。
+- Playwright 双标签实测：两页分别 seat=0/1 接入同一房间；按 D 后 P1 x 从 -118 → 73.8，**两个页面读到的 P1 坐标一致**（-118 → 73.8），无页面异常。
+
+### 2026-11-28 大厅分支
+
+- `shanyi-native-room` 的 `/health` 改为同时输出 authority 形状（`room.connected/bothReady/capacity`），大厅 `readSession` 可直接读取。
+- `room-lobby.mjs` 新增 `game.runtime==='shanyi-native'` 分支，用 `public/shanyi-native/level-1.json` 起房；相关大厅测试 10 项仍通过。
+
+### 2026-11-28 静态路由
+
+- `html5-research-host` 新增 `/shanyi-native/*` 与 `/adapters/shanyi-native/*` 白名单静态路由（后缀限 html/mjs/json/css/png）。
+- 实测观看端：`/shanyi-native/index.html`、`client.mjs`、`/adapters/shanyi-native/sim.mjs` 均返回 200（此前 404）。注意要打观看端端口，大厅端口只提供 API。
+
+### 2026-11-28 大厅 E2E 通过
+
+- `scripts/verify-shanyi-native-lobby.mjs` 全流程通过：建房 → 两席 join → select-game/propose/confirm → session-start → 两个真实页面 → 按 D 后 P1 从 −118 到 73.8，**两页一致**。
+- 过程中修掉四个具体问题：
+  1. 大厅 API 是 `app.lobbyUrl`（`app.url` 是观看端，POST 会返回 HTML5_UNSAFE_PATH）；
+  2. 目录加载需要 `extraRoots['shanyi-native']=public`（原生包不在素材根下）；
+  3. 观看端 `ensureGame` 不认识原生条目，要把它从 games 列表里排除；
+  4. 客户端拼 ws 地址时重复加了 `/ws`，导致连不上——改成幂等拼接。
+- `config/games/shanyi-native.json` 的 `listed` 已翻为 **true**。

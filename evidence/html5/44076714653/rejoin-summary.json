@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "source": "Measured GitHub Actions artifact from controlled three-Chromium run, not original user ZIP",
+  "runId": 44076714653,
+  "ciUrl": "https://github.com/scarlet20252025-cloud/multiplayer-browser-game/actions/runs/44076714653",
+  "jobCommit": "b2ed9a8f8c9c26c2242169d9e56acbe4d9f4b98d",
+  "artifactId": 14324234891,
+  "artifactArchiveSha256": "c394f136f6377dc8b018c1bd9e43a63f342277d8f374775735ee2fc383fcfe31",
+  "testedGameJsSha256": "337125629748bace45e23b040e54b0d206e4cd78c9c8709d7785faa637e00677",
+  "status": "passed",
+  "checksPassed": 14,
+  "errors": [],
+  "evidence": {
+    "genuineDiamondPickup": {
+      "authorityBefore": 7,
+      "authorityAfter": 6,
+      "fireDiamondsBefore": 0,
+      "fireDiamondsAfter": 1,
+      "visibleInExistingViewers": [
+        6,
+        6
+      ],
+      "pickupType": "native Box2D contact after browser keyboard movement"
+    },
+    "lateJoin": {
+      "serverDiamonds": 6,
+      "rejoinedViewerVisibleDiamonds": 6,
+      "originalRejectedViewerDiamonds": 7,
+      "shiftedIndexBug": "fixed by immutable per-level diamond spawn roster and tombstones",
+      "observation": "all six visible diamond coordinates match the authority snapshot"
+    },
+    "rejoinedInput": {
+      "seat": 1,
+      "direction": "KeyA",
+      "priorWaterX": 268.29644694636306,
+      "newWaterX": 95.03775747534601,
+      "deltaWaterX": -173.25868947101705,
+      "viewerWaterX": [
+        95.03775747534601,
+        95.03775747534601
+      ],
+      "beforeAck": -1,
+      "afterAck": 5,
+      "authorityGamePaused": false
+    },
+    "spectatorPhysicsSteps": [
+      0,
+      0
+    ]
+  },
+  "priorFailure": {
+    "runId": 44074796969,
+    "status": "failed",
+    "reason": "Late join viewer displayed 7 diamonds while authoritative world had 6"
+  },
+  "limitations": [
+    "Test uses fixed research candidate (not user-uploaded game.js)",
+    "One tutorial level, no full puzzle/door/level-end test",
+    "Not a public deployable game service or proof of distribution rights"
+  ]
+}
