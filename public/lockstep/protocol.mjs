@@ -1,7 +1,10 @@
 export const LOCKSTEP_RUNTIME = 'browser-lockstep';
 export const FRAME_RATE = 30;
 export const CHECKPOINT_FRAMES = 30;
-export const MAX_FRAME_LEAD = 4;
+// How many frames the server may run ahead of the slowest acknowledgement.
+// Four frames (100 ms at 40 Hz) stalls on any public-route round trip, so keep
+// enough slack to absorb a ~250 ms ack while the client catches up.
+export const MAX_FRAME_LEAD = 10;
 export const MIN_LOCKSTEP_PLAYERS = 2;
 export const MAX_LOCKSTEP_PLAYERS = 4;
 

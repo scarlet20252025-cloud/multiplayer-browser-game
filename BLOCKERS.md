@@ -25,3 +25,16 @@
 - 已验证：大厅前端 `navigateToGame()` 会把 `ws`、`seat`、`room`、`game`、`level` 一并拼进 entryPath（lobby.mjs:1085-1103），所以席位参数不是问题。
 - **已解决（静态路由）**：`html5-research-host` 增加白名单静态路由，三个资源实测 200。
 **原诊断保留**：`room-lobby` 只提供 API（`/health`、`/api/games`、`/api/rooms`），实测 `/shanyi-native/index.html` 返回 404；游戏页面由 `start-html5-research-host` 按 catalog 的 `ensureGame()` 逐个提供，其 `servedGames` 只登记 html5 脚本类游戏。原生页要可用，必须在 viewers host 里加一条静态路由（`/shanyi-native/*` → `public/shanyi-native/*`），或让 ensureGame 支持没有脚本的静态包。
+
+### 大厅 E2E 进展（脚本已存在）
+
+`scripts/verify-shanyi-native-lobby.mjs` 已经能跑完前半段，并暴露一个具体错误：
+
+- 大厅 API 地址是 `app.lobbyUrl`（**不是** `app.url`，后者是观看端，POST 返回 HTML5_UNSAFE_PATH）；
+- 建房 / `POST /api/rooms` 返回 **400 GAME_UNKNOWN「未接入这个游戏」** —— 说明 `startGameLobby({manifestsDir:'config/games'})` 的目录里没有 `shanyi-native`。
+- 已排除：运行时已注册（`RUNTIME_POLICY` 有 `shanyi-native`）；清单文件本身能通过 `game-catalog` 的格式校验（`tests/game-catalog-manifests.test.mjs` 通过）。
+
+下一步定位方向（按顺序试）：
+1. `loadGameCatalog` 是否要求清单里有 `levels` 数组（我们的 manifest 只有 `package.levels` 路径）；
+2. `listed:false` 是否被归入 `unlistedGames` 并从 `gameFor()` 的查找表里排除（测试里隐藏游戏是直接塞进 catalog 的）；
+3. 用 `loadGameCatalog({root, manifestsDir:'config/games'})` 单独打印返回的 id 列表，确认到底加载了什么。

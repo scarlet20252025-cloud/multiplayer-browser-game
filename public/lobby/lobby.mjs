@@ -212,8 +212,13 @@ function profileModal(){
     </div>
   </div></div>`;
 }
+function wallpaper(){
+  const pieces=FLOAT_PIECES.map(([name,x,y,size,duration],index)=>
+    `<img class="float-piece" src="${DECOR[name]}" alt="" decoding="async" style="--x:${x}%;--y:${y}%;--size:${size}px;--duration:${duration}s;--delay:-${index%5}s">`).join('');
+  return `<div class="lobby-wall" aria-hidden="true"><div class="lobby-wall-art"></div><div class="float-layer">${pieces}</div></div>`;
+}
 function shell(inner){
-  return `${topbar()}<main class="site-main">${inner}</main>
+  return `${wallpaper()}${topbar()}<main class="site-main">${inner}</main>
     <footer class="site-footer">肥鱼乐园 <span>·</span> ${onLan?'局域网大厅':onWan?'公网大厅':'联机大厅'}</footer>
     ${profileModal()}`;
 }
