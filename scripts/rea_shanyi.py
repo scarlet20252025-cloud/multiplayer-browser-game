@@ -170,6 +170,10 @@ def parse_place(body, place3=False):
         cursor += 2
     return {
         'depth': depth,
+        'matrixFull': None if matrix is None else {
+            'a': matrix['scaleX'], 'b': matrix['rotate0'],
+            'c': matrix['rotate1'], 'd': matrix['scaleY'],
+            'tx': matrix['x'], 'ty': matrix['y']},
         'characterId': character,
         'name': name,
         'className': class_name,
@@ -264,6 +268,15 @@ def sprite_placements(body):
     return frames
 
 
+def mat_mul(m1, m2):
+    """SWF 用行向量：[x y 1] · M。这里返回 m1 之后接 m2 的合成矩阵。"""
+    a1, b1, c1, d1, e1, f1 = m1
+    a2, b2, c2, d2, e2, f2 = m2
+    return (a1 * a2 + b1 * c2, a1 * b2 + b1 * d2,
+            c1 * a2 + d1 * c2, c1 * b2 + d1 * d2,
+            e1 * a2 + f1 * c2 + e2, e1 * b2 + f1 * d2 + f2)
+
+
 def resolve_bounds(char_id, sprites, shapes, cache, depth=0):
     """递归算一个字符的局部包围盒（twips）。sprite 取所有子对象变换后的并集。"""
     if char_id in cache:
@@ -327,8 +340,9 @@ def main():
 
     bounds_cache = {}
 
-    def annotate(entries, depth, path, seen, acc=None):
+    def annotate(entries, depth, path, seen, acc=None, world=None):
         acc = acc or {'x': 0.0, 'y': 0.0, 'sx': 1.0, 'sy': 1.0}
+        world = world or (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
         for entry in entries:
             cid = entry.get('characterId')
             entry['targetName'] = symbols.get(cid) if cid else None
@@ -350,6 +364,10 @@ def main():
             elif box:
                 entry['boundsTwips'] = {k: round(v, 1) for k, v in box.items()}
             # 祖先变换累计：容器只提供位移/缩放，旋转对地形可以先忽略。
+            full = entry.get('matrixFull')
+            own = (full['a'], full['b'], full['c'], full['d'], full['tx'], full['ty']) \
+                if full else (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+            entry['worldMatrix'] = list(mat_mul(world, own))
             box = entry.get('boundsTwips')
             if box:
                 entry['worldTwips'] = {
@@ -368,7 +386,7 @@ def main():
                     'sy': acc['sy'] * (matrix.get('scaleY', 1) or 1),
                 }
                 annotate(child, depth + 1, f'{path}/{entry.get("name") or cid}',
-                    seen | {cid}, child_acc)
+                    seen | {cid}, child_acc, tuple(entry['worldMatrix']))
                 entry['children'] = child
 
     annotate(placements, 0, args.level, {target_id})

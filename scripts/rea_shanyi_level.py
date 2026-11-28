@@ -26,16 +26,22 @@ def walk(entries, top=''):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--level', required=True)
-    parser.add_argument('--shapes', required=True)
+    parser.add_argument('--shapes', default=None)
+    parser.add_argument('--svg-shapes', default=None)
     parser.add_argument('--svg', required=True)
     parser.add_argument('--only', default='Ground')
     args = parser.parse_args()
 
     level = json.loads(Path(args.level).read_text(encoding='utf-8'))
-    shapes = json.loads(Path(args.shapes).read_text(encoding='utf-8'))
     polygons = {}
-    for item in shapes['items']:
-        polygons.setdefault(item['shapeId'], []).append(item)
+    if args.shapes:
+        shapes = json.loads(Path(args.shapes).read_text(encoding='utf-8'))
+        for item in shapes['items']:
+            polygons.setdefault(item['shapeId'], []).append(item)
+    svg_shapes = {}
+    if args.svg_shapes:
+        raw = json.loads(Path(args.svg_shapes).read_text(encoding='utf-8'))
+        svg_shapes = {int(k): v for k, v in raw.items()}
 
     only = set(filter(None, args.only.split(',')))
     paths = []
@@ -44,18 +50,27 @@ def main():
             continue
         if only and top not in only:
             continue
-        world = entry.get('worldTwips')
-        if not world or entry.get('characterId') not in polygons:
+        cid = entry.get('characterId')
+        matrix = entry.get('worldMatrix') or [1, 0, 0, 1, 0, 0]
+        a, b, c, d, tx, ty = matrix
+        source = None
+        if cid in svg_shapes:
+            source = [p['points'] for p in svg_shapes[cid].get('polygons', [])]
+        elif cid in polygons:
+            source = [[[x, y] for x, y in poly['pointsTwips']] for poly in polygons[cid]]
+        if not source:
             continue
-        for poly in polygons[entry['characterId']]:
-            # worldTwips 是对象的世界 AABB；多边形在形状局部坐标里，按 AABB 左上角对齐。
-            dx = world['xMin'] - poly['boundsTwips']['xMin']
-            dy = world['yMin'] - poly['boundsTwips']['yMin']
-            pts = [[round((x + dx) / 20, 1), round((y + dy) / 20, 1)] for x, y in poly['pointsTwips']]
+        for points in source:
+            # SVG 是像素；矩阵是 twips。先换成 twips，套矩阵，再换回像素。
+            pts = []
+            for x, y in points:
+                wx = a * (x * 20) + c * (y * 20) + tx
+                wy = b * (x * 20) + d * (y * 20) + ty
+                pts.append([round(wx / 20, 1), round(wy / 20, 1)])
             if len(pts) < 3:
                 continue
-            d = 'M' + ' L'.join(f'{x},{y}' for x, y in pts) + ' Z'
-            paths.append((top, d))
+            dpath = 'M' + ' L'.join(f'{x},{y}' for x, y in pts) + ' Z'
+            paths.append((top, dpath))
 
     all_pts = []
     for _, d in paths:

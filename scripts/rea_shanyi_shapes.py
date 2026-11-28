@@ -207,10 +207,9 @@ def parse_shape(data, offset, shape_type):
             continue
         contours, end_pos = result
         area = sum(polygon_area(c['points']) for c in contours)
-        if area <= 0:
-            continue
-        error = abs(area - rect_area) / rect_area
-        score = -error
+        error = abs(area - rect_area) / rect_area if area > 0 else 9
+        # 先看解析是否走得远（end_pos），再看是否接近声明面积；两者都要。
+        score = (end_pos, -error)
         if best is None or score > best[0]:
             best = (score, contours, skip)
     if best is None:
