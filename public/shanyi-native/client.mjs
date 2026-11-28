@@ -30,7 +30,8 @@ addEventListener('blur', () => held.clear());
 let socket = null;
 const netState = new Map();
 if (wsUrl) {
-  socket = new WebSocket(wsUrl.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws?seat=' + mySeat);
+  const base = wsUrl.replace(/^http/, 'ws').replace(/\/$/, '');
+  socket = new WebSocket((base.endsWith('/ws') ? base : base + '/ws') + '?seat=' + mySeat);
   socket.onmessage = event => {
     let msg; try { msg = JSON.parse(event.data); } catch { return; }
     if (msg.type === 'state') for (const p of msg.players) netState.set(p.seat, p);

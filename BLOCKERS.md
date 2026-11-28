@@ -44,3 +44,7 @@
 - 传 `manifestsDir` 时目录返回空，即使只放我们一条清单、`root` 指到 `public`。已排除「文件路径不存在」：`public/shanyi-native/` 与新增的 `levels.json` 都在。
 - 已做的改动（无回归，306 测试全过）：`game-catalog.mjs` 把 `shanyi-native` 归入静态包分支；manifest 的 `package.levels` 指向 `levels.json`。
 - 下一条命令：直接在 `loadGameCatalog` 内部打印 `definitions.length` 与 `definition.dir/stat` 的结果（`server/game-manifest.mjs` 的实际导出名要以文件为准，上一轮猜错了模块名）。
+
+## 已关闭
+
+- 大厅入口与静态宿主均已通过 E2E，`listed` 已开启。剩余未完成项见 TASKS.md（Hero 参数对照、门、黄金轨迹）。

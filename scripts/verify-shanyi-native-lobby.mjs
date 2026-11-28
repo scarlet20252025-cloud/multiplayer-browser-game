@@ -21,7 +21,7 @@ try {
   const api = app.lobbyUrl ?? 'http://127.0.0.1:8902';
   const lobbyUrl = app.lobbyWsUrl ?? api.replace(/^http/, 'ws') + '/lobby';
   const viewer = app.viewerUrl ?? 'http://127.0.0.1:8901';
-  const name = '原生闪翼E2E', password = 'pass1234';
+  const name = '原生闪翼E2E-' + Date.now().toString(36), password = 'pass1234';
   const create = await fetch(api + '/api/rooms', {method: 'POST',
     headers: {'content-type': 'application/json'}, body: JSON.stringify({name, password, gameId: 'shanyi-native'})});
   const created = await create.json();
@@ -29,7 +29,7 @@ try {
     headers: {'content-type': 'application/json'}, body: JSON.stringify({name, password})});
   const joined = await join.json();
   report.checks.push({name: 'room-created', status: create.status, body: created, joinStatus: join.status, joinBody: joined});
-  if (create.status !== 200) throw Error('room create failed: ' + JSON.stringify(created));
+  if (!create.ok) throw Error('room create failed: ' + JSON.stringify(created));
 
   const connect = token => new Promise((resolve, reject) => {
     const ws = new WebSocket(lobbyUrl + '?token=' + token);

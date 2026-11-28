@@ -8,7 +8,7 @@
   "order": 6,
   "seats": 2,
   "online": true,
-  "listed": false,
+  "listed": true,
   "capabilities": {
     "authority": true,
     "levelVote": true,
@@ -25,5 +25,5 @@
     "docs/SHANYI_NATIVE_REA.md",
     "TASKS.md"
   ],
-  "notes": "逆向还原的闪翼双星：服务端跑 60Hz 固定步长模拟（跑/跳/二段跳/箱子推动/AABB 地形），客户端只发输入、收状态。当前只有第一关、无门与机关；listed:false 表示尚未接入大厅入口。"
+  "notes": "逆向还原的闪翼双星：服务端跑 60Hz 固定步长模拟（跑/跳/二段跳/箱子推动/AABB 地形），客户端只发输入、收状态。当前只有第一关、无门与机关；已接入大厅：建房、席位、会话启动与静态页均通过 E2E。"
 }

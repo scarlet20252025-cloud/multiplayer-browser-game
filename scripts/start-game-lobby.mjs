@@ -57,6 +57,8 @@ export async function startGameLobby({
   for(const manifest of manifests){
     if(manifest.runtime===LOCKSTEP_RUNTIME)extraRoots[manifest.id]=flashRoot;
     if([ARENA_RUNTIME,BRAWL_RUNTIME].includes(manifest.runtime))extraRoots[manifest.id]=path.join(REPO_ROOT,'public');
+    // 原生闪翼没有脚本包，静态文件就放在 public/shanyi-native。
+    if(manifest.runtime==='shanyi-native')extraRoots[manifest.id]=path.join(REPO_ROOT,'public');
   }
   const staticCatalog=await loadGameCatalog({root,manifests,extraRoots});
   const bvn33Service=bvn33ServiceUrl?createBvn33RoomService(bvn33ServiceUrl,bvn33PublicUrl):null;
@@ -91,7 +93,7 @@ export async function startGameLobby({
       bvn33Service,arenaOnViewer,listAdditionalRooms:glortonBrowser?.listRooms,
       hasAdditionalRoomName:glortonBrowser?.hasRoomName,
       ...(roomsFile?{roomsFile}:{})});
-    viewers=await startHtml5ResearchHost({root,games:catalog.filter(game=>game.runtime!==BVN33_RUNTIME),
+    viewers=await startHtml5ResearchHost({root,games:catalog.filter(game=>game.runtime!==BVN33_RUNTIME&&game.runtime!=='shanyi-native'),
       port:viewerPort,publicPort:publicViewerPort,host,publicHost:displayHost,lobbyWsUrl:lobby.lobbyWsUrl,
       lobbyHttpHandler:lobby.handleHttp,lanViewerOrigin,wanViewerOrigin,bvnProxy,glortonProxy,glortonBrowser,
       glortonLocalWebRoot:localWebRoot,

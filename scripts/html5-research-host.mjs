@@ -740,7 +740,11 @@ export async function startHtml5ResearchHost({root, script, port = 0, publicPort
             return reply(404, 'text/plain; charset=utf-8', 'Not Found');
           try {
             const bytes = await readContainedFile(REPO_ROOT, relative);
-            return reply(200, TYPES[ext] ?? 'application/octet-stream', bytes);
+            const nativeTypes = {'.html': 'text/html; charset=utf-8',
+              '.mjs': 'text/javascript; charset=utf-8',
+              '.json': 'application/json; charset=utf-8',
+              '.css': 'text/css; charset=utf-8', '.png': 'image/png'};
+            return reply(200, nativeTypes[ext] ?? 'application/octet-stream', bytes);
           } catch {
             return reply(404, 'text/plain; charset=utf-8', 'Not Found');
           }

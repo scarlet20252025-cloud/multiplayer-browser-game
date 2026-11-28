@@ -256,7 +256,7 @@ function roomCard(item,game){
     ?`<div class="catalog-room-actions">${hasSeat?joinAction:''}<button type="button" class="primary" data-action="spectate-room" data-key="${esc(item.key)}" ${watchable?'':'disabled'}>观战</button></div>`
     :joinAction;
   return `<li class="catalog-room ${running?'live':''}" style="--game-color:${styleFor(game?.id).color}">
-    <span class="room-thumbnail">${coverImage(game?.id)}</span><div class="catalog-room-copy"><b>${esc(item.name)}</b><small>${status} · ${count}/${roomCapacity(item)} ${playing?'参赛':'在线'}${saved?' · '+esc(levelName(saved.levelId)):''}</small>${canShowSpectate&&!watchable?`<small class="spectate-status">${roomsConfirmed?'双方开战后开放观战':'正在确认观战状态'}</small>`:''}</div>${action}</li>`;
+    <span class="room-thumbnail">${coverImage(game?.id)}</span><div class="catalog-room-copy"><b>${game?`<span class="room-game-tag">[${esc(game.title)}]</span>`:''}${esc(item.name)}</b><small>${status} · ${count}/${roomCapacity(item)} ${playing?'参赛':'在线'}${saved?' · '+esc(levelName(saved.levelId)):''}</small>${canShowSpectate&&!watchable?`<small class="spectate-status">${roomsConfirmed?'双方开战后开放观战':'正在确认观战状态'}</small>`:''}</div>${action}</li>`;
 }
 function glortonRoomCard(item){
   const playing=item.phase==='playing';

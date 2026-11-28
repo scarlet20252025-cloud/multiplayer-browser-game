@@ -45,3 +45,13 @@
 
 - `html5-research-host` 新增 `/shanyi-native/*` 与 `/adapters/shanyi-native/*` 白名单静态路由（后缀限 html/mjs/json/css/png）。
 - 实测观看端：`/shanyi-native/index.html`、`client.mjs`、`/adapters/shanyi-native/sim.mjs` 均返回 200（此前 404）。注意要打观看端端口，大厅端口只提供 API。
+
+### 2026-11-28 大厅 E2E 通过
+
+- `scripts/verify-shanyi-native-lobby.mjs` 全流程通过：建房 → 两席 join → select-game/propose/confirm → session-start → 两个真实页面 → 按 D 后 P1 从 −118 到 73.8，**两页一致**。
+- 过程中修掉四个具体问题：
+  1. 大厅 API 是 `app.lobbyUrl`（`app.url` 是观看端，POST 会返回 HTML5_UNSAFE_PATH）；
+  2. 目录加载需要 `extraRoots['shanyi-native']=public`（原生包不在素材根下）；
+  3. 观看端 `ensureGame` 不认识原生条目，要把它从 games 列表里排除；
+  4. 客户端拼 ws 地址时重复加了 `/ws`，导致连不上——改成幂等拼接。
+- `config/games/shanyi-native.json` 的 `listed` 已翻为 **true**。
