@@ -45,6 +45,21 @@ TL 时间轴上的平移量接近 0（0.0–0.6），说明**对象都在原点�
 仍在样式表之后对不齐而抛 IndexError——说明 LineStyle 数组或 NumFillBits 的起始位置还差一两个字节，
 这是下一步要先修的点。修好后 Level1 的 Ground（sprite 80 → 79）就能拿到可用轮廓。
 
+`shape 79` 的 30 字节已经逐位走过一遍，定位到了具体位置：
+
+```
+4f 00 54 18 fa 41 8f a0 01 00 ff ff 00 00 10 15 50 64 19 e4 7d 1c af a3 92 0c 72 c1 80 00
+id=79  RECT(-500..500)  fills=1(solid FFFF00)  lines=0  nf=1 nl=0
+```
+
+- 第 0 条记录：`MoveTo(-500,-500)` + `FillStyle1=1`，32 bit，正确；
+- 第 1 条：水平线 dx=-250（9 bit），正确；
+- 第 2 条：flags=0x0E（Fill0+Fill1+LineStyle），读完 fill0/fill1 共 8 bit；
+- 第 3 条从第 65 bit 开始，读出来是 `flags=0x17 + nbits=26` 的非法值——**说明第 2 条多读或少读了 1 个 bit**。
+
+两个待验证的假设：`NumLineBits=0` 时 LineStyle 字段是否仍然占位；以及 flags 五个位的读入顺序。
+验证方法：对第 3 条尝试 8 种 bit 偏移，只有能让流在 30 字节内走到 `flags==0`（EndShapeRecord）的那一种是对的。
+
 关卡不是时间轴动画：`Level1` 只有 1 帧，地形和机关由 `Level1.as` 的构造逻辑加子对象，所以「SWF 显示列表 + 场景构建脚本」两边都要读，缺一不可。
 
 ## 已有的可复用资产
