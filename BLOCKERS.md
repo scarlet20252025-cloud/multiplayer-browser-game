@@ -38,3 +38,9 @@
 1. `loadGameCatalog` 是否要求清单里有 `levels` 数组（我们的 manifest 只有 `package.levels` 路径）；
 2. `listed:false` 是否被归入 `unlistedGames` 并从 `gameFor()` 的查找表里排除（测试里隐藏游戏是直接塞进 catalog 的）；
 3. 用 `loadGameCatalog({root, manifestsDir:'config/games'})` 单独打印返回的 id 列表，确认到底加载了什么。
+
+### 目录加载：最新实测（下一条命令已确定）
+
+- 传 `manifestsDir` 时目录返回空，即使只放我们一条清单、`root` 指到 `public`。已排除「文件路径不存在」：`public/shanyi-native/` 与新增的 `levels.json` 都在。
+- 已做的改动（无回归，306 测试全过）：`game-catalog.mjs` 把 `shanyi-native` 归入静态包分支；manifest 的 `package.levels` 指向 `levels.json`。
+- 下一条命令：直接在 `loadGameCatalog` 内部打印 `definitions.length` 与 `definition.dir/stat` 的结果（`server/game-manifest.mjs` 的实际导出名要以文件为准，上一轮猜错了模块名）。

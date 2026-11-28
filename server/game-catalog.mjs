@@ -77,7 +77,8 @@ export async function loadGameCatalog({root, manifests=null, manifestsDir=null, 
     const isFlash=definition.runtime==='flash-ruffle';
     const isExternal=definition.runtime==='html5-external';
     const isLockstep=definition.runtime===LOCKSTEP_RUNTIME;
-    const isStaticGame=isFlash||isExternal||isLockstep||[ARENA_RUNTIME,BRAWL_RUNTIME].includes(definition.runtime);
+    const isStaticGame=isFlash||isExternal||isLockstep||
+      [ARENA_RUNTIME,BRAWL_RUNTIME,'shanyi-native'].includes(definition.runtime);
     const serveRoot=isStaticGame&&extraRoots[definition.id]
       ?path.resolve(extraRoots[definition.id])
       :path.resolve(root);

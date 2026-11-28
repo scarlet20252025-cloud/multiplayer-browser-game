@@ -17,7 +17,7 @@
   "package": {
     "dir": "shanyi-native",
     "entry": "index.html",
-    "levels": "level-1.json",
+    "levels": "levels.json",
     "templeId": "shanyi-native",
     "storagePrefix": "shanyi-native"
   },

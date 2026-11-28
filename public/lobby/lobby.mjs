@@ -268,9 +268,8 @@ function glortonRoomCard(item){
   const buttonLabel=returning?'返回房间':item.available?'加入':finished?'结算中':playing?'对局中':item.paused?'等待重连':full?'已满':'暂不可加入';
   return `<li class="catalog-room ${playing?'live':''}" style="--game-color:${styleFor(glortonGame.id).color}">
     <span class="room-thumbnail glorton-room-thumbnail">${coverImage(glortonGame.id)||icon('gamepad')}</span>
-    <div class="catalog-room-copy"><b>${esc(item.name)}</b>
-    <small>${status} · ${Number(item.connected)||0}/${capacity} 在线</small>
-    <small class="glorton-room-meta">${glortonGame.title}</small></div>
+    <div class="catalog-room-copy"><b><span class="room-game-tag">[${esc(glortonGame.title)}]</span>${esc(item.name)}</b>
+    <small>${status} · ${Number(item.connected)||0}/${capacity} 在线</small></div>
     <button type="button" data-action="join-glorton-room" data-key="${esc(item.key)}" ${item.available||returning?'':'disabled'}>${buttonLabel}</button>
   </li>`;
 }
@@ -1277,3 +1276,29 @@ window.addEventListener('pageshow',event=>{if(event.persisted&&matchNavigation)l
 })();
 window.addEventListener('online',()=>void refreshLobby(true));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshLobby();});
+
+// 背景视差：参数与部署包一致（背景 12/10 px、装饰 22/18 px），
+// 指针移动只在下一帧写一次自定义属性，减少布局抖动。
+{
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let frame = 0, lastX = 0, lastY = 0;
+  document.body.classList.toggle('tab-hidden', document.hidden);
+  document.addEventListener('visibilitychange', () => {
+    document.body.classList.toggle('tab-hidden', document.hidden);
+    if (document.hidden && frame) { cancelAnimationFrame(frame); frame = 0; }
+  });
+  window.addEventListener('pointermove', (event) => {
+    if (reduceMotion.matches || document.hidden || event.pointerType === 'touch') return;
+    lastX = event.clientX / innerWidth - .5;
+    lastY = event.clientY / innerHeight - .5;
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      const style = document.documentElement.style;
+      style.setProperty('--wall-x', `${lastX * 12}px`);
+      style.setProperty('--wall-y', `${lastY * 10}px`);
+      style.setProperty('--decor-x', `${lastX * 22}px`);
+      style.setProperty('--decor-y', `${lastY * 18}px`);
+    });
+  }, {passive: true});
+}
