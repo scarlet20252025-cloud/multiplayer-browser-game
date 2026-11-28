@@ -311,6 +311,7 @@ def main():
     parser.add_argument('--output')
     parser.add_argument('--depth', type=int, default=2)
     parser.add_argument('--svg')
+    parser.add_argument('--leaves', action='store_true')
     args = parser.parse_args()
     swf = parse_swf(args.swf)
     symbols, sprites, shapes = collect(swf)
@@ -326,7 +327,8 @@ def main():
 
     bounds_cache = {}
 
-    def annotate(entries, depth, path, seen):
+    def annotate(entries, depth, path, seen, acc=None):
+        acc = acc or {'x': 0.0, 'y': 0.0, 'sx': 1.0, 'sy': 1.0}
         for entry in entries:
             cid = entry.get('characterId')
             entry['targetName'] = symbols.get(cid) if cid else None
@@ -347,9 +349,26 @@ def main():
                 }
             elif box:
                 entry['boundsTwips'] = {k: round(v, 1) for k, v in box.items()}
+            # 祖先变换累计：容器只提供位移/缩放，旋转对地形可以先忽略。
+            box = entry.get('boundsTwips')
+            if box:
+                entry['worldTwips'] = {
+                    'xMin': round(acc['x'] + acc['sx'] * box['xMin'], 1),
+                    'xMax': round(acc['x'] + acc['sx'] * box['xMax'], 1),
+                    'yMin': round(acc['y'] + acc['sy'] * box['yMin'], 1),
+                    'yMax': round(acc['y'] + acc['sy'] * box['yMax'], 1),
+                }
             if cid in sprites and depth < args.depth and cid not in seen:
                 child = sprite_placements(sprites[cid]['body'])
-                annotate(child, depth + 1, f'{path}/{entry.get("name") or cid}', seen | {cid})
+                matrix = entry.get('matrix') or {}
+                child_acc = {
+                    'x': acc['x'] + acc['sx'] * matrix.get('x', 0),
+                    'y': acc['y'] + acc['sy'] * matrix.get('y', 0),
+                    'sx': acc['sx'] * (matrix.get('scaleX', 1) or 1),
+                    'sy': acc['sy'] * (matrix.get('scaleY', 1) or 1),
+                }
+                annotate(child, depth + 1, f'{path}/{entry.get("name") or cid}',
+                    seen | {cid}, child_acc)
                 entry['children'] = child
 
     annotate(placements, 0, args.level, {target_id})
@@ -379,7 +398,12 @@ def main():
         'symbols': {str(cid): name for cid, name in sorted(symbols.items())},
     }
     if args.svg:
-        boxes = [e['boundsTwips'] for e in flat if e.get('boundsTwips')]
+        source = [e for e in flat if e.get('worldTwips')]
+        if args.leaves:
+            # 只要叶子形状（容器不画），并默认丢掉背景层的美术。
+            source = [e for e in source if e.get('targetKind') == 'other'
+                      and 'BG2' not in (e.get('path') or '')]
+        boxes = [e['worldTwips'] for e in source]
         if boxes:
             x0 = min(b['xMin'] for b in boxes) / 20.0
             y0 = min(b['yMin'] for b in boxes) / 20.0
@@ -390,8 +414,8 @@ def main():
             parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0:.1f} {y0:.1f} '
                      f'{x1 - x0:.1f} {y1 - y0:.1f}" width="1200">',
                      f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{x1 - x0:.1f}" height="{y1 - y0:.1f}" fill="#0d1117"/>']
-            for e in flat:
-                b = e.get('boundsTwips')
+            for e in source:
+                b = e.get('worldTwips')
                 if not b:
                     continue
                 top = (e.get('path') or '').split('/')[1] if '/' in (e.get('path') or '') else ''
